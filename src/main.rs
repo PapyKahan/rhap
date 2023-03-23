@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::BufReader;
-use rodio::{Decoder, OutputStream, source::Source, cpal::traits::HostTrait, cpal::traits::DeviceTrait, OutputStreamHandle};
+use rodio::{Decoder, cpal::traits::HostTrait, cpal::traits::DeviceTrait};
 
 fn main() {
     let args = std::env::args().collect::<Vec<String>>();
