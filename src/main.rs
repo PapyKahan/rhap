@@ -88,30 +88,34 @@ fn main() {
         },
     }
 
-    let hosts = rodio::cpal::available_hosts();
-    for host in hosts {
-        let h = rodio::cpal::host_from_id(host).unwrap();
-        let devices = h.output_devices().unwrap();
-        for device in devices {
-            //if device.name().unwrap().contains("Qudelix-5K USB DAC") {
-            //    playback_device = device;
-            //    break;
-            //}
-            if device.name().unwrap().contains("Cayin RU6") {
-                playback_device = device;
-                break;
-            }
-            //if device.name().unwrap().contains("Realtek High Definition Audio(SST)") {
-            //    playback_device = device;
-            //    break;
-            //}
-        }
-    }
+    println!("list devices");
+    playback_device = rodio::cpal::default_host().default_output_device().unwrap();
+    //let hosts = rodio::cpal::available_hosts();
+    //for host in hosts {
+    //    let h = rodio::cpal::host_from_id(host).unwrap();
+    //    let devices = h.output_devices().unwrap();
+    //    for device in devices {
+    //        if device.name().unwrap().contains("Qudelix-5K USB DAC") {
+    //            playback_device = device;
+    //            break;
+    //        }
+    //        //if device.name().unwrap().contains("Cayin RU6") {
+    //        //    playback_device = device;
+    //        //    break;
+    //        //}
+    //        //if device.name().unwrap().contains("Realtek High Definition Audio(SST)") {
+    //        //    playback_device = device;
+    //        //    break;
+    //        //}
+    //    }
+    //}
 
     // Configure output stream
-    let config = rodio::cpal::SupportedStreamConfig::new(2, rodio::cpal::SampleRate(44100), rodio::cpal::SupportedBufferSize::Range{ min: 192000, max: 192000 }, rodio::cpal::SampleFormat::I32);
+    print!("Configuring output stream...");
+    let config = rodio::cpal::SupportedStreamConfig::new(2, rodio::cpal::SampleRate(44100), rodio::cpal::SupportedBufferSize::Range{ min: 192000, max: 192000 }, rodio::cpal::SampleFormat::I16);
 
     // Get a output stream handle to the selected physical sound device
+    println!("Using device: {}", playback_device.name().unwrap());
     let (_stream, stream_handle) = rodio::OutputStream::try_from_device_config(&playback_device, config).unwrap();
 
     // Load a sound from a file, using a path relative to Cargo.toml
