@@ -1,77 +1,20 @@
 use std::fs::File;
 use std::io::BufReader;
-use rodio::{Decoder, cpal::traits::HostTrait, cpal::traits::DeviceTrait};
-use rodio::cpal;
+use std::ffi::OsStr;
+use std::os::windows::ffi::OsStrExt;
+use windows::Win32::Foundation::*;
+use windows::Win32::Media::Audio::*;
+use windows::win32::windows_media_devices::{AUDIO_CLIENT_SHAREMODE_EXCLUSIVE, AUDCLNT_STREAMFLAGS_EVENTCALLBACK};
+use windows::win32::direct3d11::D3D_DRIVER_TYPE_NULL;
+use windows::win32::direct3d9::D3D_SDK_VERSION;
+use windows::win32::mmdeviceapi::{eRender, CLSCTX_ALL};
+use windows::win32::com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
+use windows::win32::winrt::RoInitialize;
 
 fn enumerate_devices() {
-    println!("Supported hosts:\n  {:?}", cpal::ALL_HOSTS);
-    let available_hosts = cpal::available_hosts();
-    println!("Available hosts:\n  {:?}", available_hosts);
-
-    for host_id in available_hosts {
-        println!("{}", host_id.name());
-        let host = cpal::host_from_id(host_id).unwrap();
-
-        let default_in = host.default_input_device().map(|e| e.name().unwrap());
-        let default_out = host.default_output_device().map(|e| e.name().unwrap());
-        println!("  Default Input Device:\n    {:?}", default_in);
-        println!("  Default Output Device:\n    {:?}", default_out);
-
-        let devices = host.devices().unwrap();
-        println!("  Devices: ");
-        for (device_index, device) in devices.enumerate() {
-            println!("  {}. \"{}\"", device_index + 1, device.name().unwrap());
-
-            // Input configs
-            if let Ok(conf) = device.default_input_config() {
-                println!("    Default input stream config:\n      {:?}", conf);
-            }
-            let input_configs = match device.supported_input_configs() {
-                Ok(f) => f.collect(),
-                Err(e) => {
-                    println!("    Error getting supported input configs: {:?}", e);
-                    Vec::new()
-                }
-            };
-            if !input_configs.is_empty() {
-                println!("    All supported input stream configs:");
-                for (config_index, config) in input_configs.into_iter().enumerate() {
-                    println!(
-                        "      {}.{}. {:?}",
-                        device_index + 1,
-                        config_index + 1,
-                        config
-                    );
-                }
-            }
-
-            // Output configs
-            if let Ok(conf) = device.default_output_config() {
-                println!("    Default output stream config:\n      {:?}", conf);
-            }
-            let output_configs = match device.supported_output_configs() {
-                Ok(f) => f.collect(),
-                Err(e) => {
-                    println!("    Error getting supported output configs: {:?}", e);
-                    Vec::new()
-                }
-            };
-            if !output_configs.is_empty() {
-                println!("    All supported output stream configs:");
-                for (config_index, config) in output_configs.into_iter().enumerate() {
-                    println!(
-                        "      {}.{}. {:?}",
-                        device_index + 1,
-                        config_index + 1,
-                        config
-                    );
-                }
-            }
-        }
-    }
 }
 
-fn main() {
+fn main() -> windows::Result<()> {
     let args = std::env::args().collect::<Vec<String>>();
 
     let file_path = match args.len() {
@@ -87,35 +30,6 @@ fn main() {
         return;
     }
 
-    let playback_device = match rodio::cpal::default_host().default_output_device() {
-        Some(device) => device,
-        None => {
-            println!("No playback device found");
-            return;
-        }
-    };
-    println!("Using device: {}", playback_device.name().unwrap());
-
-    // Configure output stream
-    let config = rodio::cpal::SupportedStreamConfig::new(
-        2, 
-        rodio::cpal::SampleRate(44100), 
-        rodio::cpal::SupportedBufferSize::Range {
-            min: 44100, 
-            max: 44100
-        }, 
-        rodio::cpal::SampleFormat::I16
-    );
-
-    // Get a output stream handle to the selected physical sound device
-    let (_stream, stream_handle) = match rodio::OutputStream::try_from_device_config(&playback_device, config) {
-        Ok((stream, stream_handle)) => (stream, stream_handle),
-        Err(err) => {
-            println!("Error opening output stream: {}", err);
-            return;
-        },
-    };
-
     let file = match File::open(file_path) {
         Ok(file) => file,
         Err(err) => {
@@ -126,27 +40,57 @@ fn main() {
 
     // Load a sound from a file, using a path relative to Cargo.toml
     let buffer = BufReader::new(file);
+    unsafe {
+        // Initialise les sous-systèmes COM et WinRT.
+        CoInitializeEx(std::ptr::null_mut(), COINIT_APARTMENTTHREADED)?;
+        RoInitialize(0)?;
 
-    // Decode that sound file into a source
-    let source = match Decoder::new(buffer) {
-        Ok(decoder) => decoder,
-        Err(e) => {
-            println!("Error: {}", e);
-            return;
-        }
-    };
+        // Ouvre le fichier FLAC.
+        let filename = "C:/Chemin/vers/le/fichier.flac";
+        let file_handle = windows::file_system::File::open(filename)?;
 
-    // Play the sound directly on the device
-    let sink = match rodio::Sink::try_new(&stream_handle) {
-        Ok(sink) => sink,
-        Err(e) => {
-            println!("Error: {}", e);
-            return;
+        // Crée un périphérique audio WASAPI exclusif.
+        let device = windows::media::audio::AudioDevice::get_default_audio_endpoint(eRender, windows::media::AUDIO_DEVICE_ROLE::Multimedia)?;
+        let client = device.activate_audio_client()?;
+        let format = client.get_mix_format()?;
+        let mut wave_format = format.clone().into();
+        wave_format.wFormatTag = windows::win32::mmreg::WAVE_FORMAT_EXTENSIBLE as u16;
+        wave_format.SubFormat = windows::win32::ksmedia::KSDATAFORMAT_SUBTYPE_PCM;
+        wave_format.Format.wBitsPerSample = 16;
+        wave_format.Format.nBlockAlign = wave_format.Format.nChannels * wave_format.Format.wBitsPerSample / 8;
+        wave_format.Format.nAvgBytesPerSec = wave_format.Format.nSamplesPerSec * wave_format.Format.nBlockAlign;
+        let event_handle = windows::synch::Event::create(None, true, false, None)?;
+        client.initialize(AUDIO_CLIENT_SHAREMODE_EXCLUSIVE, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, 0, 0, &wave_format.Format, std::ptr::null())?;
+        client.set_event_handle(event_handle.handle)?;
+
+        // Lit le fichier FLAC et écrit les échantillons dans le périphérique audio.
+        let flac_reader = claxon::FlacReader::new(file_handle)?;
+        let sample_rate = flac_reader.streaminfo().sample_rate as u32;
+        let channels = flac_reader.streaminfo().channels as u16;
+        let buffer_size = client.get_buffer_size()?;
+        let buffer_frame_count = buffer_size / wave_format.Format.nBlockAlign as u32;
+        let mut buffer = Vec::with_capacity(buffer_size as usize);
+        for frame in flac_reader.stream_blocks() {
+            let pcm = frame.into_pcm().unwrap();
+            for sample in pcm {
+                for channel in sample {
+                    buffer.extend_from_slice(&channel.to_le_bytes());
+                }
+                if buffer.len() >= buffer_size as usize {
+                    client.write(buffer.as_slice(), buffer_frame_count, None)?;
+                    buffer.clear();
+                }
+            }
         }
-    };
-    sink.append(source);
-    
-    // The sound plays in a separate audio thread,
-    // so we need to keep the main thread alive while it's playing.
-    sink.sleep_until_end();
-}
+        if !buffer.is_empty() {
+            client.write(buffer.as_slice(), buffer_frame_count, None)?;
+        }
+
+        // Nettoie les ressources.
+        drop(flac_reader);
+        drop(file_handle);
+        drop(client);
+        drop(device);
+        drop(event_handle);
+
+        // Libère les sous-syst
