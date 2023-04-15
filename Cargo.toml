@@ -10,6 +10,9 @@ version = "0.48.0"
 features = [
     "Win32_Foundation",
     "Win32_Security",
+    "Win32_System_Com",
     "Win32_System_Threading",
-    "Win32_Media_Audio"
+    "Win32_Media_Audio",
+    "Devices_Enumeration",
+    "Media_Audio",
 ]
