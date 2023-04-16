@@ -3,6 +3,10 @@ name = "rhap"
 version = "0.1.0"
 edition = "2021"
 
+[dependencies]
+claxon = "0.4.3"
+symphonia = "0.5.2"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies.windows]
@@ -15,4 +19,8 @@ features = [
     "Win32_Media_Audio",
     "Devices_Enumeration",
     "Media_Audio",
+    "Win32_UI_Shell_PropertiesSystem",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_Devices_FunctionDiscovery",
+    "Win32_Media_KernelStreaming",
 ]
