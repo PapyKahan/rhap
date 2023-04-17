@@ -1,7 +1,5 @@
-use std::fs::File;
-//use std::io::BufReader;
-//use windows::Win32::Foundation::*;
 use claxon::{Block, FlacReader};
+use windows::core::{PCWSTR, PWSTR};
 use std::slice;
 use std::ffi::OsString;
 use std::os::windows::ffi::OsStringExt;
@@ -13,9 +11,15 @@ use windows::Win32::Devices::FunctionDiscovery::*;
 use windows::Win32::Media::Audio::*;
 
 struct Device {
-    inner_device : IMMDevice,
-    id: u32,
+    inner_device_id : PWSTR,
+    index: u32,
     name: String,
+}
+
+impl Device {
+    pub fn new(inner_device_id: PWSTR, index: u32, name : String) -> Device {
+        Self { inner_device_id, index, name }
+    }
 }
 
 fn enumerate_devices() -> Result<Vec<Device>, String> {
@@ -52,6 +56,7 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
                 },
             };
 
+            println!("Open property store: {:?}", device);
             let property_store : IPropertyStore = device.OpenPropertyStore(STGM_READ).unwrap();
             let mut name_property_value = property_store.GetValue(&PKEY_Device_FriendlyName).unwrap();
 
@@ -84,21 +89,15 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
             // Clean up the property.
             PropVariantClear(&mut name_property_value).ok();
 
-            //let id = match device.GetId() {
-            //    Ok(id) => { id },
-            //    Err(err) => {
-            //        println!("Error getting device id: {}", err);
-            //        return Err("Error getting device id".to_string());
-            //    },
-            //};
-
-            //println!("Device ID: {} : {}", id.to_string().unwrap(), name_string);
-            let enumerated_device = Device {
-                inner_device: device,
-                id: i,
-                name: name_string,
+            let id : PWSTR = match device.GetId() {
+                Ok(id) => { id },
+                Err(err) => {
+                    println!("Error getting device id: {}", err);
+                    return Err("Error getting device id".to_string());
+                },
             };
-            enumerated_devices.push(enumerated_device);
+
+            enumerated_devices.push(Device::new(id, i, name_string));
         }
 
         Ok(enumerated_devices)
@@ -114,7 +113,7 @@ fn main() -> Result<(), ()> {
             println!("Usage: rhap <file>");
             let devices = enumerate_devices().unwrap();
             for dev in devices {
-                println!("Device: id={}, name={}", dev.id, dev.name);
+                println!("Device: id={}, name={}", dev.index, dev.name);
             }
             return Ok(());
         },
@@ -122,11 +121,11 @@ fn main() -> Result<(), ()> {
 
     let mut device : *const Device = std::ptr::null();
     let devices = enumerate_devices().unwrap();
-    let selected_device_id = 1;
+    let selected_device_id = 0;
 
     for dev in devices {
-        if dev.id == selected_device_id {
-            println!("Selected device: id={}, name={}", dev.id, dev.name);
+        if dev.index == selected_device_id {
+            println!("Selected device: id={}, name={}", dev.index, dev.name);
             device = &dev;
         }
     }
@@ -153,17 +152,43 @@ fn main() -> Result<(), ()> {
     
     // Lit le fichier FLAC et écrit les échantillons dans le périphérique audio.
     let mut flac_reader = FlacReader::open(&file_path).expect("Failed to open FLAC file");
+    println!("File opened successfully {}", file_path);
 
     unsafe {
-        // Crée un périphérique audio WASAPI exclusif.
+        let _ = CoInitialize(None);
+        let enumerator : IMMDeviceEnumerator = match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+            Ok(device_enumerator) => { device_enumerator },
+            Err(err) => {
+                println!("Error getting device enumerator: {}", err);
+                return Err(());
+            },
+        };
 
-        let client = (*device).inner_device.Activate::<IAudioClient>(
+        let d = match enumerator.GetDevice(PCWSTR((*device).inner_device_id.as_ptr())) {
+            Ok(device) => { device },
+            Err(err) => {
+                println!("Error getting device: {}", err);
+                return Err(());
+            },
+        };
+
+        println!("device: {:?}", device);
+        // Crée un périphérique audio WASAPI exclusif.
+        let client = match d.Activate::<IAudioClient>(
             CLSCTX_ALL,
             None,
-        ).unwrap();
+        ) {
+            Ok(client) => client,
+            Err(err) => {
+                println!("Error activating device: {}", err);
+                return Err(());
+            },
+        };
 
+        println!("Device activated successfully");
 
         let format = client.GetMixFormat().unwrap();
+        println!("Format: {:?}", format);
 
         let wave_format : *mut WAVEFORMATEXTENSIBLE = format.clone() as *mut WAVEFORMATEXTENSIBLE;
         (*wave_format).Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE as u16;
@@ -177,26 +202,28 @@ fn main() -> Result<(), ()> {
         (*wave_format).Format.nAvgBytesPerSec = (*wave_format).Format.nSamplesPerSec * (*wave_format).Format.nBlockAlign as u32;
 
         //let event_handle = windows::synch::Event::create(None, true, false, None)?;
-        let sharmode = AUDCLNT_SHAREMODE_EXCLUSIVE;
+        let sharemode = AUDCLNT_SHAREMODE_EXCLUSIVE;
         let flags = AUDCLNT_STREAMFLAGS_NOPERSIST | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM;
+        println!("Initializing client");
+        let buffer_duration = 12 as i64 * (1_000_000_000 / 100) / (*wave_format).Format.nSamplesPerSec as i64;
         let result = client.Initialize(
-            sharmode,
-            flags,
+            sharemode,
             0,
+            buffer_duration,
             0,
-            &(*wave_format).Format,
+            wave_format as *mut WAVEFORMATEX,
             None
         );
 
         if result.is_err() {
-            println!("Error: {:?}", result);
+            println!("Error initializing client : {:?}", result);
             return Err(());
         }
 
         //client.set_event_handle(event_handle.handle)?;
         let result = client.Start();
         if result.is_err() {
-            println!("Error: {:?}", result);
+            println!("Error starting client : {:?}", result);
             return Err(());
         }
 
@@ -206,9 +233,7 @@ fn main() -> Result<(), ()> {
         let mut frame_reader = flac_reader.blocks();
         let mut block = Block::empty();
         loop {
-            let frame = block.into_buffer().clone();
-            let frame_len = frame.len();
-            match frame_reader.read_next_or_eof(frame) {
+            match frame_reader.read_next_or_eof(block.into_buffer()) {
                 Ok(Some(next_block)) => block = next_block,
                 Ok(None) => break, // EOF.
                 Err(error) => panic!("{}", error),
@@ -218,20 +243,19 @@ fn main() -> Result<(), ()> {
             let frames_available = buffer_frame_count - padding;
 
             let client_renderer = client.GetService::<IAudioRenderClient>().unwrap();
-            let client_buffer = client_renderer.GetBuffer(frames_available).unwrap();
-            let data = client_buffer as *mut ();
-
-            //let frame : Vec<i32> = block.into_buffer();
-            if frames_available >= frame.len() as u32 {
-                let len = frames_available as usize * (*wave_format).Format.wBitsPerSample as usize / flac_reader.streaminfo().sample_rate as usize;
-                std::slice::from_raw_parts(data as *const u8, len);
+            let client_buffer = client_renderer.GetBuffer(frames_available).unwrap() as *mut ();
+            if frames_available >= block.len() as u32 {
+                let len = frames_available as usize * (*wave_format).Format.wBitsPerSample as usize / (*wave_format).Format.nSamplesPerSec as usize;
+                let _ = std::slice::from_raw_parts(client_buffer as *const u8, len);
+                client_renderer.ReleaseBuffer(len as u32, 0).unwrap();
             } else {
                 let frames_to_write = frames_available as usize;
-                let frames_to_keep = frame.len() - frames_to_write;
+                let frames_to_keep = block.len() as usize - frames_to_write;
 
-                let len = frames_to_keep as usize * (*wave_format).Format.wBitsPerSample as usize / flac_reader.streaminfo().sample_rate as usize;
-                std::slice::from_raw_parts(data as *const u8, len);
-                // TODO : keep the rest of the frame
+                let len = frames_to_keep as usize * (*wave_format).Format.wBitsPerSample as usize / (*wave_format).Format.nSamplesPerSec as usize;
+                let _ = std::slice::from_raw_parts(client_buffer as *const u8, len);
+                client_renderer.ReleaseBuffer(len as u32, 0).unwrap()
+                // TODO: keep the rest of the frame
             }
         }
     } 
