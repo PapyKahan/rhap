@@ -3,6 +3,8 @@
 // reference : Exclusive mode streaming : https://learn.microsoft.com/en-us/windows/win32/coreaudio/exclusive-mode-streams
 //
 use claxon::{Block, FlacReader};
+use windows::Win32::Foundation::*;
+use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use std::ffi::OsString;
 use std::mem::size_of;
 use std::os::windows::ffi::OsStringExt;
@@ -199,63 +201,139 @@ fn main() -> Result<(), ()> {
             }
         };
 
-        let format = client.GetMixFormat().unwrap();
+        let wave_format = client.GetMixFormat().unwrap();
+        (*wave_format).wFormatTag = WAVE_FORMAT_PCM as u16;
+        //(*wave_format).wFormatTag = WAVE_FORMAT_EXTENSIBLE as u16;
+        (*wave_format).nChannels = flac_reader.streaminfo().channels as u16;
+        (*wave_format).nSamplesPerSec = flac_reader.streaminfo().sample_rate as u32;
+        (*wave_format).wBitsPerSample = flac_reader.streaminfo().bits_per_sample as u16;
+        (*wave_format).nBlockAlign = (*wave_format).nChannels * (*wave_format).wBitsPerSample / 8;
+        (*wave_format).nAvgBytesPerSec = (*wave_format).nSamplesPerSec * (*wave_format).nBlockAlign as u32;
+        (*wave_format).cbSize = size_of::<WAVEFORMATEX>() as u16;
 
-        let wave_format: *mut WAVEFORMATEXTENSIBLE = format.clone() as *mut WAVEFORMATEXTENSIBLE;
-        (*wave_format).Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE as u16;
-        (*wave_format).Format.nChannels = flac_reader.streaminfo().channels as u16;
-        (*wave_format).Format.nSamplesPerSec = flac_reader.streaminfo().sample_rate as u32;
-        (*wave_format).Format.wBitsPerSample = flac_reader.streaminfo().bits_per_sample as u16;
-        (*wave_format).Format.nBlockAlign =
-            (*wave_format).Format.nChannels * (*wave_format).Format.wBitsPerSample / 8;
-        (*wave_format).Format.nAvgBytesPerSec =
-            (*wave_format).Format.nSamplesPerSec * (*wave_format).Format.nBlockAlign as u32;
-        (*wave_format).Format.cbSize =
-            size_of::<WAVEFORMATEXTENSIBLE>() as u16 - size_of::<WAVEFORMATEX>() as u16;
+        //let wave_format: *mut WAVEFORMATEXTENSIBLE = format.clone() as *mut WAVEFORMATEXTENSIBLE;
+        //(*wave_format).Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE as u16;
+        //(*wave_format).Format.nChannels = flac_reader.streaminfo().channels as u16;
+        //(*wave_format).Format.nSamplesPerSec = flac_reader.streaminfo().sample_rate as u32;
+        //(*wave_format).Format.wBitsPerSample = flac_reader.streaminfo().bits_per_sample as u16;
+        //(*wave_format).Format.nBlockAlign = (*wave_format).Format.nChannels * (*wave_format).Format.wBitsPerSample / 8;
+        //(*wave_format).Format.nAvgBytesPerSec = (*wave_format).Format.nSamplesPerSec * (*wave_format).Format.nBlockAlign as u32;
+        //(*wave_format).Format.cbSize = size_of::<WAVEFORMATEXTENSIBLE>() as u16 - size_of::<WAVEFORMATEX>() as u16;
+        //(*wave_format).Samples.wValidBitsPerSample = (*wave_format).Format.wBitsPerSample;
+        //(*wave_format).SubFormat = KSDATAFORMAT_SUBTYPE_PCM;
+        //(*wave_format).dwChannelMask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
 
-        (*wave_format).Samples.wValidBitsPerSample = (*wave_format).Format.wBitsPerSample;
-        (*wave_format).SubFormat = KSDATAFORMAT_SUBTYPE_PCM;
-        (*wave_format).dwChannelMask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
+        // Création des pointeurs pour les paramètres
+        let mut default_device_period: i64 = 0;
+        let mut minimum_device_period: i64 = 0;
 
-        //let defaut_device_period : ::core::option::Option<*mut i64> = None;
-        //let max_device_period : ::core::option::Option<*mut i64> = None;
-        //let _ = client.GetDevicePeriod(defaut_device_period, max_device_period).unwrap();
+        match client.GetDevicePeriod(Some(&mut default_device_period as *mut i64), Some(&mut minimum_device_period as *mut i64)) {
+            Ok(_) => (),
+            Err(err) => {
+                println!("Error getting device period: {}", err);
+                return Err(());
+            }
+        };
 
-        //let event_handle = windows::synch::Event::create(None, true, false, None)?;
-        let sharemode = AUDCLNT_SHAREMODE_EXCLUSIVE;
-        //let flags = AUDCLNT_STREAMFLAGS_NOPERSIST | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM;
-        let flags = AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM;
-        let buffer_duration = REFTIMES_PER_SEC;
+        //let flags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
+        let flags = 0;
+
         let result = client.Initialize(
-            sharemode,
-            0,
-            0,
-            0,
-            wave_format as *mut WAVEFORMATEX,
+            AUDCLNT_SHAREMODE_EXCLUSIVE,
+            flags,
+            minimum_device_period,
+            minimum_device_period,
+            wave_format,
             None,
         );
 
-        if result.is_err() {
-            println!("Error initializing client : {:?}", result);
-            return Err(());
+        if result.is_err() && result.err().unwrap().code() == AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED {
+            println!("Buffer size not aligned");
+            let buffer_size = match client.GetBufferSize() {
+                Ok(buffer_size) => buffer_size as i64,
+                Err(err) => {
+                    println!("Initialize: Error getting buffer size: {}", err);
+                    return Err(());
+                }
+            };
+            let minimum_device_period  = REFTIMES_PER_SEC / (*wave_format).nSamplesPerSec as i64 * buffer_size;
+            match client.Initialize(
+                AUDCLNT_SHAREMODE_EXCLUSIVE,
+                flags,
+                minimum_device_period,
+                minimum_device_period,
+                wave_format,
+                None,
+            ) {
+                Ok(_) => (),
+                Err(err) => {
+                    println!("Error initializing client: {}", err);
+                    return Err(());
+                }
+            }
         }
 
-        //client.set_event_handle(event_handle.handle)?;
-        let result = client.Start();
-        if result.is_err() {
-            println!("Error starting client : {:?}", result);
-            return Err(());
-        }
+        //let eventhandle = match CreateEventW(
+        //    None,
+        //    FALSE,
+        //    FALSE,
+        //    PCWSTR::null(),
+        //) {
+        //    Ok(eventhandle) => eventhandle,
+        //    Err(err) => {
+        //        println!("Error creating event handle: {}", err);
+        //        return Err(());
+        //    }
+        //};
 
-        let buffer_size = client.GetBufferSize().unwrap() as u32;
-        let buffer_frame_count = buffer_size / (*wave_format).Format.nBlockAlign as u32;
+        //match client.SetEventHandle(eventhandle) {
+        //    Ok(_) => (),
+        //    Err(err) => {
+        //        println!("Error setting event handle: {}", err);
+        //        return Err(());
+        //    }
+        //}
+
+        let buffer_size = match client.GetBufferSize() {
+            Ok(buffer_size) => buffer_size,
+            Err(err) => {
+                println!("Size: Error getting buffer size: {}", err);
+                return Err(());
+            }
+        };
+
+        let client_renderer = match client.GetService::<IAudioRenderClient>() {
+            Ok(client_renderer) => client_renderer,
+            Err(err) => {
+                println!("Error getting client renderer: {}", err);
+                return Err(());
+            }
+        };
+
+        match client.Start() {
+            Ok(_) => (),
+            Err(err) => {
+                println!("Error starting client: {}", err);
+                return Err(());
+            }
+        }
 
         let mut frame_reader = flac_reader.blocks();
         let mut block = Block::empty();
 
-        let client_renderer = client.GetService::<IAudioRenderClient>().unwrap();
-
         loop {
+            //match WaitForSingleObject(eventhandle, 2000) {
+            //    WAIT_OBJECT_0 => (),
+            //    WAIT_TIMEOUT => {
+            //        println!("Timeout");
+            //        break;
+            //    },
+            //    WAIT_FAILED => {
+            //        println!("Wait failed");
+            //        break;
+            //    },
+            //    _ => (),
+            //}
             match frame_reader.read_next_or_eof(block.into_buffer()) {
                 Ok(Some(next_block)) => {
                     block = next_block;
@@ -264,42 +342,42 @@ fn main() -> Result<(), ()> {
                 Err(error) => panic!("{}", error),
             };
 
+            let mut index = 0;
+            let client_buffer = client_renderer.GetBuffer(buffer_size).unwrap() as *mut ();
+            let client_buffer_len = buffer_size as usize * (*wave_format).wBitsPerSample as usize;
+            let data = std::slice::from_raw_parts_mut(client_buffer as *mut u8, client_buffer_len);
+            let mut frames_writen = 0;
 
+            for i in 0..buffer_size as usize {
+                let left_channel_sample = block.sample(0, index);
+                let left_channel_sample = left_channel_sample.to_le_bytes();
+                let right_channel_sample = block.sample(1, index);
+                let right_channel_sample = right_channel_sample.to_le_bytes();
 
-            loop {
-                let mut index = 0;
-
-                let padding = client.GetCurrentPadding().unwrap();
-                let frames_available = buffer_frame_count - padding;
-                let client_buffer = client_renderer.GetBuffer(frames_available).unwrap() as *mut ();
-
-                let client_buffer_len = frames_available as usize * (*wave_format).Format.wBitsPerSample as usize;
-                let data = std::slice::from_raw_parts_mut(client_buffer as *mut u8, client_buffer_len);
-                let mut frames_writen = 0;
-
-                for mut i in 0..frames_available as usize {
-                    let left_channel_sample = block.sample(0, index);
-                    let left_channel_sample = left_channel_sample.to_le_bytes();
-                    let right_channel_sample = block.sample(1, index);
-                    let right_channel_sample = right_channel_sample.to_le_bytes();
-
-                    for j in 0..left_channel_sample.len() {
-                        data[i] = left_channel_sample[j];
-                        i += 1;
-                        data[i] = right_channel_sample[j];
-                    }
-                    frames_writen += 1;
-                    index += 1;
-                    if index > block.len() {
-                        break;
-                    }
+                for j in 0..left_channel_sample.len() {
+                    data[i * (*wave_format).nBlockAlign as usize + 0 as usize] = left_channel_sample[j];
+                    data[i * (*wave_format).nBlockAlign as usize + 2 as usize] = right_channel_sample[j];
                 }
-
-                client_renderer.ReleaseBuffer(frames_writen, 0).unwrap();
-
+                frames_writen += 1;
+                index += 1;
                 if index > block.len() {
                     break;
                 }
+            }
+
+            println!("frames writen: {}", frames_writen);
+            client_renderer.ReleaseBuffer(frames_writen, 0).unwrap();
+
+            if index > block.len() {
+                break;
+            }
+        }
+
+        match client.Stop() {
+            Ok(_) => (),
+            Err(err) => {
+                println!("Error stopping client: {}", err);
+                return Err(());
             }
         }
         println!("Done playing");
