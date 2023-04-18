@@ -249,12 +249,15 @@ fn main() -> Result<(), ()> {
             let client_renderer = client.GetService::<IAudioRenderClient>().unwrap();
             let client_buffer = client_renderer.GetBuffer(frames_available).unwrap() as *mut ();
             if frames_available >= block.len() as u32 {
+                println!("Writing {} frames", block.len());
                 let len = frames_available as usize * (*wave_format).Format.wBitsPerSample as usize / (*wave_format).Format.nSamplesPerSec as usize;
                 let _ = std::slice::from_raw_parts(client_buffer as *const u8, len);
                 client_renderer.ReleaseBuffer(len as u32, 0).unwrap();
             } else {
                 let frames_to_write = frames_available as usize;
                 let frames_to_keep = block.len() as usize - frames_to_write;
+                println!("Writing {} frames", block.len());
+                println!("Writing {} frames to keep", frames_to_keep);
 
                 let len = frames_to_keep as usize * (*wave_format).Format.wBitsPerSample as usize / (*wave_format).Format.nSamplesPerSec as usize;
                 let _ = std::slice::from_raw_parts(client_buffer as *const u8, len);
