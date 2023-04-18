@@ -1,9 +1,10 @@
 use claxon::{Block, FlacReader};
 use windows::core::{PCWSTR, PWSTR};
+use std::mem::size_of;
 use std::slice;
 use std::ffi::OsString;
 use std::os::windows::ffi::OsStringExt;
-use windows::Win32::Media::KernelStreaming::{WAVE_FORMAT_EXTENSIBLE, KSDATAFORMAT_SUBTYPE_PCM};
+use windows::Win32::Media::KernelStreaming::{WAVE_FORMAT_EXTENSIBLE, KSDATAFORMAT_SUBTYPE_PCM, SPEAKER_FRONT_LEFT, SPEAKER_FRONT_RIGHT};
 use windows::Win32::System::Com::{CoInitialize, CoCreateInstance, CLSCTX_ALL, STGM_READ, VT_LPWSTR};
 use windows::Win32::System::Com::StructuredStorage::PropVariantClear;
 use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
@@ -192,14 +193,16 @@ fn main() -> Result<(), ()> {
 
         let wave_format : *mut WAVEFORMATEXTENSIBLE = format.clone() as *mut WAVEFORMATEXTENSIBLE;
         (*wave_format).Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE as u16;
-        (*wave_format).SubFormat = KSDATAFORMAT_SUBTYPE_PCM;
-
-        (*wave_format).Format.wBitsPerSample = flac_reader.streaminfo().bits_per_sample as u16;
         (*wave_format).Format.nChannels = flac_reader.streaminfo().channels as u16;
         (*wave_format).Format.nSamplesPerSec = flac_reader.streaminfo().sample_rate as u32;
-
+        (*wave_format).Format.wBitsPerSample = flac_reader.streaminfo().bits_per_sample as u16;
         (*wave_format).Format.nBlockAlign = (*wave_format).Format.nChannels * (*wave_format).Format.wBitsPerSample / 8;
         (*wave_format).Format.nAvgBytesPerSec = (*wave_format).Format.nSamplesPerSec * (*wave_format).Format.nBlockAlign as u32;
+        (*wave_format).Format.cbSize = size_of::<WAVEFORMATEXTENSIBLE>() as u16 - size_of::<WAVEFORMATEX>() as u16;
+
+        (*wave_format).Samples.wValidBitsPerSample = (*wave_format).Format.wBitsPerSample;
+        (*wave_format).SubFormat = KSDATAFORMAT_SUBTYPE_PCM;
+        (*wave_format).dwChannelMask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
 
         //let event_handle = windows::synch::Event::create(None, true, false, None)?;
         let sharemode = AUDCLNT_SHAREMODE_EXCLUSIVE;
@@ -232,6 +235,7 @@ fn main() -> Result<(), ()> {
 
         let mut frame_reader = flac_reader.blocks();
         let mut block = Block::empty();
+        println!("Starting loop");
         loop {
             match frame_reader.read_next_or_eof(block.into_buffer()) {
                 Ok(Some(next_block)) => block = next_block,
@@ -258,6 +262,7 @@ fn main() -> Result<(), ()> {
                 // TODO: keep the rest of the frame
             }
         }
+        println!("Done playing");
     } 
     return Ok(());
 }
