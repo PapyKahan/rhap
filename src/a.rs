@@ -7,6 +7,7 @@ use claxon::{Block, FlacReader};
 use windows::Win32::Foundation::*;
 use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject, CreateEventA};
 use std::ffi::OsString;
+use std::mem::size_of;
 use std::os::windows::ffi::OsStringExt;
 use std::slice;
 use windows::core::{PCWSTR, PWSTR, HRESULT};
@@ -237,7 +238,8 @@ fn main() -> Result<(), ()> {
                 println!("Error initializing COM: {} - {}", host_error(err.code()), err);
                 return Err(());
             }
-        }
+        };
+
         let enumerator: IMMDeviceEnumerator =
             match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
                 Ok(device_enumerator) => device_enumerator,
@@ -281,19 +283,13 @@ fn main() -> Result<(), ()> {
 
         // WAVEFORMATEX documentation: https://learn.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatex
         (*wave_format).wFormatTag = formattag as u16;
+        //(*wave_format).wFormatTag = WAVE_FORMAT_EXTENSIBLE as u16;
         (*wave_format).nChannels = channels as u16;
         (*wave_format).nSamplesPerSec = sample_rate;
         (*wave_format).wBitsPerSample = bits_per_sample as u16;
         (*wave_format).nBlockAlign = block_align as u16;
         (*wave_format).nAvgBytesPerSec = bytes_per_second;
         (*wave_format).cbSize = 0;
-
-        println!("nChannels: {}", channels);
-        println!("nSamplesPerSec: {}", sample_rate);
-        println!("wBitsPerSample: {}", bits_per_sample);
-        println!("nBlockAlign: {}", block_align);
-        println!("nAvgBytesPerSec: {}", bytes_per_second);
-
 
         // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
         //let wave_format: *mut WAVEFORMATEXTENSIBLE = format.clone() as *mut WAVEFORMATEXTENSIBLE;
@@ -351,11 +347,7 @@ fn main() -> Result<(), ()> {
                     return Err(());
                 }
             };
-            let buffer_size = buffer_size * block_align;
-            let minimum_device_period  = REFTIMES_PER_SEC as u32 / sample_rate * buffer_size;
-
-            println!("Minimum device period: REFTIMES_PER_SEC ({}) / nSamplesPerSec ({}) * buffer_size ({}) = {}", REFTIMES_PER_SEC, flac_reader.streaminfo().sample_rate, buffer_size, minimum_device_period);
-
+            let minimum_device_period  = REFTIMES_PER_SEC / (*wave_format).nSamplesPerSec as i64 * buffer_size;
             match client.Initialize(
                 sharemode,
                 streamflags,
@@ -401,7 +393,6 @@ fn main() -> Result<(), ()> {
             }
         };
 
-
         let client_renderer = match client.GetService::<IAudioRenderClient>() {
             Ok(client_renderer) => client_renderer,
             Err(err) => {
@@ -409,7 +400,6 @@ fn main() -> Result<(), ()> {
                 return Err(());
             }
         };
-
 
         match client.Start() {
             Ok(_) => (),
@@ -445,15 +435,13 @@ fn main() -> Result<(), ()> {
             };
 
             let mut index = 0;
-
             let client_buffer = match client_renderer.GetBuffer(buffer_size) {
-                Ok(client_buffer) => client_buffer,
+                Ok(buffer) => buffer,
                 Err(err) => {
                     println!("Error getting client buffer: {} - {}", host_error(err.code()), err);
                     return Err(());
                 }
             };
-
             let client_buffer_len = buffer_size as usize * (*wave_format).wBitsPerSample as usize;
             let data = std::slice::from_raw_parts_mut(client_buffer, client_buffer_len);
             let mut frames_writen = 0;
