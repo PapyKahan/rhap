@@ -411,7 +411,7 @@ fn main() -> Result<(), ()> {
 
         let mut frame_reader = flac_reader.blocks();
         let mut block = Block::empty();
-
+        let vec_buffer = VecDeque::new();
         loop {
             match frame_reader.read_next_or_eof(block.into_buffer()) {
                 Ok(Some(next_block)) => {
@@ -423,10 +423,16 @@ fn main() -> Result<(), ()> {
 
             for samples in block.stereo_samples() {
                 let left = samples.0.to_le_bytes();
+                for l in left.iter() {
+                    vec_buffer.push_back(*l);
+                }
                 let right = samples.1.to_le_bytes();
+                for r in right.iter() {
+                    vec_buffer.push_back(*r);
+                }
             }
         }
-
+        while vec_buffer.len() > 0 {
             match WaitForSingleObject(eventhandle, 2000) {
                 WAIT_OBJECT_0 => (),
                 WAIT_TIMEOUT => {
@@ -462,7 +468,7 @@ fn main() -> Result<(), ()> {
                 }
             };
 
-
+        }
         match client.Stop() {
             Ok(_) => (),
             Err(err) => {
