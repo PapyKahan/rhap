@@ -9,7 +9,7 @@ use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject, Creat
 use std::ffi::OsString;
 use std::os::windows::ffi::OsStringExt;
 use std::slice;
-use windows::core::{PCWSTR, PWSTR};
+use windows::core::{PCWSTR, PWSTR, HRESULT};
 use windows::Win32::Devices::FunctionDiscovery::*;
 use windows::Win32::Media::Audio::*;
 use windows::Win32::Media::KernelStreaming::{
@@ -23,6 +23,52 @@ use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 
 const REFTIMES_PER_SEC : i64 = 10000000;
 const REFTIMES_PER_MILLISEC : i64 = 10000;
+
+fn host_error<'life>(errorcode: HRESULT) ->  &'life str {
+    match errorcode {
+        S_OK => "S_OK",
+        E_POINTER => "E_POINTER",
+        E_INVALIDARG => "E_INVALIDARG",
+        AUDCLNT_E_NOT_INITIALIZED => "AUDCLNT_E_NOT_INITIALIZED",
+        AUDCLNT_E_ALREADY_INITIALIZED => "AUDCLNT_E_ALREADY_INITIALIZED",
+        AUDCLNT_E_WRONG_ENDPOINT_TYPE => "AUDCLNT_E_WRONG_ENDPOINT_TYPE",
+        AUDCLNT_E_DEVICE_INVALIDATED => "AUDCLNT_E_DEVICE_INVALIDATED",
+        AUDCLNT_E_NOT_STOPPED => "AUDCLNT_E_NOT_STOPPED",
+        AUDCLNT_E_BUFFER_TOO_LARGE => "AUDCLNT_E_BUFFER_TOO_LARGE",
+        AUDCLNT_E_OUT_OF_ORDER => "AUDCLNT_E_OUT_OF_ORDER",
+        AUDCLNT_E_UNSUPPORTED_FORMAT => "AUDCLNT_E_UNSUPPORTED_FORMAT",
+        AUDCLNT_E_INVALID_SIZE => "AUDCLNT_E_INVALID_SIZE",
+        AUDCLNT_E_DEVICE_IN_USE => "AUDCLNT_E_DEVICE_IN_USE",
+        AUDCLNT_E_BUFFER_OPERATION_PENDING => "AUDCLNT_E_BUFFER_OPERATION_PENDING",
+        AUDCLNT_E_THREAD_NOT_REGISTERED => "AUDCLNT_E_THREAD_NOT_REGISTERED",
+        AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED => "AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED",
+        AUDCLNT_E_ENDPOINT_CREATE_FAILED => "AUDCLNT_E_ENDPOINT_CREATE_FAILED",
+        AUDCLNT_E_SERVICE_NOT_RUNNING => "AUDCLNT_E_SERVICE_NOT_RUNNING",
+        AUDCLNT_E_EVENTHANDLE_NOT_EXPECTED => "AUDCLNT_E_EVENTHANDLE_NOT_EXPECTED",
+        AUDCLNT_E_EXCLUSIVE_MODE_ONLY => "AUDCLNT_E_EXCLUSIVE_MODE_ONLY",
+        AUDCLNT_E_BUFDURATION_PERIOD_NOT_EQUAL => "AUDCLNT_E_BUFDURATION_PERIOD_NOT_EQUAL",
+        AUDCLNT_E_EVENTHANDLE_NOT_SET => "AUDCLNT_E_EVENTHANDLE_NOT_SET",
+        AUDCLNT_E_INCORRECT_BUFFER_SIZE => "AUDCLNT_E_INCORRECT_BUFFER_SIZE",
+        AUDCLNT_E_BUFFER_SIZE_ERROR => "AUDCLNT_E_BUFFER_SIZE_ERROR",
+        AUDCLNT_E_CPUUSAGE_EXCEEDED => "AUDCLNT_E_CPUUSAGE_EXCEEDED",
+        AUDCLNT_E_BUFFER_ERROR => "AUDCLNT_E_BUFFER_ERROR",
+        AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED => "AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED",
+        AUDCLNT_E_INVALID_DEVICE_PERIOD => "AUDCLNT_E_INVALID_DEVICE_PERIOD",
+        AUDCLNT_E_INVALID_STREAM_FLAG => "AUDCLNT_E_INVALID_STREAM_FLAG",
+        AUDCLNT_E_ENDPOINT_OFFLOAD_NOT_CAPABLE => "AUDCLNT_E_ENDPOINT_OFFLOAD_NOT_CAPABLE",
+        AUDCLNT_E_OUT_OF_OFFLOAD_RESOURCES => "AUDCLNT_E_OUT_OF_OFFLOAD_RESOURCES",
+        AUDCLNT_E_OFFLOAD_MODE_ONLY => "AUDCLNT_E_OFFLOAD_MODE_ONLY",
+        AUDCLNT_E_NONOFFLOAD_MODE_ONLY => "AUDCLNT_E_NONOFFLOAD_MODE_ONLY",
+        AUDCLNT_E_RESOURCES_INVALIDATED => "AUDCLNT_E_RESOURCES_INVALIDATED",
+        AUDCLNT_E_RAW_MODE_UNSUPPORTED => "AUDCLNT_E_RAW_MODE_UNSUPPORTED",
+        AUDCLNT_E_ENGINE_PERIODICITY_LOCKED => "AUDCLNT_E_ENGINE_PERIODICITY_LOCKED",
+        AUDCLNT_E_ENGINE_FORMAT_LOCKED => "AUDCLNT_E_ENGINE_FORMAT_LOCKED",
+        AUDCLNT_S_BUFFER_EMPTY => "AUDCLNT_S_BUFFER_EMPTY",
+        AUDCLNT_S_THREAD_ALREADY_REGISTERED => "AUDCLNT_S_THREAD_ALREADY_REGISTERED",
+        AUDCLNT_S_POSITION_STALLED => "AUDCLNT_S_POSITION_STALLED",
+        _ => "Unknown error",
+    }
+}
 
 struct Device {
     inner_device_id: PWSTR,
@@ -185,12 +231,18 @@ fn main() -> Result<(), ()> {
     let mut flac_reader = FlacReader::open(&file_path).expect("Failed to open FLAC file");
 
     unsafe {
-        let _ = CoInitialize(None);
+        match CoInitialize(None) {
+            Ok(_) => (),
+            Err(err) => {
+                println!("Error initializing COM: {} - {}", host_error(err.code()), err);
+                return Err(());
+            }
+        }
         let enumerator: IMMDeviceEnumerator =
             match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
                 Ok(device_enumerator) => device_enumerator,
                 Err(err) => {
-                    println!("Error getting device enumerator: {}", err);
+                    println!("Error getting device enumerator: {} - {}", host_error(err.code()), err);
                     return Err(());
                 }
             };
@@ -198,7 +250,7 @@ fn main() -> Result<(), ()> {
         let d = match enumerator.GetDevice(PCWSTR((*device).inner_device_id.as_ptr())) {
             Ok(device) => device,
             Err(err) => {
-                println!("Error getting device: {}", err);
+                println!("Error getting device: {} - {}", host_error(err.code()), err);
                 return Err(());
             }
         };
@@ -207,7 +259,7 @@ fn main() -> Result<(), ()> {
         let client = match d.Activate::<IAudioClient>(CLSCTX_ALL, None) {
             Ok(client) => client,
             Err(err) => {
-                println!("Error activating device: {}", err);
+                println!("Error activating device: {} - {}", host_error(err.code()), err);
                 return Err(());
             }
         };
@@ -215,7 +267,7 @@ fn main() -> Result<(), ()> {
         let wave_format = match client.GetMixFormat() {
             Ok(wave_format) => wave_format,
             Err(err) => {
-                println!("Error getting mix format: {}", err);
+                println!("Error getting mix format: {} - {}", host_error(err.code()), err);
                 return Err(());
             }
         };
@@ -263,7 +315,7 @@ fn main() -> Result<(), ()> {
         match client.GetDevicePeriod(Some(&mut default_device_period as *mut i64), Some(&mut minimum_device_period as *mut i64)) {
             Ok(_) => (),
             Err(err) => {
-                println!("Error getting device period: {}", err);
+                println!("Error getting device period: {} - {}", host_error(err.code()), err);
                 return Err(());
             }
         };
@@ -272,7 +324,7 @@ fn main() -> Result<(), ()> {
         let sharemode = AUDCLNT_SHAREMODE_EXCLUSIVE;
         let result = client.IsFormatSupported(sharemode, wave_format, None);
         if result != S_OK {
-            println!("Format not supported: {}", result);
+            println!("Format not supported: {} - {}", host_error(result), result);
             return Err(());
         }
 
@@ -287,14 +339,15 @@ fn main() -> Result<(), ()> {
 
         if result.is_err() {
             if result.as_ref().err().unwrap().code() != AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED {
-                println!("Error initializing client: {}", result.err().unwrap());
+                let err = result.err().unwrap();
+                println!("Error initializing client: {} - {}", host_error(err.code()), err);
                 return Err(());
             }
             println!("Buffer size not aligned");
             let buffer_size = match client.GetBufferSize() {
                 Ok(buffer_size) => buffer_size,
                 Err(err) => {
-                    println!("Initialize: Error getting buffer size: {}", err);
+                    println!("Initialize: Error getting buffer size: {} - {}", host_error(err.code()), err);
                     return Err(());
                 }
             };
@@ -313,7 +366,7 @@ fn main() -> Result<(), ()> {
             ) {
                 Ok(_) => (),
                 Err(err) => {
-                    println!("Error initializing client: {}", err);
+                    println!("Error initializing client: {} - {}", host_error(err.code()), err);
                     return Err(());
                 }
             }
@@ -327,7 +380,7 @@ fn main() -> Result<(), ()> {
         ) {
             Ok(eventhandle) => eventhandle,
             Err(err) => {
-                println!("Error creating event handle: {}", err);
+                println!("Error creating event handle: {} - {}", host_error(err.code()), err);
                 return Err(());
             }
         };
@@ -335,7 +388,7 @@ fn main() -> Result<(), ()> {
         match client.SetEventHandle(eventhandle) {
             Ok(_) => (),
             Err(err) => {
-                println!("Error setting event handle: {}", err);
+                println!("Error setting event handle: {} - {}", host_error(err.code()), err);
                 return Err(());
             }
         }
@@ -343,7 +396,7 @@ fn main() -> Result<(), ()> {
         let buffer_size = match client.GetBufferSize() {
             Ok(buffer_size) => buffer_size,
             Err(err) => {
-                println!("Size: Error getting buffer size: {}", err);
+                println!("Size: Error getting buffer size: {} - {}", host_error(err.code()), err);
                 return Err(());
             }
         };
@@ -352,7 +405,7 @@ fn main() -> Result<(), ()> {
         let client_renderer = match client.GetService::<IAudioRenderClient>() {
             Ok(client_renderer) => client_renderer,
             Err(err) => {
-                println!("Error getting client renderer: {}", err);
+                println!("Error getting client renderer: {} - {}", host_error(err.code()), err);
                 return Err(());
             }
         };
@@ -361,7 +414,7 @@ fn main() -> Result<(), ()> {
         match client.Start() {
             Ok(_) => (),
             Err(err) => {
-                println!("Error starting client: {}", err);
+                println!("Error starting client: {} - {}", host_error(err.code()), err);
                 return Err(());
             }
         }
@@ -396,7 +449,7 @@ fn main() -> Result<(), ()> {
             let client_buffer = match client_renderer.GetBuffer(buffer_size) {
                 Ok(client_buffer) => client_buffer,
                 Err(err) => {
-                    println!("Error getting client buffer: {}", err);
+                    println!("Error getting client buffer: {} - {}", host_error(err.code()), err);
                     return Err(());
                 }
             };
@@ -423,7 +476,13 @@ fn main() -> Result<(), ()> {
             }
 
             println!("frames writen: {}", frames_writen);
-            client_renderer.ReleaseBuffer(frames_writen, 0).unwrap();
+            match client_renderer.ReleaseBuffer(frames_writen, 0) {
+                Ok(_) => (),
+                Err(err) => {
+                    println!("Error releasing client buffer: {} - {}", host_error(err.code()), err);
+                    return Err(());
+                }
+            };
 
             if index > block.len() {
                 break;
@@ -433,7 +492,7 @@ fn main() -> Result<(), ()> {
         match client.Stop() {
             Ok(_) => (),
             Err(err) => {
-                println!("Error stopping client: {}", err);
+                println!("Error stopping client: {} - {}", host_error(err.code()), err);
                 return Err(());
             }
         }
