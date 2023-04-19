@@ -1,4 +1,6 @@
-fn log_host_error(errorcode: HRESULT) -> str {
+use windows::core::HRESULT;
+
+pub fn host_error<'life>(errorcode: HRESULT) -> &'life str {
     match errorcode {
         S_OK => "S_OK",
         E_POINTER => "E_POINTER",
@@ -40,5 +42,6 @@ fn log_host_error(errorcode: HRESULT) -> str {
         AUDCLNT_S_BUFFER_EMPTY => "AUDCLNT_S_BUFFER_EMPTY",
         AUDCLNT_S_THREAD_ALREADY_REGISTERED => "AUDCLNT_S_THREAD_ALREADY_REGISTERED",
         AUDCLNT_S_POSITION_STALLED => "AUDCLNT_S_POSITION_STALLED",
+        _ => "Unknown error",
     }
 }
