@@ -1,4 +1,5 @@
 //
+// TODO add commandline parsing : https://docs.rs/clap/latest/clap/
 // reference : Shared mode streaming : https://learn.microsoft.com/en-us/windows/win32/coreaudio/rendering-a-stream
 // reference : Exclusive mode streaming : https://learn.microsoft.com/en-us/windows/win32/coreaudio/exclusive-mode-streams
 // reference : https://www.hresult.info/FACILITY_AUDCLNT
@@ -413,6 +414,7 @@ fn main() -> Result<(), ()> {
         let mut frame_reader = flac_reader.blocks();
         let mut block = Block::empty();
         let mut vec_buffer = VecDeque::new();
+        let bytes = bits_per_sample / 8;
         loop {
             match frame_reader.read_next_or_eof(block.into_buffer()) {
                 Ok(Some(next_block)) => {
@@ -424,12 +426,22 @@ fn main() -> Result<(), ()> {
 
             for samples in block.stereo_samples() {
                 let left = samples.0.to_le_bytes();
+                let mut copied_bytes = 0;
                 for l in left.iter() {
                     vec_buffer.push_back(*l);
+                    copied_bytes += 1;
+                    if copied_bytes >= bytes {
+                        break;
+                    }
                 }
                 let right = samples.1.to_le_bytes();
+                copied_bytes = 0;
                 for r in right.iter() {
                     vec_buffer.push_back(*r);
+                    copied_bytes += 1;
+                    if copied_bytes >= bytes {
+                        break;
+                    }
                 }
             }
         }
@@ -449,7 +461,6 @@ fn main() -> Result<(), ()> {
                 _ => (),
             }
 
-            println!("Getting client buffer...");
             let client_buffer = match client_renderer.GetBuffer(buffer_size) {
                 Ok(buffer) => buffer,
                 Err(err) => {
@@ -457,7 +468,10 @@ fn main() -> Result<(), ()> {
                     return Err(());
                 }
             };
-            let client_buffer_len = buffer_size as usize * (*wave_format).wBitsPerSample as usize;
+
+            // Compute client buffer size in bytes.
+            let client_buffer_len = buffer_size as usize * (bits_per_sample / 8) as usize * channels as usize;
+            // Convert client buffer to a slice of bytes.
             let data = std::slice::from_raw_parts_mut(client_buffer, client_buffer_len);
 
             for i in 0..client_buffer_len {
