@@ -18,7 +18,7 @@ use windows::core::{PCWSTR, PWSTR};
 use windows::Win32::Devices::FunctionDiscovery::*;
 use windows::Win32::Media::Audio::*;
 use windows::Win32::System::Com::StructuredStorage::PropVariantClear;
-use windows::Win32::System::Com::{CoCreateInstance, CoInitialize, CLSCTX_ALL, STGM_READ, VT_LPWSTR};
+use windows::Win32::System::Com::{CoCreateInstance, CoInitialize, CLSCTX_ALL, STGM_READ, VT_LPWSTR, CoInitializeEx, COINIT_MULTITHREADED};
 use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 
 mod device;
@@ -28,13 +28,13 @@ const REFTIMES_PER_MILLISEC : i64 = 10000;
 
 struct Device {
     device : *const IMMDevice,
-    inner_device_id: PWSTR,
+    inner_device_id: PCWSTR,
     index: u32,
     name: String,
 }
 
 impl Device {
-    pub fn new(device : *const IMMDevice, inner_device_id: PWSTR, index: u32, name: String) -> Device {
+    pub fn new(device : *const IMMDevice, inner_device_id: PCWSTR, index: u32, name: String) -> Device {
         Self {
             device,
             inner_device_id,
@@ -77,7 +77,7 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
 
     unsafe {
         // Initialise les sous-systèmes COM
-        match CoInitialize(None) {
+        match CoInitializeEx(None, COINIT_MULTITHREADED) {
             Ok(_) => (),
             Err(err) => {
                 println!("Error initialising COM: {}", err);
@@ -100,7 +100,6 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
                     return Err("Error getting device list".to_string());
                 }
             };
-
 
         for i in 0..devices.GetCount().unwrap() {
             let device: IMMDevice = match devices.Item(i) {
@@ -155,8 +154,8 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
                 }
             };
 
-            let id : PWSTR = match device.GetId() {
-                Ok(id) => id,
+            let id = match device.GetId() {
+                Ok(id) => PCWSTR::from_raw(id.as_ptr()),
                 Err(err) => {
                     println!("Error getting device id: {}", err);
                     return Err("Error getting device id".to_string());
@@ -199,7 +198,7 @@ fn main() -> Result<(), ()> {
         }
     };
 
-    let mut selected_device: *const Device = std::ptr::null();
+    let selected_device_id = 2;
     let devices = match enumerate_devices() {
         Ok(devices) => devices,
         Err(err) => {
@@ -207,12 +206,16 @@ fn main() -> Result<(), ()> {
             return Err(());
         }
     };
-    let selected_device_id = 3;
 
+    let mut selected_device: *const Device = std::ptr::null();
     for dev in devices {
+        println!("Device: id={}, name={}", dev.index, dev.name);
+        println!("----------------------------");
+
         if dev.index == selected_device_id {
             println!("Selected device: id={}, name={}", dev.index, dev.name);
             selected_device = &dev;
+            break;
         }
     }
 
@@ -228,13 +231,13 @@ fn main() -> Result<(), ()> {
     let mut flac_reader = FlacReader::open(&file_path).expect("Failed to open FLAC file");
 
     unsafe {
-        match CoInitialize(None) {
+        match CoInitializeEx(None, COINIT_MULTITHREADED) {
             Ok(_) => (),
             Err(err) => {
                 println!("Error initializing COM: {} - {}", device::log::host_error(err.code()), err);
                 return Err(());
             }
-        };
+        }
 
         let enumerator: IMMDeviceEnumerator =
             match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
@@ -245,15 +248,13 @@ fn main() -> Result<(), ()> {
                 }
             };
 
-        let device = match enumerator.GetDevice(PCWSTR((*selected_device).inner_device_id.as_ptr())) {
+        let device = match enumerator.GetDevice((*selected_device).inner_device_id) {
             Ok(device) => device,
             Err(err) => {
                 println!("Error getting device: {} - {}", device::log::host_error(err.code()), err);
                 return Err(());
             }
         };
-        
-
 
         // Crée un périphérique audio WASAPI exclusif.
         let client = match device.Activate::<IAudioClient>(CLSCTX_ALL, None) {
