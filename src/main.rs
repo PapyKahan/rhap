@@ -27,14 +27,16 @@ const REFTIMES_PER_SEC : i64 = 10000000;
 const REFTIMES_PER_MILLISEC : i64 = 10000;
 
 struct Device {
+    device : *const IMMDevice,
     inner_device_id: PWSTR,
     index: u32,
     name: String,
 }
 
 impl Device {
-    pub fn new(inner_device_id: PWSTR, index: u32, name: String) -> Device {
+    pub fn new(device : *const IMMDevice, inner_device_id: PWSTR, index: u32, name: String) -> Device {
         Self {
+            device,
             inner_device_id,
             index,
             name,
@@ -99,6 +101,7 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
                 }
             };
 
+
         for i in 0..devices.GetCount().unwrap() {
             let device: IMMDevice = match devices.Item(i) {
                 Ok(device) => device,
@@ -116,7 +119,6 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
                     return Err("Error getting device name".to_string());
                 }
             };
-
 
             let prop_variant = &name_property_value.Anonymous.Anonymous;
 
@@ -153,7 +155,7 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
                 }
             };
 
-            let id: PWSTR = match device.GetId() {
+            let id : PWSTR = match device.GetId() {
                 Ok(id) => id,
                 Err(err) => {
                     println!("Error getting device id: {}", err);
@@ -161,7 +163,7 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
                 }
             };
 
-            enumerated_devices.push(Device::new(id, i, name_string));
+            enumerated_devices.push(Device::new(&device.clone(), id, i, name_string));
         }
 
         Ok(enumerated_devices)
@@ -189,15 +191,23 @@ fn main() -> Result<(), ()> {
             println!("Usage: rhap <file>");
             let devices = enumerate_devices().unwrap();
             for dev in devices {
-                println!("Device: id={}, name={}", dev.index, dev.name);
+                unsafe {
+                    println!("Device: id={}, name={}, inner_id={}", dev.index, dev.name, dev.inner_device_id.display().to_string());
+                }
             }
             return Ok(());
         }
     };
 
     let mut selected_device: *const Device = std::ptr::null();
-    let devices = enumerate_devices().unwrap();
-    let selected_device_id = 0;
+    let devices = match enumerate_devices() {
+        Ok(devices) => devices,
+        Err(err) => {
+            println!("Error enumerating devices: {}", err);
+            return Err(());
+        }
+    };
+    let selected_device_id = 3;
 
     for dev in devices {
         if dev.index == selected_device_id {
@@ -242,6 +252,8 @@ fn main() -> Result<(), ()> {
                 return Err(());
             }
         };
+        
+
 
         // Crée un périphérique audio WASAPI exclusif.
         let client = match device.Activate::<IAudioClient>(CLSCTX_ALL, None) {
@@ -252,17 +264,17 @@ fn main() -> Result<(), ()> {
             }
         };
 
-        //let wave_format = match client.GetMixFormat() {
-        //    Ok(wave_format) => wave_format,
-        //    Err(err) => {
-        //        println!("Error getting mix format: {} - {}", device::log::host_error(err.code()), err);
-        //        return Err(());
-        //    }
-        //};
+        let wave_format = match client.GetMixFormat() {
+            Ok(wave_format) => wave_format,
+            Err(err) => {
+                println!("Error getting mix format: {} - {}", device::log::host_error(err.code()), err);
+                return Err(());
+            }
+        };
 
-        //println!("-------------------------------------------------");
-        //println!("Mix format:");
-        //print_wave_format(wave_format);
+        println!("-------------------------------------------------");
+        println!("Mix format:");
+        print_wave_format(wave_format);
 
         let formattag = WAVE_FORMAT_EXTENSIBLE;
         //let formattag = WAVE_FORMAT_IEEE_FLOAT;
@@ -293,9 +305,15 @@ fn main() -> Result<(), ()> {
             //SubFormat: KSDATAFORMAT_SUBTYPE_IEEE_FLOAT,
         };
 
-        println!("");
-        println!("Using format:");
-        print_wave_format(wave_format as *const WAVEFORMATEX);
+        let sharemode = AUDCLNT_SHAREMODE_EXCLUSIVE;
+        let streamflags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
+        match client.IsFormatSupported(sharemode, wave_format as *const WAVEFORMATEX, None) {
+            S_OK => (),
+            result => {
+                println!("Error checking format support: {} - {}", device::log::host_error(result), "Unsuporrted format");
+                return Err(());
+            }
+        };
 
         // Création des pointeurs pour les paramètres
         let mut default_device_period: i64 = 0;
@@ -305,16 +323,6 @@ fn main() -> Result<(), ()> {
             Ok(_) => (),
             Err(err) => {
                 println!("Error getting device period: {} - {}", device::log::host_error(err.code()), err);
-                return Err(());
-            }
-        };
-
-        let sharemode = AUDCLNT_SHAREMODE_EXCLUSIVE;
-        let streamflags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
-        match client.IsFormatSupported(sharemode, wave_format as *const WAVEFORMATEX, None) {
-            S_OK => (),
-            result => {
-                println!("Error checking format support: {} - {}", device::log::host_error(result), "Unsuporrted format");
                 return Err(());
             }
         };
