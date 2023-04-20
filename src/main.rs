@@ -6,6 +6,7 @@
 use claxon::{Block, FlacReader};
 use windows::Win32::Foundation::*;
 use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
+use std::collections::VecDeque;
 use std::ffi::OsString;
 use std::mem::size_of;
 use std::os::windows::ffi::OsStringExt;
@@ -210,7 +211,7 @@ fn main() -> Result<(), ()> {
 
     let mut selected_device: *const Device = std::ptr::null();
     let devices = enumerate_devices().unwrap();
-    let selected_device_id = 0;
+    let selected_device_id = 2;
 
     for dev in devices {
         if dev.index == selected_device_id {
@@ -411,7 +412,7 @@ fn main() -> Result<(), ()> {
 
         let mut frame_reader = flac_reader.blocks();
         let mut block = Block::empty();
-        let vec_buffer = VecDeque::new();
+        let mut vec_buffer = VecDeque::new();
         loop {
             match frame_reader.read_next_or_eof(block.into_buffer()) {
                 Ok(Some(next_block)) => {
@@ -432,6 +433,8 @@ fn main() -> Result<(), ()> {
                 }
             }
         }
+        println!("Vec buffer size: {}", vec_buffer.len());
+        
         while vec_buffer.len() > 0 {
             match WaitForSingleObject(eventhandle, 2000) {
                 WAIT_OBJECT_0 => (),
@@ -446,7 +449,7 @@ fn main() -> Result<(), ()> {
                 _ => (),
             }
 
-            let mut index = 0;
+            println!("Getting client buffer...");
             let client_buffer = match client_renderer.GetBuffer(buffer_size) {
                 Ok(buffer) => buffer,
                 Err(err) => {
@@ -456,19 +459,23 @@ fn main() -> Result<(), ()> {
             };
             let client_buffer_len = buffer_size as usize * (*wave_format).wBitsPerSample as usize;
             let data = std::slice::from_raw_parts_mut(client_buffer, client_buffer_len);
-            let mut frames_writen = 0;
 
-            // TODO : fill the buffer
+            for i in 0..client_buffer_len {
+                if vec_buffer.len() == 0 {
+                    break;
+                }
+                data[i] = vec_buffer.pop_front().unwrap();
+            }
             
-            match client_renderer.ReleaseBuffer(frames_writen, 0) {
+            match client_renderer.ReleaseBuffer(buffer_size, 0) {
                 Ok(_) => (),
                 Err(err) => {
                     println!("Error releasing client buffer: {} - {}", host_error(err.code()), err);
                     return Err(());
                 }
             };
-
         }
+
         match client.Stop() {
             Ok(_) => (),
             Err(err) => {
