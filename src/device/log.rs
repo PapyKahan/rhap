@@ -1,6 +1,7 @@
+use windows::core::HRESULT;
 use windows::Win32::Foundation::*;
 use windows::Win32::Media::Audio::*;
-use windows::core::HRESULT;
+use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 
 pub fn host_error<'life>(errorcode: HRESULT) -> &'life str {
     match errorcode {
@@ -45,5 +46,33 @@ pub fn host_error<'life>(errorcode: HRESULT) -> &'life str {
         AUDCLNT_S_THREAD_ALREADY_REGISTERED => "AUDCLNT_S_THREAD_ALREADY_REGISTERED",
         AUDCLNT_S_POSITION_STALLED => "AUDCLNT_S_POSITION_STALLED",
         _ => "Unknown error",
+    }
+}
+
+pub fn print_wave_format(wave_format: *const WAVEFORMATEX) {
+    unsafe {
+        let formattag = (*wave_format).wFormatTag;
+        println!("Format tag: {:?}", formattag);
+        let channels = (*wave_format).nChannels;
+        println!("Channels: {:?}", channels);
+        let sample_rate = (*wave_format).nSamplesPerSec;
+        println!("Sample rate: {:?}", sample_rate);
+        let bits_per_sample = (*wave_format).wBitsPerSample;
+        println!("Bits per sample: {:?}", bits_per_sample);
+        let block_align = (*wave_format).nBlockAlign;
+        println!("Block align: {:?}", block_align);
+        let bytes_per_second = (*wave_format).nAvgBytesPerSec;
+        println!("Bytes per second: {:?}", bytes_per_second);
+        let cb_size = (*wave_format).cbSize;
+        println!("cbSize: {:?}", cb_size);
+        if formattag as u32 == WAVE_FORMAT_EXTENSIBLE {
+            let wave_format_extensible = wave_format as *const WAVEFORMATEXTENSIBLE;
+            let sub_format = (*wave_format_extensible).SubFormat;
+            println!("Sub format: {:?}", sub_format);
+            let valid_bits_per_sample = (*wave_format_extensible).Samples.wValidBitsPerSample;
+            println!("Valid bits per sample: {:?}", valid_bits_per_sample);
+            let channel_mask = (*wave_format_extensible).dwChannelMask;
+            println!("Channel mask: {:?}", channel_mask);
+        }
     }
 }

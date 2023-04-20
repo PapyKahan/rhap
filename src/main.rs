@@ -5,74 +5,45 @@
 // reference : https://www.hresult.info/FACILITY_AUDCLNT
 //
 use claxon::{Block, FlacReader};
-use windows::Win32::Foundation::*;
-use windows::Win32::Media::Multimedia::{WAVE_FORMAT_IEEE_FLOAT, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT};
-use windows::Win32::Media::KernelStreaming::{KSDATAFORMAT_SUBTYPE_PCM, SPEAKER_FRONT_LEFT, SPEAKER_FRONT_RIGHT, WAVE_FORMAT_EXTENSIBLE};
-use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use std::collections::VecDeque;
 use std::ffi::OsString;
 use std::mem::size_of;
 use std::os::windows::ffi::OsStringExt;
 use std::slice;
-use windows::core::{PCWSTR, PWSTR};
+use windows::Win32::Foundation::*;
+use windows::Win32::Media::KernelStreaming::{KSDATAFORMAT_SUBTYPE_PCM, SPEAKER_FRONT_LEFT, SPEAKER_FRONT_RIGHT, WAVE_FORMAT_EXTENSIBLE};
+use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
+use windows::core::PCWSTR;
 use windows::Win32::Devices::FunctionDiscovery::*;
 use windows::Win32::Media::Audio::*;
 use windows::Win32::System::Com::StructuredStorage::PropVariantClear;
-use windows::Win32::System::Com::{CoCreateInstance, CoInitialize, CLSCTX_ALL, STGM_READ, VT_LPWSTR, CoInitializeEx, COINIT_MULTITHREADED};
+use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, STGM_READ, VT_LPWSTR, COINIT_MULTITHREADED};
 use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 
 mod device;
+use crate::device::log::*;
+use crate::device::api::windows::wasapi::stream::*;
 
 const REFTIMES_PER_SEC : i64 = 10000000;
 const REFTIMES_PER_MILLISEC : i64 = 10000;
 
-struct Device {
-    device : *const IMMDevice,
-    inner_device_id: PCWSTR,
+struct WasapiDevice {
+    id: PCWSTR,
     index: u32,
     name: String,
 }
 
-impl Device {
-    pub fn new(device : *const IMMDevice, inner_device_id: PCWSTR, index: u32, name: String) -> Device {
+impl WasapiDevice {
+    pub fn new(inner_device_id: PCWSTR, index: u32, name: String) -> WasapiDevice {
         Self {
-            device,
-            inner_device_id,
+            id: inner_device_id,
             index,
             name,
         }
     }
 }
 
-fn print_wave_format(wave_format: *const WAVEFORMATEX) {
-    unsafe {
-        let formattag = (*wave_format).wFormatTag;
-        println!("Format tag: {:?}", formattag);
-        let channels = (*wave_format).nChannels;
-        println!("Channels: {:?}", channels);
-        let sample_rate = (*wave_format).nSamplesPerSec;
-        println!("Sample rate: {:?}", sample_rate);
-        let bits_per_sample = (*wave_format).wBitsPerSample;
-        println!("Bits per sample: {:?}", bits_per_sample);
-        let block_align = (*wave_format).nBlockAlign;
-        println!("Block align: {:?}", block_align);
-        let bytes_per_second = (*wave_format).nAvgBytesPerSec;
-        println!("Bytes per second: {:?}", bytes_per_second);
-        let cb_size = (*wave_format).cbSize;
-        println!("cbSize: {:?}", cb_size);
-        if formattag as u32 == WAVE_FORMAT_EXTENSIBLE {
-            let wave_format_extensible = wave_format as *const WAVEFORMATEXTENSIBLE;
-            let sub_format = (*wave_format_extensible).SubFormat;
-            println!("Sub format: {:?}", sub_format);
-            let valid_bits_per_sample = (*wave_format_extensible).Samples.wValidBitsPerSample;
-            println!("Valid bits per sample: {:?}", valid_bits_per_sample);
-            let channel_mask = (*wave_format_extensible).dwChannelMask;
-            println!("Channel mask: {:?}", channel_mask);
-        }
-    }
-}
-
-fn enumerate_devices() -> Result<Vec<Device>, String> {
+fn enumerate_devices() -> Result<Vec<WasapiDevice>, String> {
     let mut enumerated_devices = vec![];
 
     unsafe {
@@ -101,8 +72,8 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
                 }
             };
 
-        for i in 0..devices.GetCount().unwrap() {
-            let device: IMMDevice = match devices.Item(i) {
+        for index in 0..devices.GetCount().unwrap() {
+            let device: IMMDevice = match devices.Item(index) {
                 Ok(device) => device,
                 Err(err) => {
                     println!("Error getting device: {}", err);
@@ -140,7 +111,7 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
             // Create the utf16 slice and convert it into a string.
             let name_slice = slice::from_raw_parts(ptr_utf16, len as usize);
             let name_os_string: OsString = OsStringExt::from_wide(name_slice);
-            let name_string = match name_os_string.into_string() {
+            let name = match name_os_string.into_string() {
                 Ok(string) => string,
                 Err(os_string) => os_string.to_string_lossy().into(),
             };
@@ -162,24 +133,12 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
                 }
             };
 
-            enumerated_devices.push(Device::new(&device.clone(), id, i, name_string));
+            enumerated_devices.push(WasapiDevice::new(id, index, name));
         }
 
         Ok(enumerated_devices)
     }
 }
-
-// Aligns 'v' backwards
-//fn align_bwd(v : u32, align : u32) -> u32
-//{
-//    // (v - (align ? v % align : 0))
-//    if align != 0 {
-//        v - (v % align)
-//    }
-//    else {
-//        v
-//    }
-//}
 
 fn main() -> Result<(), ()> {
     let args = std::env::args().collect::<Vec<String>>();
@@ -191,7 +150,7 @@ fn main() -> Result<(), ()> {
             let devices = enumerate_devices().unwrap();
             for dev in devices {
                 unsafe {
-                    println!("Device: id={}, name={}, inner_id={}", dev.index, dev.name, dev.inner_device_id.display().to_string());
+                    println!("Device: id={}, name={}, inner_id={}", dev.index, dev.name, dev.id.display().to_string());
                 }
             }
             return Ok(());
@@ -207,11 +166,8 @@ fn main() -> Result<(), ()> {
         }
     };
 
-    let mut selected_device: *const Device = std::ptr::null();
+    let mut selected_device: *const WasapiDevice = std::ptr::null();
     for dev in devices {
-        println!("Device: id={}, name={}", dev.index, dev.name);
-        println!("----------------------------");
-
         if dev.index == selected_device_id {
             println!("Selected device: id={}, name={}", dev.index, dev.name);
             selected_device = &dev;
@@ -248,7 +204,7 @@ fn main() -> Result<(), ()> {
                 }
             };
 
-        let device = match enumerator.GetDevice((*selected_device).inner_device_id) {
+        let device = match enumerator.GetDevice((*selected_device).id) {
             Ok(device) => device,
             Err(err) => {
                 println!("Error getting device: {} - {}", device::log::host_error(err.code()), err);
@@ -273,15 +229,10 @@ fn main() -> Result<(), ()> {
             }
         };
 
-        println!("-------------------------------------------------");
-        println!("Mix format:");
-        print_wave_format(wave_format);
 
         let formattag = WAVE_FORMAT_EXTENSIBLE;
-        //let formattag = WAVE_FORMAT_IEEE_FLOAT;
         let channels = flac_reader.streaminfo().channels as u32;
         let sample_rate = flac_reader.streaminfo().sample_rate as u32;
-        //let bits_per_sample = 32;
         let bits_per_sample = flac_reader.streaminfo().bits_per_sample as u32;
         let block_align = channels * bits_per_sample as u32 / 8;
         let bytes_per_second = sample_rate * block_align;
@@ -303,8 +254,11 @@ fn main() -> Result<(), ()> {
             },
             dwChannelMask: SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT,
             SubFormat: KSDATAFORMAT_SUBTYPE_PCM,
-            //SubFormat: KSDATAFORMAT_SUBTYPE_IEEE_FLOAT,
         };
+
+        println!("--------------------------------------------------------------------------------------");
+        print_wave_format(wave_format as *const WAVEFORMATEX);
+        println!("--------------------------------------------------------------------------------------");
 
         let sharemode = AUDCLNT_SHAREMODE_EXCLUSIVE;
         let streamflags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
@@ -319,7 +273,6 @@ fn main() -> Result<(), ()> {
         // Création des pointeurs pour les paramètres
         let mut default_device_period: i64 = 0;
         let mut minimum_device_period: i64 = 0;
-
         match client.GetDevicePeriod(Some(&mut default_device_period as *mut i64), Some(&mut minimum_device_period as *mut i64)) {
             Ok(_) => (),
             Err(err) => {
