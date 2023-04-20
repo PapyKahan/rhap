@@ -157,7 +157,7 @@ fn main() -> Result<(), ()> {
         }
     };
 
-    let selected_device_id = 2;
+    let selected_device_id = 0;
     let devices = match enumerate_devices() {
         Ok(devices) => devices,
         Err(err) => {
@@ -284,8 +284,8 @@ fn main() -> Result<(), ()> {
         let result = client.Initialize(
             sharemode,
             streamflags,
-            minimum_device_period,
-            minimum_device_period,
+            default_device_period,
+            default_device_period,
             wave_format as *const WAVEFORMATEX,
             None,
         );
