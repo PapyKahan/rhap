@@ -6,72 +6,25 @@
 //
 use claxon::{Block, FlacReader};
 use windows::Win32::Foundation::*;
+use windows::Win32::Media::Multimedia::{WAVE_FORMAT_IEEE_FLOAT, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT};
+use windows::Win32::Media::KernelStreaming::{KSDATAFORMAT_SUBTYPE_PCM, SPEAKER_FRONT_LEFT, SPEAKER_FRONT_RIGHT, WAVE_FORMAT_EXTENSIBLE};
 use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use std::collections::VecDeque;
 use std::ffi::OsString;
 use std::mem::size_of;
 use std::os::windows::ffi::OsStringExt;
 use std::slice;
-use windows::core::{PCWSTR, PWSTR, HRESULT};
+use windows::core::{PCWSTR, PWSTR};
 use windows::Win32::Devices::FunctionDiscovery::*;
 use windows::Win32::Media::Audio::*;
-use windows::Win32::Media::KernelStreaming::{
-    KSDATAFORMAT_SUBTYPE_PCM, SPEAKER_FRONT_LEFT, SPEAKER_FRONT_RIGHT, WAVE_FORMAT_EXTENSIBLE,
-};
 use windows::Win32::System::Com::StructuredStorage::PropVariantClear;
-use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitialize, CLSCTX_ALL, STGM_READ, VT_LPWSTR,
-};
+use windows::Win32::System::Com::{CoCreateInstance, CoInitialize, CLSCTX_ALL, STGM_READ, VT_LPWSTR};
 use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
+
+mod device;
 
 const REFTIMES_PER_SEC : i64 = 10000000;
 const REFTIMES_PER_MILLISEC : i64 = 10000;
-
-fn host_error<'life>(errorcode: HRESULT) ->  &'life str {
-    match errorcode {
-        S_OK => "S_OK",
-        E_POINTER => "E_POINTER",
-        E_INVALIDARG => "E_INVALIDARG",
-        AUDCLNT_E_NOT_INITIALIZED => "AUDCLNT_E_NOT_INITIALIZED",
-        AUDCLNT_E_ALREADY_INITIALIZED => "AUDCLNT_E_ALREADY_INITIALIZED",
-        AUDCLNT_E_WRONG_ENDPOINT_TYPE => "AUDCLNT_E_WRONG_ENDPOINT_TYPE",
-        AUDCLNT_E_DEVICE_INVALIDATED => "AUDCLNT_E_DEVICE_INVALIDATED",
-        AUDCLNT_E_NOT_STOPPED => "AUDCLNT_E_NOT_STOPPED",
-        AUDCLNT_E_BUFFER_TOO_LARGE => "AUDCLNT_E_BUFFER_TOO_LARGE",
-        AUDCLNT_E_OUT_OF_ORDER => "AUDCLNT_E_OUT_OF_ORDER",
-        AUDCLNT_E_UNSUPPORTED_FORMAT => "AUDCLNT_E_UNSUPPORTED_FORMAT",
-        AUDCLNT_E_INVALID_SIZE => "AUDCLNT_E_INVALID_SIZE",
-        AUDCLNT_E_DEVICE_IN_USE => "AUDCLNT_E_DEVICE_IN_USE",
-        AUDCLNT_E_BUFFER_OPERATION_PENDING => "AUDCLNT_E_BUFFER_OPERATION_PENDING",
-        AUDCLNT_E_THREAD_NOT_REGISTERED => "AUDCLNT_E_THREAD_NOT_REGISTERED",
-        AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED => "AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED",
-        AUDCLNT_E_ENDPOINT_CREATE_FAILED => "AUDCLNT_E_ENDPOINT_CREATE_FAILED",
-        AUDCLNT_E_SERVICE_NOT_RUNNING => "AUDCLNT_E_SERVICE_NOT_RUNNING",
-        AUDCLNT_E_EVENTHANDLE_NOT_EXPECTED => "AUDCLNT_E_EVENTHANDLE_NOT_EXPECTED",
-        AUDCLNT_E_EXCLUSIVE_MODE_ONLY => "AUDCLNT_E_EXCLUSIVE_MODE_ONLY",
-        AUDCLNT_E_BUFDURATION_PERIOD_NOT_EQUAL => "AUDCLNT_E_BUFDURATION_PERIOD_NOT_EQUAL",
-        AUDCLNT_E_EVENTHANDLE_NOT_SET => "AUDCLNT_E_EVENTHANDLE_NOT_SET",
-        AUDCLNT_E_INCORRECT_BUFFER_SIZE => "AUDCLNT_E_INCORRECT_BUFFER_SIZE",
-        AUDCLNT_E_BUFFER_SIZE_ERROR => "AUDCLNT_E_BUFFER_SIZE_ERROR",
-        AUDCLNT_E_CPUUSAGE_EXCEEDED => "AUDCLNT_E_CPUUSAGE_EXCEEDED",
-        AUDCLNT_E_BUFFER_ERROR => "AUDCLNT_E_BUFFER_ERROR",
-        AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED => "AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED",
-        AUDCLNT_E_INVALID_DEVICE_PERIOD => "AUDCLNT_E_INVALID_DEVICE_PERIOD",
-        AUDCLNT_E_INVALID_STREAM_FLAG => "AUDCLNT_E_INVALID_STREAM_FLAG",
-        AUDCLNT_E_ENDPOINT_OFFLOAD_NOT_CAPABLE => "AUDCLNT_E_ENDPOINT_OFFLOAD_NOT_CAPABLE",
-        AUDCLNT_E_OUT_OF_OFFLOAD_RESOURCES => "AUDCLNT_E_OUT_OF_OFFLOAD_RESOURCES",
-        AUDCLNT_E_OFFLOAD_MODE_ONLY => "AUDCLNT_E_OFFLOAD_MODE_ONLY",
-        AUDCLNT_E_NONOFFLOAD_MODE_ONLY => "AUDCLNT_E_NONOFFLOAD_MODE_ONLY",
-        AUDCLNT_E_RESOURCES_INVALIDATED => "AUDCLNT_E_RESOURCES_INVALIDATED",
-        AUDCLNT_E_RAW_MODE_UNSUPPORTED => "AUDCLNT_E_RAW_MODE_UNSUPPORTED",
-        AUDCLNT_E_ENGINE_PERIODICITY_LOCKED => "AUDCLNT_E_ENGINE_PERIODICITY_LOCKED",
-        AUDCLNT_E_ENGINE_FORMAT_LOCKED => "AUDCLNT_E_ENGINE_FORMAT_LOCKED",
-        AUDCLNT_S_BUFFER_EMPTY => "AUDCLNT_S_BUFFER_EMPTY",
-        AUDCLNT_S_THREAD_ALREADY_REGISTERED => "AUDCLNT_S_THREAD_ALREADY_REGISTERED",
-        AUDCLNT_S_POSITION_STALLED => "AUDCLNT_S_POSITION_STALLED",
-        _ => "Unknown error",
-    }
-}
 
 struct Device {
     inner_device_id: PWSTR,
@@ -89,15 +42,48 @@ impl Device {
     }
 }
 
+fn print_wave_format(wave_format: *const WAVEFORMATEX) {
+    unsafe {
+        let formattag = (*wave_format).wFormatTag;
+        println!("Format tag: {:?}", formattag);
+        let channels = (*wave_format).nChannels;
+        println!("Channels: {:?}", channels);
+        let sample_rate = (*wave_format).nSamplesPerSec;
+        println!("Sample rate: {:?}", sample_rate);
+        let bits_per_sample = (*wave_format).wBitsPerSample;
+        println!("Bits per sample: {:?}", bits_per_sample);
+        let block_align = (*wave_format).nBlockAlign;
+        println!("Block align: {:?}", block_align);
+        let bytes_per_second = (*wave_format).nAvgBytesPerSec;
+        println!("Bytes per second: {:?}", bytes_per_second);
+        let cb_size = (*wave_format).cbSize;
+        println!("cbSize: {:?}", cb_size);
+        if formattag as u32 == WAVE_FORMAT_EXTENSIBLE {
+            let wave_format_extensible = wave_format as *const WAVEFORMATEXTENSIBLE;
+            let sub_format = (*wave_format_extensible).SubFormat;
+            println!("Sub format: {:?}", sub_format);
+            let valid_bits_per_sample = (*wave_format_extensible).Samples.wValidBitsPerSample;
+            println!("Valid bits per sample: {:?}", valid_bits_per_sample);
+            let channel_mask = (*wave_format_extensible).dwChannelMask;
+            println!("Channel mask: {:?}", channel_mask);
+        }
+    }
+}
+
 fn enumerate_devices() -> Result<Vec<Device>, String> {
     let mut enumerated_devices = vec![];
 
     unsafe {
         // Initialise les sous-systèmes COM
-        let _ = CoInitialize(None);
+        match CoInitialize(None) {
+            Ok(_) => (),
+            Err(err) => {
+                println!("Error initialising COM: {}", err);
+                return Err("Error initialising COM".to_string());
+            }
+        }
 
-        let enumerator: IMMDeviceEnumerator =
-            match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+        let enumerator: IMMDeviceEnumerator = match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
                 Ok(device_enumerator) => device_enumerator,
                 Err(err) => {
                     println!("Error getting device enumerator: {}", err);
@@ -105,10 +91,7 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
                 }
             };
 
-        //let d = enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia).unwrap();
-
-        let devices: IMMDeviceCollection =
-            match enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE) {
+        let devices: IMMDeviceCollection = match enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE) {
                 Ok(devices) => devices,
                 Err(err) => {
                     println!("Error getting device list: {}", err);
@@ -126,8 +109,14 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
             };
 
             let property_store: IPropertyStore = device.OpenPropertyStore(STGM_READ).unwrap();
-            let mut name_property_value =
-                property_store.GetValue(&PKEY_Device_FriendlyName).unwrap();
+            let mut name_property_value = match property_store.GetValue(&PKEY_Device_FriendlyName) {
+                Ok(name_property_value) => name_property_value,
+                Err(err) => {
+                    println!("Error getting device name: {}", err);
+                    return Err("Error getting device name".to_string());
+                }
+            };
+
 
             let prop_variant = &name_property_value.Anonymous.Anonymous;
 
@@ -156,7 +145,13 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
             };
 
             // Clean up the property.
-            PropVariantClear(&mut name_property_value).ok();
+            match PropVariantClear(&mut name_property_value) {
+                Ok(_) => (),
+                Err(err) => {
+                    println!("Error clearing property: {}", err);
+                    return Err("Error clearing property".to_string());
+                }
+            };
 
             let id: PWSTR = match device.GetId() {
                 Ok(id) => id,
@@ -174,26 +169,16 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
 }
 
 // Aligns 'v' backwards
-fn align_bwd(v : u32, align : u32) -> u32
-{
-    // (v - (align ? v % align : 0))
-    if align != 0 {
-        v - (v % align)
-    }
-    else {
-        v
-    }
-}
-
-fn calculate_periodicity(
-    sharemode : AUDCLNT_SHAREMODE,
-    streamflags : AUDCLNT_STREAMOPTIONS,
-    framesperbuffer : u32,
-    waveformat : WAVEFORMATEX,
-    periodicity : u32) {
-
-
-}
+//fn align_bwd(v : u32, align : u32) -> u32
+//{
+//    // (v - (align ? v % align : 0))
+//    if align != 0 {
+//        v - (v % align)
+//    }
+//    else {
+//        v
+//    }
+//}
 
 fn main() -> Result<(), ()> {
     let args = std::env::args().collect::<Vec<String>>();
@@ -212,7 +197,7 @@ fn main() -> Result<(), ()> {
 
     let mut selected_device: *const Device = std::ptr::null();
     let devices = enumerate_devices().unwrap();
-    let selected_device_id = 2;
+    let selected_device_id = 0;
 
     for dev in devices {
         if dev.index == selected_device_id {
@@ -230,14 +215,13 @@ fn main() -> Result<(), ()> {
         return Err(());
     }
 
-    // Lit le fichier FLAC et écrit les échantillons dans le périphérique audio.
     let mut flac_reader = FlacReader::open(&file_path).expect("Failed to open FLAC file");
 
     unsafe {
         match CoInitialize(None) {
             Ok(_) => (),
             Err(err) => {
-                println!("Error initializing COM: {} - {}", host_error(err.code()), err);
+                println!("Error initializing COM: {} - {}", device::log::host_error(err.code()), err);
                 return Err(());
             }
         };
@@ -246,7 +230,7 @@ fn main() -> Result<(), ()> {
             match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
                 Ok(device_enumerator) => device_enumerator,
                 Err(err) => {
-                    println!("Error getting device enumerator: {} - {}", host_error(err.code()), err);
+                    println!("Error getting device enumerator: {} - {}", device::log::host_error(err.code()), err);
                     return Err(());
                 }
             };
@@ -254,7 +238,7 @@ fn main() -> Result<(), ()> {
         let device = match enumerator.GetDevice(PCWSTR((*selected_device).inner_device_id.as_ptr())) {
             Ok(device) => device,
             Err(err) => {
-                println!("Error getting device: {} - {}", host_error(err.code()), err);
+                println!("Error getting device: {} - {}", device::log::host_error(err.code()), err);
                 return Err(());
             }
         };
@@ -263,48 +247,55 @@ fn main() -> Result<(), ()> {
         let client = match device.Activate::<IAudioClient>(CLSCTX_ALL, None) {
             Ok(client) => client,
             Err(err) => {
-                println!("Error activating device: {} - {}", host_error(err.code()), err);
+                println!("Error activating device: {} - {}", device::log::host_error(err.code()), err);
                 return Err(());
             }
         };
 
-        let wave_format = match client.GetMixFormat() {
-            Ok(wave_format) => wave_format,
-            Err(err) => {
-                println!("Error getting mix format: {} - {}", host_error(err.code()), err);
-                return Err(());
-            }
-        };
+        //let wave_format = match client.GetMixFormat() {
+        //    Ok(wave_format) => wave_format,
+        //    Err(err) => {
+        //        println!("Error getting mix format: {} - {}", device::log::host_error(err.code()), err);
+        //        return Err(());
+        //    }
+        //};
 
-        let formattag = WAVE_FORMAT_PCM;
+        //println!("-------------------------------------------------");
+        //println!("Mix format:");
+        //print_wave_format(wave_format);
+
+        let formattag = WAVE_FORMAT_EXTENSIBLE;
+        //let formattag = WAVE_FORMAT_IEEE_FLOAT;
         let channels = flac_reader.streaminfo().channels as u32;
         let sample_rate = flac_reader.streaminfo().sample_rate as u32;
+        //let bits_per_sample = 32;
         let bits_per_sample = flac_reader.streaminfo().bits_per_sample as u32;
-        let block_align = channels * bits_per_sample / 8;
+        let block_align = channels * bits_per_sample as u32 / 8;
         let bytes_per_second = sample_rate * block_align;
 
         // WAVEFORMATEX documentation: https://learn.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatex
-        (*wave_format).wFormatTag = formattag as u16;
-        //(*wave_format).wFormatTag = WAVE_FORMAT_EXTENSIBLE as u16;
-        (*wave_format).nChannels = channels as u16;
-        (*wave_format).nSamplesPerSec = sample_rate;
-        (*wave_format).wBitsPerSample = bits_per_sample as u16;
-        (*wave_format).nBlockAlign = block_align as u16;
-        (*wave_format).nAvgBytesPerSec = bytes_per_second;
-        (*wave_format).cbSize = 0;
-
         // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
-        //let wave_format: *mut WAVEFORMATEXTENSIBLE = format.clone() as *mut WAVEFORMATEXTENSIBLE;
-        //(*wave_format).Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE as u16;
-        //(*wave_format).Format.nChannels = flac_reader.streaminfo().channels as u16;
-        //(*wave_format).Format.nSamplesPerSec = flac_reader.streaminfo().sample_rate as u32;
-        //(*wave_format).Format.wBitsPerSample = flac_reader.streaminfo().bits_per_sample as u16;
-        //(*wave_format).Format.nBlockAlign = (*wave_format).Format.nChannels * (*wave_format).Format.wBitsPerSample / 8;
-        //(*wave_format).Format.nAvgBytesPerSec = (*wave_format).Format.nSamplesPerSec * (*wave_format).Format.nBlockAlign as u32;
-        //(*wave_format).Format.cbSize = size_of::<WAVEFORMATEXTENSIBLE>() as u16 - size_of::<WAVEFORMATEX>() as u16;
-        //(*wave_format).Samples.wValidBitsPerSample = (*wave_format).Format.wBitsPerSample;
-        //(*wave_format).SubFormat = KSDATAFORMAT_SUBTYPE_PCM;
-        //(*wave_format).dwChannelMask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
+        let wave_format: *const WAVEFORMATEXTENSIBLE = &mut WAVEFORMATEXTENSIBLE {
+            Format: WAVEFORMATEX {
+                wFormatTag: formattag as u16,
+                nChannels: channels as u16,
+                nSamplesPerSec: sample_rate,
+                wBitsPerSample: bits_per_sample as u16,
+                nBlockAlign: block_align as u16,
+                nAvgBytesPerSec: bytes_per_second,
+                cbSize: size_of::<WAVEFORMATEXTENSIBLE>() as u16 - size_of::<WAVEFORMATEX>() as u16,
+            },
+            Samples: WAVEFORMATEXTENSIBLE_0 {
+                wValidBitsPerSample: bits_per_sample as u16,
+            },
+            dwChannelMask: SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT,
+            SubFormat: KSDATAFORMAT_SUBTYPE_PCM,
+            //SubFormat: KSDATAFORMAT_SUBTYPE_IEEE_FLOAT,
+        };
+
+        println!("");
+        println!("Using format:");
+        print_wave_format(wave_format as *const WAVEFORMATEX);
 
         // Création des pointeurs pour les paramètres
         let mut default_device_period: i64 = 0;
@@ -313,32 +304,34 @@ fn main() -> Result<(), ()> {
         match client.GetDevicePeriod(Some(&mut default_device_period as *mut i64), Some(&mut minimum_device_period as *mut i64)) {
             Ok(_) => (),
             Err(err) => {
-                println!("Error getting device period: {} - {}", host_error(err.code()), err);
+                println!("Error getting device period: {} - {}", device::log::host_error(err.code()), err);
                 return Err(());
             }
         };
 
         let sharemode = AUDCLNT_SHAREMODE_EXCLUSIVE;
         let streamflags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
-        let result = client.IsFormatSupported(sharemode, wave_format, None);
-        if result != S_OK {
-            println!("Format not supported: {} - {}", host_error(result), result);
-            return Err(());
-        }
+        match client.IsFormatSupported(sharemode, wave_format as *const WAVEFORMATEX, None) {
+            S_OK => (),
+            result => {
+                println!("Error checking format support: {} - {}", device::log::host_error(result), "Unsuporrted format");
+                return Err(());
+            }
+        };
 
         let result = client.Initialize(
             sharemode,
             streamflags,
             minimum_device_period,
             minimum_device_period,
-            wave_format,
+            wave_format as *const WAVEFORMATEX,
             None,
         );
 
         if result.is_err() {
             if result.as_ref().err().unwrap().code() != AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED {
                 let err = result.err().unwrap();
-                println!("Error initializing client: {} - {}", host_error(err.code()), err);
+                println!("Error initializing client: {} - {}", device::log::host_error(err.code()), err);
                 return Err(());
             }
             println!("Buffer size not aligned");
@@ -349,13 +342,13 @@ fn main() -> Result<(), ()> {
                     return Err(());
                 }
             };
-            let minimum_device_period  = REFTIMES_PER_SEC / (*wave_format).nSamplesPerSec as i64 * buffer_size;
+            let minimum_device_period  = REFTIMES_PER_SEC / sample_rate as i64 * buffer_size;
             match client.Initialize(
                 sharemode,
                 streamflags,
                 minimum_device_period,
                 minimum_device_period,
-                wave_format,
+                wave_format as *const WAVEFORMATEX,
                 None,
             ) {
                 Ok(_) => (),
@@ -374,7 +367,7 @@ fn main() -> Result<(), ()> {
         ) {
             Ok(eventhandle) => eventhandle,
             Err(err) => {
-                println!("Error creating event handle: {} - {}", host_error(err.code()), err);
+                println!("Error creating event handle: {} - {}", device::log::host_error(err.code()), err);
                 return Err(());
             }
         };
@@ -382,7 +375,7 @@ fn main() -> Result<(), ()> {
         match client.SetEventHandle(eventhandle) {
             Ok(_) => (),
             Err(err) => {
-                println!("Error setting event handle: {} - {}", host_error(err.code()), err);
+                println!("Error setting event handle: {} - {}", device::log::host_error(err.code()), err);
                 return Err(());
             }
         }
@@ -390,7 +383,7 @@ fn main() -> Result<(), ()> {
         let buffer_size = match client.GetBufferSize() {
             Ok(buffer_size) => buffer_size,
             Err(err) => {
-                println!("Size: Error getting buffer size: {} - {}", host_error(err.code()), err);
+                println!("Size: Error getting buffer size: {} - {}", device::log::host_error(err.code()), err);
                 return Err(());
             }
         };
@@ -398,7 +391,7 @@ fn main() -> Result<(), ()> {
         let client_renderer = match client.GetService::<IAudioRenderClient>() {
             Ok(client_renderer) => client_renderer,
             Err(err) => {
-                println!("Error getting client renderer: {} - {}", host_error(err.code()), err);
+                println!("Error getting client renderer: {} - {}", device::log::host_error(err.code()), err);
                 return Err(());
             }
         };
@@ -406,7 +399,7 @@ fn main() -> Result<(), ()> {
         match client.Start() {
             Ok(_) => (),
             Err(err) => {
-                println!("Error starting client: {} - {}", host_error(err.code()), err);
+                println!("Error starting client: {} - {}", device::log::host_error(err.code()), err);
                 return Err(());
             }
         }
@@ -414,7 +407,7 @@ fn main() -> Result<(), ()> {
         let mut frame_reader = flac_reader.blocks();
         let mut block = Block::empty();
         let mut vec_buffer = VecDeque::new();
-        let bytes = bits_per_sample / 8;
+        let bytes = block_align / channels;
         loop {
             match frame_reader.read_next_or_eof(block.into_buffer()) {
                 Ok(Some(next_block)) => {
@@ -445,8 +438,8 @@ fn main() -> Result<(), ()> {
                 }
             }
         }
-        println!("Vec buffer size: {}", vec_buffer.len());
         
+        println!("Playing file path: {}", file_path);
         while vec_buffer.len() > 0 {
             match WaitForSingleObject(eventhandle, 2000) {
                 WAIT_OBJECT_0 => (),
@@ -484,7 +477,7 @@ fn main() -> Result<(), ()> {
             match client_renderer.ReleaseBuffer(buffer_size, 0) {
                 Ok(_) => (),
                 Err(err) => {
-                    println!("Error releasing client buffer: {} - {}", host_error(err.code()), err);
+                    println!("Error releasing client buffer: {} - {}", device::log::host_error(err.code()), err);
                     return Err(());
                 }
             };
@@ -493,7 +486,7 @@ fn main() -> Result<(), ()> {
         match client.Stop() {
             Ok(_) => (),
             Err(err) => {
-                println!("Error stopping client: {} - {}", host_error(err.code()), err);
+                println!("Error stopping client: {} - {}", device::log::host_error(err.code()), err);
                 return Err(());
             }
         }
