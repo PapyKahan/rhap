@@ -83,7 +83,7 @@ fn main() -> Result<(), ()> {
     let mut stream = match Stream::<WasapiStream>::new(
         StreamParams {
             device: Device {
-                id: 0,
+                id: 1,
                 name: String::from(""),
             },
             samplerate: sample_rate.unwrap(),

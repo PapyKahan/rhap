@@ -24,9 +24,9 @@ use windows::Win32::System::Com::{
 use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 
+use crate::audio::api::wasapi::utils::{host_error, print_wave_format};
+
 mod audio;
-use crate::audio::log::*;
-//use crate::audio::api::wasapi::stream::*;
 
 const REFTIMES_PER_SEC: i64 = 10000000;
 //const REFTIMES_PER_MILLISEC : i64 = 10000;
@@ -202,7 +202,7 @@ fn main() -> Result<(), ()> {
             Err(err) => {
                 println!(
                     "Error initializing COM: {} - {}",
-                    audio::log::host_error(err.code()),
+                    host_error(err.code()),
                     err
                 );
                 return Err(());
@@ -215,7 +215,7 @@ fn main() -> Result<(), ()> {
                 Err(err) => {
                     println!(
                         "Error getting device enumerator: {} - {}",
-                        audio::log::host_error(err.code()),
+                        host_error(err.code()),
                         err
                     );
                     return Err(());
@@ -227,7 +227,7 @@ fn main() -> Result<(), ()> {
             Err(err) => {
                 println!(
                     "Error getting device: {} - {}",
-                    audio::log::host_error(err.code()),
+                    host_error(err.code()),
                     err
                 );
                 return Err(());
@@ -240,7 +240,7 @@ fn main() -> Result<(), ()> {
             Err(err) => {
                 println!(
                     "Error activating device: {} - {}",
-                    audio::log::host_error(err.code()),
+                    host_error(err.code()),
                     err
                 );
                 return Err(());
@@ -292,7 +292,7 @@ fn main() -> Result<(), ()> {
             result => {
                 println!(
                     "Error checking format support: {} - {}",
-                    audio::log::host_error(result),
+                    host_error(result),
                     "Unsuporrted format"
                 );
                 return Err(());
@@ -310,7 +310,7 @@ fn main() -> Result<(), ()> {
             Err(err) => {
                 println!(
                     "Error getting device period: {} - {}",
-                    audio::log::host_error(err.code()),
+                    host_error(err.code()),
                     err
                 );
                 return Err(());
@@ -331,7 +331,7 @@ fn main() -> Result<(), ()> {
                 let err = result.err().unwrap();
                 println!(
                     "Error initializing client: {} - {}",
-                    audio::log::host_error(err.code()),
+                    host_error(err.code()),
                     err
                 );
                 return Err(());
@@ -366,7 +366,7 @@ fn main() -> Result<(), ()> {
             Err(err) => {
                 println!(
                     "Error creating event handle: {} - {}",
-                    audio::log::host_error(err.code()),
+                    host_error(err.code()),
                     err
                 );
                 return Err(());
@@ -378,7 +378,7 @@ fn main() -> Result<(), ()> {
             Err(err) => {
                 println!(
                     "Error setting event handle: {} - {}",
-                    audio::log::host_error(err.code()),
+                    host_error(err.code()),
                     err
                 );
                 return Err(());
@@ -390,7 +390,7 @@ fn main() -> Result<(), ()> {
             Err(err) => {
                 println!(
                     "Size: Error getting buffer size: {} - {}",
-                    audio::log::host_error(err.code()),
+                    host_error(err.code()),
                     err
                 );
                 return Err(());
@@ -402,7 +402,7 @@ fn main() -> Result<(), ()> {
             Err(err) => {
                 println!(
                     "Error getting client renderer: {} - {}",
-                    audio::log::host_error(err.code()),
+                    host_error(err.code()),
                     err
                 );
                 return Err(());
@@ -414,7 +414,7 @@ fn main() -> Result<(), ()> {
             Err(err) => {
                 println!(
                     "Error starting client: {} - {}",
-                    audio::log::host_error(err.code()),
+                    host_error(err.code()),
                     err
                 );
                 return Err(());
@@ -498,7 +498,7 @@ fn main() -> Result<(), ()> {
                 Err(err) => {
                     println!(
                         "Error releasing client buffer: {} - {}",
-                        audio::log::host_error(err.code()),
+                        host_error(err.code()),
                         err
                     );
                     return Err(());
@@ -511,7 +511,7 @@ fn main() -> Result<(), ()> {
             Err(err) => {
                 println!(
                     "Error stopping client: {} - {}",
-                    audio::log::host_error(err.code()),
+                    host_error(err.code()),
                     err
                 );
                 return Err(());
