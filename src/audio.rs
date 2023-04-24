@@ -109,7 +109,7 @@ pub trait StreamTrait {
     where
         Self: Sized,
         T: FnMut(*mut [u8], f32) -> Result<DataProcessing, String> + Send + 'static;
-    fn start(&self) -> Result<(), String>;
+    fn start(&mut self) -> Result<(), String>;
     fn stop(&self) -> Result<(), String>;
     fn pause(&self) -> Result<(), String>;
     fn resume(&self) -> Result<(), String>;

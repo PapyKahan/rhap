@@ -8,7 +8,7 @@ use claxon::{Block, FlacReader};
 use std::collections::VecDeque;
 
 use crate::audio::{
-    api::wasapi::{enumerate_devices, stream::WasapiStream, stream::WasapiDevice}, DataProcessing, Device, Stream, StreamParams, SampleRate, BitsPerSample,
+    api::wasapi::{enumerate_devices, stream::WasapiStream}, DataProcessing, Device, Stream, StreamParams, SampleRate, BitsPerSample,
 };
 
 mod audio;
@@ -73,7 +73,7 @@ fn main() -> Result<(), ()> {
         Ok(DataProcessing::Continue)
     };
 
-    let stream = match Stream::<WasapiStream>::new(
+    let mut stream = match Stream::<WasapiStream>::new(
         StreamParams {
             device: Device {
                 id: 0,

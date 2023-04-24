@@ -22,6 +22,32 @@ use super::enumerate_devices;
 const REFTIMES_PER_SEC: i64 = 10000000;
 //const REFTIMES_PER_MILLISEC : i64 = 10000;
 
+fn _get_device(id: u16) -> Result<PCWSTR, String> {
+    let mut selected_device: PCWSTR = PCWSTR(std::ptr::null_mut());
+
+    let devices = match enumerate_devices() {
+        Ok(devices) => devices,
+        Err(err) => {
+            println!("Error enumerating devices: {}", err);
+            return Err(err);
+        }
+    };
+
+    for dev in devices {
+        if dev.index == id {
+            selected_device = dev.id;
+            break;
+        }
+    }
+
+    if selected_device.is_null() {
+        println!("Device not found");
+        return Err("Device not found".to_string());
+    }
+
+    Ok(selected_device)
+}
+
 pub struct WasapiDevice {
     id: PCWSTR,
     pub index: u16,
@@ -40,45 +66,19 @@ impl WasapiDevice {
     }
 }
 
-pub struct WasapiStream {
+pub struct WasapiStream<'a> {
     params: StreamParams,
-    client: *const IAudioClient,
+    client: &'a mut IAudioClient,
     renderer: *const IAudioRenderClient,
     buffersize: u32,
-    callback : &'static (dyn FnMut(*mut [u8], f32) -> Result<DataProcessing, String> + Send + 'static),
     eventhandle: *const HANDLE,
+    callback : Box<dyn FnMut(*mut [u8], f32) -> Result<DataProcessing, String> + Send + 'static>,
 }
 
-fn _get_device(id: u16) -> Result<*const WasapiDevice, String> {
-    let mut selected_device: *const WasapiDevice = std::ptr::null();
 
-    let devices = match enumerate_devices() {
-        Ok(devices) => devices,
-        Err(err) => {
-            println!("Error enumerating devices: {}", err);
-            return Err(err);
-        }
-    };
-
-    for dev in devices {
-        if dev.index == id {
-            println!("Selected device: id={}, name={}", dev.index, dev.name);
-            selected_device = &dev;
-            break;
-        }
-    }
-
-    if selected_device.is_null() {
-        println!("Device not found");
-        return Err("Device not found".to_string());
-    }
-
-    Ok(selected_device)
-}
-
-impl StreamTrait for WasapiStream {
+impl<'a> StreamTrait for WasapiStream<'a> {
     fn new<T>(params: StreamParams, callback: T) -> Result<Self, String>
-        where T: FnMut(*mut [u8], f32) -> Result<DataProcessing, String>,
+        where T: FnMut(*mut [u8], f32) -> Result<DataProcessing, String> + Send + 'static,
     {
         let selected_device = match _get_device(params.device.id) {
             Ok(device) => device,
@@ -111,7 +111,7 @@ impl StreamTrait for WasapiStream {
                     }
                 };
 
-            let device = match enumerator.GetDevice((*selected_device).id) {
+            let device = match enumerator.GetDevice(selected_device) {
                 Ok(device) => device,
                 Err(err) => {
                     return Err(format!(
@@ -123,9 +123,9 @@ impl StreamTrait for WasapiStream {
             };
 
             // Crée un périphérique audio WASAPI exclusif.
-            let client: *const IAudioClient =
+            let mut client: *mut IAudioClient =
                 match device.Activate::<IAudioClient>(CLSCTX_ALL, None) {
-                    Ok(client) => &client,
+                    Ok(client) => client,
                     Err(err) => {
                         return Err(format!(
                             "Error activating device: {} - {}",
@@ -177,7 +177,7 @@ impl StreamTrait for WasapiStream {
 
             let sharemode = AUDCLNT_SHAREMODE_EXCLUSIVE;
             let streamflags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
-            match (*client).IsFormatSupported(sharemode, wave_format as *const WAVEFORMATEX, None) {
+            match client.IsFormatSupported(sharemode, wave_format as *const WAVEFORMATEX, None) {
                 S_OK => true,
                 result => {
                     return Err(format!(
@@ -187,11 +187,14 @@ impl StreamTrait for WasapiStream {
                     ));
                 }
             };
+            println!("--------------------------------------------------------------------------------------");
+            println!("end of new");
+            println!("--------------------------------------------------------------------------------------");
 
             // Création des pointeurs pour les paramètres
             let mut default_device_period: i64 = 0;
             let mut minimum_device_period: i64 = 0;
-            match (*client).GetDevicePeriod(
+            match client.GetDevicePeriod(
                 Some(&mut default_device_period as *mut i64),
                 Some(&mut minimum_device_period as *mut i64),
             ) {
@@ -205,7 +208,7 @@ impl StreamTrait for WasapiStream {
                 }
             };
 
-            let result = (*client).Initialize(
+            let result = client.Initialize(
                 sharemode,
                 streamflags,
                 minimum_device_period,
@@ -224,14 +227,14 @@ impl StreamTrait for WasapiStream {
                     ));
                 }
                 println!("Buffer size not aligned");
-                let buffer_size = match (*client).GetBufferSize() {
+                let buffer_size = match client.GetBufferSize() {
                     Ok(buffer_size) => buffer_size as i64,
                     Err(err) => {
                         return Err(format!("Initialize: Error getting buffer size: {}", err));
                     }
                 };
                 let minimum_device_period = REFTIMES_PER_SEC / sample_rate as i64 * buffer_size;
-                match (*client).Initialize(
+                match client.Initialize(
                     sharemode,
                     streamflags,
                     minimum_device_period,
@@ -258,7 +261,7 @@ impl StreamTrait for WasapiStream {
                 }
             };
 
-            match (*client).SetEventHandle(*eventhandle) {
+            match client.SetEventHandle(*eventhandle) {
                 Ok(_) => (),
                 Err(err) => {
                     return Err(format!(
@@ -269,7 +272,7 @@ impl StreamTrait for WasapiStream {
                 }
             }
 
-            let buffersize = match (*client).GetBufferSize() {
+            let buffersize = match client.GetBufferSize() {
                 Ok(buffer_size) => buffer_size,
                 Err(err) => {
                     return Err(format!(
@@ -281,7 +284,7 @@ impl StreamTrait for WasapiStream {
             };
 
             let renderer: *const IAudioRenderClient =
-                match (*client).GetService::<IAudioRenderClient>() {
+                match client.GetService::<IAudioRenderClient>() {
                     Ok(client_renderer) => &client_renderer,
                     Err(err) => {
                         return Err(format!(
@@ -291,19 +294,18 @@ impl StreamTrait for WasapiStream {
                         ));
                     }
                 };
-
             Ok(Self {
                 params,
-                client,
+                client: &mut client,
                 renderer,
                 buffersize,
-                callback: callback,
                 eventhandle,
+                callback: Box::new(callback),
             })
         }
     }
 
-    fn start(&self) -> Result<(), String> {
+    fn start(&mut self) -> Result<(), String> {
         println!("Starting stream with parameters: {:?}", self.params);
         unsafe {
             match (*self.client).Start() {
@@ -345,22 +347,22 @@ impl StreamTrait for WasapiStream {
                 // Convert client buffer to a slice of bytes.
                 let data = std::slice::from_raw_parts_mut(client_buffer, client_buffer_len);
 
-                //let result = match self.callback(data, 0.0)
-                //    Ok(result) => result,
-                //    Err(err) => {
-                //        return Err(format!("Error calling callback: {}", err));
-                //    }
-                //};
+                let result = match (self.callback)(data, 0.0) {
+                    Ok(result) => result,
+                    Err(err) => {
+                        return Err(format!("Error calling callback: {}", err));
+                    }
+                };
 
-                //match result {
-                //    DataProcessing::Complete => {
-                //        break;
-                //    }
-                //    DataProcessing::Abort => {
-                //        break;
-                //    }
-                //    DataProcessing::Continue => (),
-                //};
+                match result {
+                    DataProcessing::Complete => {
+                        break;
+                    }
+                    DataProcessing::Abort => {
+                        break;
+                    }
+                    DataProcessing::Continue => (),
+                };
 
                 match (*self.renderer).ReleaseBuffer(self.buffersize, 0) {
                     Ok(_) => (),
