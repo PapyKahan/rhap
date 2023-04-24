@@ -7,6 +7,8 @@
 use claxon::{Block, FlacReader};
 use std::collections::VecDeque;
 
+const DEVICE_ID : u16 = 0;
+
 use crate::audio::{
     api::wasapi::{enumerate_devices, stream::WasapiStream}, DataProcessing, Device, Stream, StreamParams, SampleRate, BitsPerSample,
 };
@@ -82,7 +84,7 @@ fn main() -> Result<(), ()> {
     let mut stream = match Stream::<WasapiStream>::new(
         StreamParams {
             device: Device {
-                id: 1,
+                id: DEVICE_ID,
                 name: String::from(""),
             },
             samplerate: sample_rate.unwrap(),
