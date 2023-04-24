@@ -167,7 +167,7 @@ fn main() -> Result<(), ()> {
         }
     };
 
-    let selected_device_id = 0;
+    let selected_device_id = 1;
     let devices = match enumerate_devices() {
         Ok(devices) => devices,
         Err(err) => {

@@ -68,7 +68,6 @@ fn main() -> Result<(), ()> {
         }
     }
     let callback = move |data: &mut [u8], buffer_size: usize| -> Result<DataProcessing, String> {
-        println!("buffer_size: {}", buffer_size);
         let mut data_processing = DataProcessing::Continue;
         for i in 0..buffer_size {
             if vec_buffer.is_empty() {
