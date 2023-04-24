@@ -66,19 +66,19 @@ impl WasapiDevice {
     }
 }
 
-pub struct WasapiStream<'a> {
+pub struct WasapiStream {
     params: StreamParams,
-    client: &'a mut IAudioClient,
-    renderer: *const IAudioRenderClient,
+    client: IAudioClient,
+    renderer: IAudioRenderClient,
     buffersize: u32,
-    eventhandle: *const HANDLE,
-    callback : Box<dyn FnMut(*mut [u8], f32) -> Result<DataProcessing, String> + Send + 'static>,
+    eventhandle: HANDLE,
+    callback : Box<dyn FnMut(&mut [u8], usize) -> Result<DataProcessing, String> + Send + 'static>,
 }
 
 
-impl<'a> StreamTrait for WasapiStream<'a> {
+impl StreamTrait for WasapiStream {
     fn new<T>(params: StreamParams, callback: T) -> Result<Self, String>
-        where T: FnMut(*mut [u8], f32) -> Result<DataProcessing, String> + Send + 'static,
+        where T: FnMut(&mut [u8], usize) -> Result<DataProcessing, String> + Send + 'static,
     {
         let selected_device = match _get_device(params.device.id) {
             Ok(device) => device,
@@ -123,7 +123,7 @@ impl<'a> StreamTrait for WasapiStream<'a> {
             };
 
             // Crée un périphérique audio WASAPI exclusif.
-            let mut client: *mut IAudioClient =
+            let client: IAudioClient =
                 match device.Activate::<IAudioClient>(CLSCTX_ALL, None) {
                     Ok(client) => client,
                     Err(err) => {
@@ -187,9 +187,6 @@ impl<'a> StreamTrait for WasapiStream<'a> {
                     ));
                 }
             };
-            println!("--------------------------------------------------------------------------------------");
-            println!("end of new");
-            println!("--------------------------------------------------------------------------------------");
 
             // Création des pointeurs pour les paramètres
             let mut default_device_period: i64 = 0;
@@ -249,9 +246,9 @@ impl<'a> StreamTrait for WasapiStream<'a> {
                 }
             }
 
-            let eventhandle: *const HANDLE = match CreateEventW(None, FALSE, FALSE, PCWSTR::null())
+            let eventhandle = match CreateEventW(None, FALSE, FALSE, PCWSTR::null())
             {
-                Ok(eventhandle) => &eventhandle,
+                Ok(eventhandle) => eventhandle,
                 Err(err) => {
                     return Err(format!(
                         "Error creating event handle: {} - {}",
@@ -261,7 +258,7 @@ impl<'a> StreamTrait for WasapiStream<'a> {
                 }
             };
 
-            match client.SetEventHandle(*eventhandle) {
+            match client.SetEventHandle(eventhandle) {
                 Ok(_) => (),
                 Err(err) => {
                     return Err(format!(
@@ -283,9 +280,9 @@ impl<'a> StreamTrait for WasapiStream<'a> {
                 }
             };
 
-            let renderer: *const IAudioRenderClient =
+            let renderer: IAudioRenderClient =
                 match client.GetService::<IAudioRenderClient>() {
-                    Ok(client_renderer) => &client_renderer,
+                    Ok(client_renderer) => client_renderer,
                     Err(err) => {
                         return Err(format!(
                             "Error getting client renderer: {} - {}",
@@ -296,7 +293,7 @@ impl<'a> StreamTrait for WasapiStream<'a> {
                 };
             Ok(Self {
                 params,
-                client: &mut client,
+                client,
                 renderer,
                 buffersize,
                 eventhandle,
@@ -308,7 +305,7 @@ impl<'a> StreamTrait for WasapiStream<'a> {
     fn start(&mut self) -> Result<(), String> {
         println!("Starting stream with parameters: {:?}", self.params);
         unsafe {
-            match (*self.client).Start() {
+            match self.client.Start() {
                 Ok(_) => (),
                 Err(err) => {
                     return Err(format!(
@@ -320,7 +317,7 @@ impl<'a> StreamTrait for WasapiStream<'a> {
             }
 
             loop {
-                match WaitForSingleObject(*self.eventhandle, 2000) {
+                match WaitForSingleObject(self.eventhandle, 2000) {
                     WAIT_OBJECT_0 => (),
                     WAIT_TIMEOUT => {
                         println!("Timeout");
@@ -333,7 +330,7 @@ impl<'a> StreamTrait for WasapiStream<'a> {
                     _ => (),
                 }
 
-                let client_buffer = match (*self.renderer).GetBuffer(self.buffersize) {
+                let client_buffer = match self.renderer.GetBuffer(self.buffersize) {
                     Ok(buffer) => buffer,
                     Err(err) => {
                         return Err(format!("Error getting client buffer: {}", err));
@@ -346,8 +343,7 @@ impl<'a> StreamTrait for WasapiStream<'a> {
                     * self.params.channels as usize;
                 // Convert client buffer to a slice of bytes.
                 let data = std::slice::from_raw_parts_mut(client_buffer, client_buffer_len);
-
-                let result = match (self.callback)(data, 0.0) {
+                let result = match (self.callback)(data, client_buffer_len) {
                     Ok(result) => result,
                     Err(err) => {
                         return Err(format!("Error calling callback: {}", err));
@@ -361,10 +357,12 @@ impl<'a> StreamTrait for WasapiStream<'a> {
                     DataProcessing::Abort => {
                         break;
                     }
-                    DataProcessing::Continue => (),
+                    DataProcessing::Continue => {
+                        ()
+                    },
                 };
 
-                match (*self.renderer).ReleaseBuffer(self.buffersize, 0) {
+                match self.renderer.ReleaseBuffer(self.buffersize, 0) {
                     Ok(_) => (),
                     Err(err) => {
                         return Err(format!(
@@ -382,7 +380,7 @@ impl<'a> StreamTrait for WasapiStream<'a> {
     fn stop(&self) -> Result<(), String> {
         println!("Stopping stream with parameters: {:?}", self.params);
         unsafe {
-            match (*self.client).Stop() {
+            match self.client.Stop() {
                 Ok(_) => (),
                 Err(err) => {
                     return Err(format!(

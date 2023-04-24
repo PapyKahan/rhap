@@ -10,21 +10,25 @@ use std::ffi::OsString;
 use std::mem::size_of;
 use std::os::windows::ffi::OsStringExt;
 use std::slice;
-use windows::Win32::Foundation::*;
-use windows::Win32::Media::KernelStreaming::{KSDATAFORMAT_SUBTYPE_PCM, SPEAKER_FRONT_LEFT, SPEAKER_FRONT_RIGHT, WAVE_FORMAT_EXTENSIBLE};
-use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::core::PCWSTR;
 use windows::Win32::Devices::FunctionDiscovery::*;
+use windows::Win32::Foundation::*;
 use windows::Win32::Media::Audio::*;
+use windows::Win32::Media::KernelStreaming::{
+    KSDATAFORMAT_SUBTYPE_PCM, SPEAKER_FRONT_LEFT, SPEAKER_FRONT_RIGHT, WAVE_FORMAT_EXTENSIBLE,
+};
 use windows::Win32::System::Com::StructuredStorage::PropVariantClear;
-use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, STGM_READ, VT_LPWSTR, COINIT_MULTITHREADED};
+use windows::Win32::System::Com::{
+    CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED, STGM_READ, VT_LPWSTR,
+};
+use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 
 mod audio;
 use crate::audio::log::*;
 //use crate::audio::api::wasapi::stream::*;
 
-const REFTIMES_PER_SEC : i64 = 10000000;
+const REFTIMES_PER_SEC: i64 = 10000000;
 //const REFTIMES_PER_MILLISEC : i64 = 10000;
 
 struct Device {
@@ -56,7 +60,8 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
             }
         }
 
-        let enumerator: IMMDeviceEnumerator = match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+        let enumerator: IMMDeviceEnumerator =
+            match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
                 Ok(device_enumerator) => device_enumerator,
                 Err(err) => {
                     println!("Error getting device enumerator: {}", err);
@@ -64,7 +69,8 @@ fn enumerate_devices() -> Result<Vec<Device>, String> {
                 }
             };
 
-        let devices: IMMDeviceCollection = match enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE) {
+        let devices: IMMDeviceCollection =
+            match enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE) {
                 Ok(devices) => devices,
                 Err(err) => {
                     println!("Error getting device list: {}", err);
@@ -149,7 +155,12 @@ fn main() -> Result<(), ()> {
             let devices = enumerate_devices().unwrap();
             for dev in devices {
                 unsafe {
-                    println!("Device: id={}, name={}, inner_id={}", dev.index, dev.name, dev.id.display().to_string());
+                    println!(
+                        "Device: id={}, name={}, inner_id={}",
+                        dev.index,
+                        dev.name,
+                        dev.id.display().to_string()
+                    );
                 }
             }
             return Ok(());
@@ -189,7 +200,11 @@ fn main() -> Result<(), ()> {
         match CoInitializeEx(None, COINIT_MULTITHREADED) {
             Ok(_) => (),
             Err(err) => {
-                println!("Error initializing COM: {} - {}", audio::log::host_error(err.code()), err);
+                println!(
+                    "Error initializing COM: {} - {}",
+                    audio::log::host_error(err.code()),
+                    err
+                );
                 return Err(());
             }
         }
@@ -198,7 +213,11 @@ fn main() -> Result<(), ()> {
             match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
                 Ok(device_enumerator) => device_enumerator,
                 Err(err) => {
-                    println!("Error getting device enumerator: {} - {}", audio::log::host_error(err.code()), err);
+                    println!(
+                        "Error getting device enumerator: {} - {}",
+                        audio::log::host_error(err.code()),
+                        err
+                    );
                     return Err(());
                 }
             };
@@ -206,7 +225,11 @@ fn main() -> Result<(), ()> {
         let device = match enumerator.GetDevice((*selected_device).id) {
             Ok(device) => device,
             Err(err) => {
-                println!("Error getting device: {} - {}", audio::log::host_error(err.code()), err);
+                println!(
+                    "Error getting device: {} - {}",
+                    audio::log::host_error(err.code()),
+                    err
+                );
                 return Err(());
             }
         };
@@ -215,7 +238,11 @@ fn main() -> Result<(), ()> {
         let client = match device.Activate::<IAudioClient>(CLSCTX_ALL, None) {
             Ok(client) => client,
             Err(err) => {
-                println!("Error activating device: {} - {}", audio::log::host_error(err.code()), err);
+                println!(
+                    "Error activating device: {} - {}",
+                    audio::log::host_error(err.code()),
+                    err
+                );
                 return Err(());
             }
         };
@@ -227,7 +254,6 @@ fn main() -> Result<(), ()> {
         //        return Err(());
         //    }
         //};
-
 
         let formattag = WAVE_FORMAT_EXTENSIBLE;
         let channels = flac_reader.streaminfo().channels as u32;
@@ -264,7 +290,11 @@ fn main() -> Result<(), ()> {
         match client.IsFormatSupported(sharemode, wave_format as *const WAVEFORMATEX, None) {
             S_OK => (),
             result => {
-                println!("Error checking format support: {} - {}", audio::log::host_error(result), "Unsuporrted format");
+                println!(
+                    "Error checking format support: {} - {}",
+                    audio::log::host_error(result),
+                    "Unsuporrted format"
+                );
                 return Err(());
             }
         };
@@ -272,10 +302,17 @@ fn main() -> Result<(), ()> {
         // Création des pointeurs pour les paramètres
         let mut default_device_period: i64 = 0;
         let mut minimum_device_period: i64 = 0;
-        match client.GetDevicePeriod(Some(&mut default_device_period as *mut i64), Some(&mut minimum_device_period as *mut i64)) {
+        match client.GetDevicePeriod(
+            Some(&mut default_device_period as *mut i64),
+            Some(&mut minimum_device_period as *mut i64),
+        ) {
             Ok(_) => (),
             Err(err) => {
-                println!("Error getting device period: {} - {}", audio::log::host_error(err.code()), err);
+                println!(
+                    "Error getting device period: {} - {}",
+                    audio::log::host_error(err.code()),
+                    err
+                );
                 return Err(());
             }
         };
@@ -292,7 +329,11 @@ fn main() -> Result<(), ()> {
         if result.is_err() {
             if result.as_ref().err().unwrap().code() != AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED {
                 let err = result.err().unwrap();
-                println!("Error initializing client: {} - {}", audio::log::host_error(err.code()), err);
+                println!(
+                    "Error initializing client: {} - {}",
+                    audio::log::host_error(err.code()),
+                    err
+                );
                 return Err(());
             }
             println!("Buffer size not aligned");
@@ -303,7 +344,7 @@ fn main() -> Result<(), ()> {
                     return Err(());
                 }
             };
-            let minimum_device_period  = REFTIMES_PER_SEC / sample_rate as i64 * buffer_size;
+            let minimum_device_period = REFTIMES_PER_SEC / sample_rate as i64 * buffer_size;
             match client.Initialize(
                 sharemode,
                 streamflags,
@@ -320,15 +361,14 @@ fn main() -> Result<(), ()> {
             }
         }
 
-        let eventhandle = match CreateEventW(
-            None,
-            FALSE,
-            FALSE,
-            PCWSTR::null(),
-        ) {
+        let eventhandle = match CreateEventW(None, FALSE, FALSE, PCWSTR::null()) {
             Ok(eventhandle) => eventhandle,
             Err(err) => {
-                println!("Error creating event handle: {} - {}", audio::log::host_error(err.code()), err);
+                println!(
+                    "Error creating event handle: {} - {}",
+                    audio::log::host_error(err.code()),
+                    err
+                );
                 return Err(());
             }
         };
@@ -336,7 +376,11 @@ fn main() -> Result<(), ()> {
         match client.SetEventHandle(eventhandle) {
             Ok(_) => (),
             Err(err) => {
-                println!("Error setting event handle: {} - {}", audio::log::host_error(err.code()), err);
+                println!(
+                    "Error setting event handle: {} - {}",
+                    audio::log::host_error(err.code()),
+                    err
+                );
                 return Err(());
             }
         }
@@ -344,7 +388,11 @@ fn main() -> Result<(), ()> {
         let buffer_size = match client.GetBufferSize() {
             Ok(buffer_size) => buffer_size,
             Err(err) => {
-                println!("Size: Error getting buffer size: {} - {}", audio::log::host_error(err.code()), err);
+                println!(
+                    "Size: Error getting buffer size: {} - {}",
+                    audio::log::host_error(err.code()),
+                    err
+                );
                 return Err(());
             }
         };
@@ -352,7 +400,11 @@ fn main() -> Result<(), ()> {
         let client_renderer = match client.GetService::<IAudioRenderClient>() {
             Ok(client_renderer) => client_renderer,
             Err(err) => {
-                println!("Error getting client renderer: {} - {}", audio::log::host_error(err.code()), err);
+                println!(
+                    "Error getting client renderer: {} - {}",
+                    audio::log::host_error(err.code()),
+                    err
+                );
                 return Err(());
             }
         };
@@ -360,7 +412,11 @@ fn main() -> Result<(), ()> {
         match client.Start() {
             Ok(_) => (),
             Err(err) => {
-                println!("Error starting client: {} - {}", audio::log::host_error(err.code()), err);
+                println!(
+                    "Error starting client: {} - {}",
+                    audio::log::host_error(err.code()),
+                    err
+                );
                 return Err(());
             }
         }
@@ -373,7 +429,7 @@ fn main() -> Result<(), ()> {
             match frame_reader.read_next_or_eof(block.into_buffer()) {
                 Ok(Some(next_block)) => {
                     block = next_block;
-                },
+                }
                 Ok(None) => break, // EOF.
                 Err(error) => panic!("{}", error),
             };
@@ -399,7 +455,7 @@ fn main() -> Result<(), ()> {
                 }
             }
         }
-        
+
         println!("Playing file path: {}", file_path);
         while vec_buffer.len() > 0 {
             match WaitForSingleObject(eventhandle, 2000) {
@@ -407,11 +463,11 @@ fn main() -> Result<(), ()> {
                 WAIT_TIMEOUT => {
                     println!("Timeout");
                     break;
-                },
+                }
                 WAIT_FAILED => {
                     println!("Wait failed");
                     break;
-                },
+                }
                 _ => (),
             }
 
@@ -424,7 +480,9 @@ fn main() -> Result<(), ()> {
             };
 
             // Compute client buffer size in bytes.
-            let client_buffer_len = buffer_size as usize * (bits_per_sample / 8) as usize * channels as usize;
+            let client_buffer_len =
+                buffer_size as usize * (bits_per_sample / 8) as usize
+                * channels as usize;
             // Convert client buffer to a slice of bytes.
             let data = std::slice::from_raw_parts_mut(client_buffer, client_buffer_len);
 
@@ -434,11 +492,15 @@ fn main() -> Result<(), ()> {
                 }
                 data[i] = vec_buffer.pop_front().unwrap();
             }
-            
+
             match client_renderer.ReleaseBuffer(buffer_size, 0) {
                 Ok(_) => (),
                 Err(err) => {
-                    println!("Error releasing client buffer: {} - {}", audio::log::host_error(err.code()), err);
+                    println!(
+                        "Error releasing client buffer: {} - {}",
+                        audio::log::host_error(err.code()),
+                        err
+                    );
                     return Err(());
                 }
             };
@@ -447,7 +509,11 @@ fn main() -> Result<(), ()> {
         match client.Stop() {
             Ok(_) => (),
             Err(err) => {
-                println!("Error stopping client: {} - {}", audio::log::host_error(err.code()), err);
+                println!(
+                    "Error stopping client: {} - {}",
+                    audio::log::host_error(err.code()),
+                    err
+                );
                 return Err(());
             }
         }

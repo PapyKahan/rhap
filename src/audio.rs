@@ -1,5 +1,4 @@
 pub mod api;
-pub mod log;
 
 #[repr(u32)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -108,7 +107,7 @@ pub trait StreamTrait {
     fn new<T>(params: StreamParams, callback : T) -> Result<Self, String>
     where
         Self: Sized,
-        T: FnMut(*mut [u8], f32) -> Result<DataProcessing, String> + Send + 'static;
+        T: FnMut(&mut [u8], usize) -> Result<DataProcessing, String> + Send + 'static;
     fn start(&mut self) -> Result<(), String>;
     fn stop(&self) -> Result<(), String>;
     fn pause(&self) -> Result<(), String>;

@@ -67,10 +67,17 @@ fn main() -> Result<(), ()> {
             }
         }
     }
-    let callback = move |data: *mut [u8], time: f32| -> Result<DataProcessing, String> {
-        let buffer = unsafe { &mut *data };
-        buffer[0] = vec_buffer.pop_front().unwrap();
-        Ok(DataProcessing::Continue)
+    let callback = move |data: &mut [u8], buffer_size: usize| -> Result<DataProcessing, String> {
+        println!("buffer_size: {}", buffer_size);
+        let mut data_processing = DataProcessing::Continue;
+        for i in 0..buffer_size {
+            if vec_buffer.is_empty() {
+                data_processing = DataProcessing::Complete;
+                break;
+            }
+            data[i] = vec_buffer.pop_front().unwrap();
+        }
+        Ok(data_processing)
     };
 
     let mut stream = match Stream::<WasapiStream>::new(

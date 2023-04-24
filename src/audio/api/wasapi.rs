@@ -7,9 +7,9 @@ use crate::audio::{StreamTrait, StreamParams, Stream, DataProcessing};
 
 use self::stream::{WasapiStream, WasapiDevice};
 
-impl<'a> Stream<WasapiStream<'a>> {
+impl Stream<WasapiStream> {
     pub fn new<T>(params : StreamParams, callback : T) -> Result<Self, String>
-        where T: FnMut(*mut [u8], f32) -> Result<DataProcessing, String> + Send + 'static,
+        where T: FnMut(&mut [u8], usize) -> Result<DataProcessing, String> + Send + 'static,
     {
         let inner_stream = match WasapiStream::new(params.clone(), callback) {
             Ok(stream) => stream,
