@@ -6,14 +6,60 @@
 //
 use claxon::{Block, FlacReader};
 use std::collections::VecDeque;
-
-const DEVICE_ID : u16 = 0;
-
-use crate::audio::{
-    api::wasapi::{enumerate_devices, stream::WasapiStream}, DataProcessing, Device, Stream, StreamParams, SampleRate, BitsPerSample,
-};
+use std::fs::File;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 mod audio;
+use crate::audio::{
+    api::wasapi::{enumerate_devices, stream::WasapiStream},
+    BitsPerSample, DataProcessing, Device, SampleRate, Stream, StreamParams,
+};
+
+const DEVICE_ID: u16 = 2;
+
+fn fill_buffer(
+    mut flac_reader: FlacReader<File>,
+    vec_buffer: Arc<Mutex<VecDeque<u8>>>,
+    bytes: u8,
+) {
+    thread::spawn(move || {
+        let mut frame_reader = flac_reader.blocks();
+        let mut block = Block::empty();
+        loop {
+            match frame_reader.read_next_or_eof(block.into_buffer()) {
+                Ok(Some(next_block)) => {
+                    block = next_block;
+                }
+                Ok(None) => break, // EOF.
+                Err(error) => panic!("{}", error),
+            };
+
+            for samples in block.stereo_samples() {
+                let left = samples.0.to_le_bytes();
+                let mut copied_bytes = 0;
+                for l in left.iter() {
+                    vec_buffer.lock().unwrap().push_back(*l);
+                    copied_bytes += 1;
+                    if copied_bytes >= bytes {
+                        break;
+                    }
+                }
+
+                let right = samples.1.to_le_bytes();
+                copied_bytes = 0;
+                for r in right.iter() {
+                    vec_buffer.lock().unwrap().push_back(*r);
+                    copied_bytes += 1;
+                    if copied_bytes >= bytes {
+                        break;
+                    }
+                }
+            }
+        }
+    });
+    thread::sleep(std::time::Duration::from_millis(1000));
+}
 
 fn main() -> Result<(), ()> {
     let args = std::env::args().collect::<Vec<String>>();
@@ -23,60 +69,32 @@ fn main() -> Result<(), ()> {
             println!("Usage: rhap <file>");
             let devices = enumerate_devices().unwrap();
             for dev in devices {
-               println!("Device: id={}, name={}", dev.index, dev.name);
+                println!("Device: id={}, name={}", dev.index, dev.name);
             }
             return Ok(());
         }
     };
 
-    let mut flac_reader = FlacReader::open(&file_path).expect("Failed to open FLAC file");
+
+    let flac_reader = FlacReader::open(&file_path).expect("Failed to open FLAC file");
+
     let sample_rate = SampleRate::from(flac_reader.streaminfo().sample_rate);
+    let channels = flac_reader.streaminfo().channels as u8;
     let bits = flac_reader.streaminfo().bits_per_sample as u8;
     let bits_per_sample = BitsPerSample::from(bits);
     let bytes = bits / 8;
 
-    let mut frame_reader = flac_reader.blocks();
-    let mut block = Block::empty();
-    let mut vec_buffer = VecDeque::new();
-    loop {
-        match frame_reader.read_next_or_eof(block.into_buffer()) {
-            Ok(Some(next_block)) => {
-                block = next_block;
-            }
-            Ok(None) => break, // EOF.
-            Err(error) => panic!("{}", error),
-        };
+    let vec_buffer = Arc::new(Mutex::new(VecDeque::new()));
+    fill_buffer(flac_reader, vec_buffer.clone(), bytes);
 
-        for samples in block.stereo_samples() {
-            let left = samples.0.to_le_bytes();
-            let mut copied_bytes = 0;
-            for l in left.iter() {
-                vec_buffer.push_back(*l);
-                copied_bytes += 1;
-                if copied_bytes >= bytes {
-                    break;
-                }
-            }
-
-            let right = samples.1.to_le_bytes();
-            copied_bytes = 0;
-            for r in right.iter() {
-                vec_buffer.push_back(*r);
-                copied_bytes += 1;
-                if copied_bytes >= bytes {
-                    break;
-                }
-            }
-        }
-    }
     let callback = move |data: &mut [u8], buffer_size: usize| -> Result<DataProcessing, String> {
         let mut data_processing = DataProcessing::Continue;
         for i in 0..buffer_size {
-            if vec_buffer.is_empty() {
+            if vec_buffer.lock().unwrap().is_empty() {
                 data_processing = DataProcessing::Complete;
                 break;
             }
-            data[i] = vec_buffer.pop_front().unwrap();
+            data[i] = vec_buffer.lock().unwrap().pop_front().unwrap();
         }
         Ok(data_processing)
     };
@@ -88,7 +106,7 @@ fn main() -> Result<(), ()> {
                 name: String::from(""),
             },
             samplerate: sample_rate.unwrap(),
-            channels: flac_reader.streaminfo().channels as u8,
+            channels,
             bits_per_sample: bits_per_sample.unwrap(),
             exclusive: true,
         },
