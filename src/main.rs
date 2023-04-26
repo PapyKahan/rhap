@@ -4,6 +4,8 @@
 // reference : Exclusive mode streaming : https://learn.microsoft.com/en-us/windows/win32/coreaudio/exclusive-mode-streams
 // reference : https://www.hresult.info/FACILITY_AUDCLNT
 //
+use clap::error::ErrorKind;
+use clap::{CommandFactory, Parser};
 use claxon::{Block, FlacReader};
 use std::collections::VecDeque;
 use std::fs::File;
@@ -17,13 +19,17 @@ use crate::audio::{
     DataProcessing, Device, Stream, StreamParams,
 };
 
-const DEVICE_ID: u16 = 0;
+#[derive(Parser)]
+struct Cli {
+    #[clap(short, long)]
+    list: Option<bool>,
+    #[clap(short, long)]
+    file: Option<String>,
+    #[clap(short, long)]
+    device: Option<u16>,
+}
 
-fn fill_buffer(
-    mut flac_reader: FlacReader<File>,
-    vec_buffer: Arc<Mutex<VecDeque<u8>>>,
-    bytes: u8,
-) {
+fn fill_buffer(mut flac_reader: FlacReader<File>, vec_buffer: Arc<Mutex<VecDeque<u8>>>, bytes: u8) {
     thread::spawn(move || {
         let mut frame_reader = flac_reader.blocks();
         let mut block = Block::empty();
@@ -66,19 +72,22 @@ fn fill_buffer(
 }
 
 fn main() -> Result<(), ()> {
-    let args = std::env::args().collect::<Vec<String>>();
-    let file_path = match args.len() {
-        2 => &args[1],
-        _ => {
-            println!("Usage: rhap <file>");
-            let devices = enumerate_devices().unwrap();
-            for dev in devices {
-                println!("Device: id={}, name={}", dev.index, dev.name);
-            }
-            return Ok(());
+    let cli = Cli::parse();
+    if cli.list.unwrap_or(false) {
+        let devices = enumerate_devices().unwrap();
+        for dev in devices {
+            println!("Device: id={}, name={}", dev.index, dev.name);
         }
-    };
-
+        return Ok(());
+    } else if cli.file.is_none() {
+        let mut cmd = Cli::command();
+            cmd.error(
+                ErrorKind::MissingRequiredArgument,
+                "Can't do relative and absolute version change",
+            )
+            .exit();
+    }
+    let file_path = cli.file.unwrap();
 
     let flac_reader = FlacReader::open(&file_path).expect("Failed to open FLAC file");
     let samplerate = flac_reader.streaminfo().sample_rate;
@@ -104,7 +113,7 @@ fn main() -> Result<(), ()> {
     let mut stream = match Stream::<WasapiStream>::new(
         StreamParams {
             device: Device {
-                id: DEVICE_ID,
+                id: cli.device.unwrap_or_default(),
                 name: String::from(""),
             },
             samplerate: samplerate.into(),
