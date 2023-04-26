@@ -3,65 +3,45 @@ pub mod api;
 #[repr(u32)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum SampleRate {
-    Rate44100Hz(u32) = 44100,
-    Rate48000Hz(u32) = 48000,
-    Rate88200Hz(u32) = 88200,
-    Rate96000Hz(u32) = 96000,
-    Rate176400Hz(u32) = 176400,
-    Rate192000Hz(u32) = 192000,
+    Rate44100Hz = 44100,
+    Rate48000Hz = 48000,
+    Rate88200Hz = 88200,
+    Rate96000Hz = 96000,
+    Rate176400Hz = 176400,
+    Rate192000Hz = 192000,
 }
 
-impl SampleRate {
-    pub fn value(&self) -> u32 {
-        match self {
-            SampleRate::Rate44100Hz(rate) => *rate,
-            SampleRate::Rate48000Hz(rate) => *rate,
-            SampleRate::Rate88200Hz(rate) => *rate,
-            SampleRate::Rate96000Hz(rate) => *rate,
-            SampleRate::Rate176400Hz(rate) => *rate,
-            SampleRate::Rate192000Hz(rate) => *rate,
-        }
-    }
-
-    pub fn from(value: u32) -> Option<SampleRate> {
+impl From<u32> for SampleRate {
+    fn from(value: u32) -> Self {
         match value {
-            44100 => Some(SampleRate::Rate44100Hz(44100)),
-            48000 => Some(SampleRate::Rate48000Hz(48000)),
-            88200 => Some(SampleRate::Rate88200Hz(88200)),
-            96000 => Some(SampleRate::Rate96000Hz(96000)),
-            176400 => Some(SampleRate::Rate176400Hz(176400)),
-            192000 => Some(SampleRate::Rate192000Hz(192000)),
-            _ => None,
+            44100 => SampleRate::Rate44100Hz,
+            48000 => SampleRate::Rate48000Hz,
+            88200 => SampleRate::Rate88200Hz,
+            96000 => SampleRate::Rate96000Hz,
+            176400 => SampleRate::Rate176400Hz,
+            192000 => SampleRate::Rate192000Hz,
+            _ => panic!("Invalid sample rate"),
         }
     }
 }
 
 #[repr(u8)]
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BitsPerSample {
-    Bits8(u8) = 8,
-    Bits16(u8) = 16,
-    Bits24(u8) = 24,
-    Bits32(u8) = 32,
+    Bits8 = 8,
+    Bits16 = 16,
+    Bits24 = 24,
+    Bits32 = 32,
 }
 
-impl BitsPerSample {
-    pub fn value(&self) -> u8 {
-        match self {
-            BitsPerSample::Bits8(bits) => *bits,
-            BitsPerSample::Bits16(bits) => *bits,
-            BitsPerSample::Bits24(bits) => *bits,
-            BitsPerSample::Bits32(bits) => *bits,
-        }
-    }
-
-    pub fn from(value: u8) -> Option<BitsPerSample> {
+impl From<u8> for BitsPerSample {
+    fn from(value: u8) -> Self {
         match value {
-            8 => Some(BitsPerSample::Bits8(8)),
-            16 => Some(BitsPerSample::Bits16(16)),
-            24 => Some(BitsPerSample::Bits24(24)),
-            32 => Some(BitsPerSample::Bits32(32)),
-            _ => None,
+            8 => BitsPerSample::Bits8,
+            16 => BitsPerSample::Bits16,
+            24 => BitsPerSample::Bits24,
+            32 => BitsPerSample::Bits32,
+            _ => panic!("Invalid bits per sample"),
         }
     }
 }
@@ -72,6 +52,7 @@ pub struct StreamParams {
     pub channels: u8,
     pub samplerate: SampleRate,
     pub bits_per_sample: BitsPerSample,
+    pub buffer_length: i64,
     pub exclusive: bool,
 }
 

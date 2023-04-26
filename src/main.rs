@@ -11,9 +11,10 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 mod audio;
+
 use crate::audio::{
     api::wasapi::{enumerate_devices, stream::WasapiStream},
-    BitsPerSample, DataProcessing, Device, SampleRate, Stream, StreamParams,
+    DataProcessing, Device, Stream, StreamParams,
 };
 
 const DEVICE_ID: u16 = 2;
@@ -57,8 +58,11 @@ fn fill_buffer(
                 }
             }
         }
+        println!("Buffer filled");
     });
-    thread::sleep(std::time::Duration::from_millis(1000));
+    println!("Waiting for buffer to be filled");
+    thread::sleep(std::time::Duration::from_secs(1));
+    println!("Waiting done");
 }
 
 fn main() -> Result<(), ()> {
@@ -77,12 +81,10 @@ fn main() -> Result<(), ()> {
 
 
     let flac_reader = FlacReader::open(&file_path).expect("Failed to open FLAC file");
-
-    let sample_rate = SampleRate::from(flac_reader.streaminfo().sample_rate);
+    let samplerate = flac_reader.streaminfo().sample_rate;
     let channels = flac_reader.streaminfo().channels as u8;
-    let bits = flac_reader.streaminfo().bits_per_sample as u8;
-    let bits_per_sample = BitsPerSample::from(bits);
-    let bytes = bits / 8;
+    let bits_per_sample = flac_reader.streaminfo().bits_per_sample as u8;
+    let bytes = bits_per_sample / 8;
 
     let vec_buffer = Arc::new(Mutex::new(VecDeque::new()));
     fill_buffer(flac_reader, vec_buffer.clone(), bytes);
@@ -105,9 +107,10 @@ fn main() -> Result<(), ()> {
                 id: DEVICE_ID,
                 name: String::from(""),
             },
-            samplerate: sample_rate.unwrap(),
+            samplerate: samplerate.into(),
             channels,
-            bits_per_sample: bits_per_sample.unwrap(),
+            bits_per_sample: bits_per_sample.into(),
+            buffer_length: 1000,
             exclusive: true,
         },
         callback,

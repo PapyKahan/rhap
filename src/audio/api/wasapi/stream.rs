@@ -1,6 +1,9 @@
 use std::mem::size_of;
-use windows::core::PCWSTR;
-use windows::Win32::Foundation::{FALSE, HANDLE, S_OK, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT};
+use windows::core::{PCSTR, PCWSTR};
+use windows::s;
+use windows::Win32::Foundation::{
+    CloseHandle, GetLastError, FALSE, HANDLE, S_OK, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT,
+};
 use windows::Win32::Media::Audio::{
     IAudioClient, IAudioRenderClient, IMMDeviceEnumerator, MMDeviceEnumerator,
     AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED, AUDCLNT_SHAREMODE_EXCLUSIVE,
@@ -10,9 +13,12 @@ use windows::Win32::Media::KernelStreaming::{
     KSDATAFORMAT_SUBTYPE_PCM, SPEAKER_FRONT_LEFT, SPEAKER_FRONT_RIGHT, WAVE_FORMAT_EXTENSIBLE,
 };
 use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED
+    CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
 };
-use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
+use windows::Win32::System::Threading::{
+    AvRevertMmThreadCharacteristics, AvSetMmThreadCharacteristicsA, CreateEventW,
+    WaitForSingleObject,
+};
 
 use crate::audio::api::wasapi::utils::{host_error, print_wave_format};
 use crate::audio::{DataProcessing, StreamParams, StreamTrait};
@@ -72,13 +78,13 @@ pub struct WasapiStream {
     renderer: IAudioRenderClient,
     buffersize: u32,
     eventhandle: HANDLE,
-    callback : Box<dyn FnMut(&mut [u8], usize) -> Result<DataProcessing, String> + Send + 'static>,
+    callback: Box<dyn FnMut(&mut [u8], usize) -> Result<DataProcessing, String> + Send + 'static>,
 }
-
 
 impl StreamTrait for WasapiStream {
     fn new<T>(params: StreamParams, callback: T) -> Result<Self, String>
-        where T: FnMut(&mut [u8], usize) -> Result<DataProcessing, String> + Send + 'static,
+    where
+        T: FnMut(&mut [u8], usize) -> Result<DataProcessing, String> + Send + 'static,
     {
         let selected_device = match _get_device(params.device.id) {
             Ok(device) => device,
@@ -123,17 +129,16 @@ impl StreamTrait for WasapiStream {
             };
 
             // Crée un périphérique audio WASAPI exclusif.
-            let client: IAudioClient =
-                match device.Activate::<IAudioClient>(CLSCTX_ALL, None) {
-                    Ok(client) => client,
-                    Err(err) => {
-                        return Err(format!(
-                            "Error activating device: {} - {}",
-                            host_error(err.code()),
-                            err
-                        ));
-                    }
-                };
+            let client: IAudioClient = match device.Activate::<IAudioClient>(CLSCTX_ALL, None) {
+                Ok(client) => client,
+                Err(err) => {
+                    return Err(format!(
+                        "Error activating device: {} - {}",
+                        host_error(err.code()),
+                        err
+                    ));
+                }
+            };
 
             //let wave_format = match client.GetMixFormat() {
             //    Ok(wave_format) => wave_format,
@@ -142,12 +147,11 @@ impl StreamTrait for WasapiStream {
             //        return Err(());
             //    }
             //};
-            //
 
             let formattag = WAVE_FORMAT_EXTENSIBLE;
             let channels = params.channels as u32;
-            let sample_rate: u32 = params.samplerate.value();
-            let bits_per_sample: u32 = params.bits_per_sample.value() as u32;
+            let sample_rate: u32 = params.samplerate as u32;
+            let bits_per_sample: u32 = params.bits_per_sample as u32;
             let block_align: u32 = channels * bits_per_sample / 8;
             let bytes_per_second = sample_rate * block_align;
 
@@ -188,31 +192,39 @@ impl StreamTrait for WasapiStream {
                 }
             };
 
-            // Création des pointeurs pour les paramètres
             let mut default_device_period: i64 = 0;
             let mut minimum_device_period: i64 = 0;
-            match client.GetDevicePeriod(
-                Some(&mut default_device_period as *mut i64),
-                Some(&mut minimum_device_period as *mut i64),
-            ) {
-                Ok(_) => (),
-                Err(err) => {
-                    return Err(format!(
-                        "Error getting device period: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
-            };
+            if params.buffer_length == 0 {
+                match client.GetDevicePeriod(
+                    Some(&mut default_device_period as *mut i64),
+                    Some(&mut minimum_device_period as *mut i64),
+                ) {
+                    Ok(_) => (),
+                    Err(err) => {
+                        return Err(format!(
+                            "Error getting device period: {} - {}",
+                            host_error(err.code()),
+                            err
+                        ));
+                    }
+                };
+            } else {
+                default_device_period = (params.buffer_length * 1000000) / 100 as i64;
+            }
 
             let result = client.Initialize(
                 sharemode,
                 streamflags,
-                minimum_device_period,
-                minimum_device_period,
+                default_device_period,
+                default_device_period,
                 wave_format as *const WAVEFORMATEX,
                 None,
             );
+
+            println!("--------------------------------------------------------------------------------------");
+            println!("Default device period: {}", default_device_period);
+            println!("Minimum device period: {}", minimum_device_period);
+            println!("--------------------------------------------------------------------------------------");
 
             if result.is_err() {
                 if result.as_ref().err().unwrap().code() != AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED {
@@ -246,8 +258,7 @@ impl StreamTrait for WasapiStream {
                 }
             }
 
-            let eventhandle = match CreateEventW(None, FALSE, FALSE, PCWSTR::null())
-            {
+            let eventhandle = match CreateEventW(None, FALSE, FALSE, PCWSTR::null()) {
                 Ok(eventhandle) => eventhandle,
                 Err(err) => {
                     return Err(format!(
@@ -280,17 +291,16 @@ impl StreamTrait for WasapiStream {
                 }
             };
 
-            let renderer: IAudioRenderClient =
-                match client.GetService::<IAudioRenderClient>() {
-                    Ok(client_renderer) => client_renderer,
-                    Err(err) => {
-                        return Err(format!(
-                            "Error getting client renderer: {} - {}",
-                            host_error(err.code()),
-                            err
-                        ));
-                    }
-                };
+            let renderer: IAudioRenderClient = match client.GetService::<IAudioRenderClient>() {
+                Ok(client_renderer) => client_renderer,
+                Err(err) => {
+                    return Err(format!(
+                        "Error getting client renderer: {} - {}",
+                        host_error(err.code()),
+                        err
+                    ));
+                }
+            };
             Ok(Self {
                 params,
                 client,
@@ -304,7 +314,49 @@ impl StreamTrait for WasapiStream {
 
     fn start(&mut self) -> Result<(), String> {
         println!("Starting stream with parameters: {:?}", self.params);
+        // Compute client buffer size in bytes.
+        let client_buffer_len = self.buffersize as usize
+            * (self.params.bits_per_sample as usize / 8) as usize
+            * self.params.channels as usize;
         unsafe {
+            //let taskindex = std::ptr::null_mut();
+            //let thread_handle = match AvSetMmThreadCharacteristicsA(s!("Pro Audio"), taskindex) {
+            //    Ok(handle) => handle,
+            //    Err(error) => {
+            //        return Err(format!(
+            //            "Error setting thread characteristics: {} - {}",
+            //            host_error(error.code()),
+            //            error
+            //        ));
+            //    }
+            //};
+
+            let client_buffer = match self.renderer.GetBuffer(self.buffersize) {
+                Ok(buffer) => buffer,
+                Err(err) => {
+                    return Err(format!("Error getting client buffer: {}", err));
+                }
+            };
+
+            // Convert client buffer to a slice of bytes.
+            let data = std::slice::from_raw_parts_mut(client_buffer, client_buffer_len);
+            match (self.callback)(data, client_buffer_len) {
+                Ok(result) => result,
+                Err(err) => {
+                    return Err(format!("Error calling callback: {}", err));
+                }
+            };
+
+            match self.renderer.ReleaseBuffer(self.buffersize, 0) {
+                Ok(_) => (),
+                Err(err) => {
+                    return Err(format!(
+                        "Error releasing client buffer: {} - {}",
+                        host_error(err.code()),
+                        err
+                    ));
+                }
+            };
             match self.client.Start() {
                 Ok(_) => (),
                 Err(err) => {
@@ -337,10 +389,6 @@ impl StreamTrait for WasapiStream {
                     }
                 };
 
-                // Compute client buffer size in bytes.
-                let client_buffer_len = self.buffersize as usize
-                    * (self.params.bits_per_sample.value() / 8) as usize
-                    * self.params.channels as usize;
                 // Convert client buffer to a slice of bytes.
                 let data = std::slice::from_raw_parts_mut(client_buffer, client_buffer_len);
                 let result = match (self.callback)(data, client_buffer_len) {
@@ -357,9 +405,7 @@ impl StreamTrait for WasapiStream {
                     DataProcessing::Abort => {
                         break;
                     }
-                    DataProcessing::Continue => {
-                        ()
-                    },
+                    DataProcessing::Continue => (),
                 };
 
                 match self.renderer.ReleaseBuffer(self.buffersize, 0) {
@@ -373,6 +419,8 @@ impl StreamTrait for WasapiStream {
                     }
                 };
             }
+            //AvRevertMmThreadCharacteristics(thread_handle);
+            //CloseHandle(self.eventhandle);
         }
         Ok(())
     }
