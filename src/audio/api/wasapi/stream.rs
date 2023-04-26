@@ -1,13 +1,13 @@
 use std::mem::size_of;
-use windows::core::{PCSTR, PCWSTR};
+use windows::core::PCWSTR;
 use windows::s;
 use windows::Win32::Foundation::{
-    CloseHandle, GetLastError, FALSE, HANDLE, S_OK, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT,
+    CloseHandle, FALSE, HANDLE, S_OK, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows::Win32::Media::Audio::{
     IAudioClient, IAudioRenderClient, IMMDeviceEnumerator, MMDeviceEnumerator,
     AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED, AUDCLNT_SHAREMODE_EXCLUSIVE,
-    AUDCLNT_STREAMFLAGS_EVENTCALLBACK, WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0,
+    AUDCLNT_STREAMFLAGS_EVENTCALLBACK, WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0, AUDCLNT_SHAREMODE_SHARED,
 };
 use windows::Win32::Media::KernelStreaming::{
     KSDATAFORMAT_SUBTYPE_PCM, SPEAKER_FRONT_LEFT, SPEAKER_FRONT_RIGHT, WAVE_FORMAT_EXTENSIBLE,
@@ -141,14 +141,6 @@ impl StreamTrait for WasapiStream {
                 }
             };
 
-            //let wave_format = match client.GetMixFormat() {
-            //    Ok(wave_format) => wave_format,
-            //    Err(err) => {
-            //        println!("Error getting mix format: {} - {}", audio::log::host_error(err.code()), err);
-            //        return Err(());
-            //    }
-            //};
-
             let formattag = WAVE_FORMAT_EXTENSIBLE;
             let channels = params.channels as u32;
             let sample_rate: u32 = params.samplerate as u32;
@@ -180,7 +172,11 @@ impl StreamTrait for WasapiStream {
             print_wave_format(wave_format as *const WAVEFORMATEX);
             println!("--------------------------------------------------------------------------------------");
 
-            let sharemode = AUDCLNT_SHAREMODE_EXCLUSIVE;
+            let sharemode = match params.exclusive {
+                true => AUDCLNT_SHAREMODE_EXCLUSIVE,
+                false => AUDCLNT_SHAREMODE_SHARED,
+            };
+
             let streamflags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
             match client.IsFormatSupported(sharemode, wave_format as *const WAVEFORMATEX, None) {
                 S_OK => true,
@@ -221,11 +217,6 @@ impl StreamTrait for WasapiStream {
                 wave_format as *const WAVEFORMATEX,
                 None,
             );
-
-            println!("--------------------------------------------------------------------------------------");
-            println!("Default device period: {}", default_device_period);
-            println!("Minimum device period: {}", minimum_device_period);
-            println!("--------------------------------------------------------------------------------------");
 
             if result.is_err() {
                 if result.as_ref().err().unwrap().code() != AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED {

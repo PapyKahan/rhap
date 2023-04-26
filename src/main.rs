@@ -17,7 +17,7 @@ use crate::audio::{
     DataProcessing, Device, Stream, StreamParams,
 };
 
-const DEVICE_ID: u16 = 2;
+const DEVICE_ID: u16 = 0;
 
 fn fill_buffer(
     mut flac_reader: FlacReader<File>,
@@ -110,7 +110,7 @@ fn main() -> Result<(), ()> {
             samplerate: samplerate.into(),
             channels,
             bits_per_sample: bits_per_sample.into(),
-            buffer_length: 0,
+            buffer_length: 1000,
             exclusive: true,
         },
         callback,
