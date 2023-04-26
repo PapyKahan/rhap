@@ -6,8 +6,8 @@ use windows::Win32::Foundation::{
 };
 use windows::Win32::Media::Audio::{
     IAudioClient, IAudioRenderClient, IMMDeviceEnumerator, MMDeviceEnumerator,
-    AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED, AUDCLNT_SHAREMODE_EXCLUSIVE,
-    AUDCLNT_STREAMFLAGS_EVENTCALLBACK, WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0, AUDCLNT_SHAREMODE_SHARED,
+    AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED, AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED,
+    AUDCLNT_STREAMFLAGS_EVENTCALLBACK, WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0,
 };
 use windows::Win32::Media::KernelStreaming::{
     KSDATAFORMAT_SUBTYPE_PCM, SPEAKER_FRONT_LEFT, SPEAKER_FRONT_RIGHT, WAVE_FORMAT_EXTENSIBLE,
@@ -20,13 +20,12 @@ use windows::Win32::System::Threading::{
     WaitForSingleObject,
 };
 
-use crate::audio::api::wasapi::utils::{host_error, print_wave_format};
+use crate::audio::api::wasapi::utils::host_error;
 use crate::audio::{DataProcessing, StreamParams, StreamTrait};
 
 use super::enumerate_devices;
 
 const REFTIMES_PER_SEC: i64 = 10000000;
-//const REFTIMES_PER_MILLISEC : i64 = 10000;
 
 fn _get_device(id: u16) -> Result<PCWSTR, String> {
     let mut selected_device: PCWSTR = PCWSTR(std::ptr::null_mut());
@@ -80,6 +79,37 @@ pub struct WasapiStream {
     eventhandle: HANDLE,
     threadhandle: HANDLE,
     callback: Box<dyn FnMut(&mut [u8], usize) -> Result<DataProcessing, String> + Send + 'static>,
+}
+
+impl WasapiStream {
+    // WAVEFORMATEX documentation: https://learn.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatex
+    // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
+    #[inline(always)]
+    unsafe fn create_waveformat_from(params: StreamParams) -> *mut WAVEFORMATEXTENSIBLE {
+        let formattag = WAVE_FORMAT_EXTENSIBLE;
+        let channels = params.channels as u32;
+        let sample_rate: u32 = params.samplerate as u32;
+        let bits_per_sample: u32 = params.bits_per_sample as u32;
+        let block_align: u32 = channels * bits_per_sample / 8;
+        let bytes_per_second = sample_rate * block_align;
+
+        &mut WAVEFORMATEXTENSIBLE {
+            Format: WAVEFORMATEX {
+                wFormatTag: formattag as u16,
+                nChannels: channels as u16,
+                nSamplesPerSec: sample_rate,
+                wBitsPerSample: bits_per_sample as u16,
+                nBlockAlign: block_align as u16,
+                nAvgBytesPerSec: bytes_per_second,
+                cbSize: size_of::<WAVEFORMATEXTENSIBLE>() as u16 - size_of::<WAVEFORMATEX>() as u16,
+            },
+            Samples: WAVEFORMATEXTENSIBLE_0 {
+                wValidBitsPerSample: bits_per_sample as u16,
+            },
+            dwChannelMask: SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT,
+            SubFormat: KSDATAFORMAT_SUBTYPE_PCM,
+        }
+    }
 }
 
 impl StreamTrait for WasapiStream {
@@ -141,37 +171,7 @@ impl StreamTrait for WasapiStream {
                 }
             };
 
-            let formattag = WAVE_FORMAT_EXTENSIBLE;
-            let channels = params.channels as u32;
-            let sample_rate: u32 = params.samplerate as u32;
-            let bits_per_sample: u32 = params.bits_per_sample as u32;
-            let block_align: u32 = channels * bits_per_sample / 8;
-            let bytes_per_second = sample_rate * block_align;
-
-            // WAVEFORMATEX documentation: https://learn.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatex
-            // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
-            let wave_format: *const WAVEFORMATEXTENSIBLE = &mut WAVEFORMATEXTENSIBLE {
-                Format: WAVEFORMATEX {
-                    wFormatTag: formattag as u16,
-                    nChannels: channels as u16,
-                    nSamplesPerSec: sample_rate,
-                    wBitsPerSample: bits_per_sample as u16,
-                    nBlockAlign: block_align as u16,
-                    nAvgBytesPerSec: bytes_per_second,
-                    cbSize: size_of::<WAVEFORMATEXTENSIBLE>() as u16
-                        - size_of::<WAVEFORMATEX>() as u16,
-                },
-                Samples: WAVEFORMATEXTENSIBLE_0 {
-                    wValidBitsPerSample: bits_per_sample as u16,
-                },
-                dwChannelMask: SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT,
-                SubFormat: KSDATAFORMAT_SUBTYPE_PCM,
-            };
-
-            println!("--------------------------------------------------------------------------------------");
-            print_wave_format(wave_format as *const WAVEFORMATEX);
-            println!("--------------------------------------------------------------------------------------");
-
+            let wave_format = WasapiStream::create_waveformat_from(params.clone());
             let sharemode = match params.exclusive {
                 true => AUDCLNT_SHAREMODE_EXCLUSIVE,
                 false => AUDCLNT_SHAREMODE_SHARED,
@@ -234,7 +234,8 @@ impl StreamTrait for WasapiStream {
                         return Err(format!("Initialize: Error getting buffer size: {}", err));
                     }
                 };
-                let minimum_device_period = REFTIMES_PER_SEC / sample_rate as i64 * buffer_size;
+                let minimum_device_period =
+                    REFTIMES_PER_SEC / params.samplerate as i64 * buffer_size;
                 match client.Initialize(
                     sharemode,
                     streamflags,
@@ -308,11 +309,7 @@ impl StreamTrait for WasapiStream {
     fn start(&mut self) -> Result<(), String> {
         println!("Starting stream with parameters: {:?}", self.params);
         // Compute client buffer size in bytes.
-        let client_buffer_len = self.buffersize as usize
-            * (self.params.bits_per_sample as usize / 8) as usize
-            * self.params.channels as usize;
         unsafe {
-
             let client_buffer = match self.renderer.GetBuffer(self.buffersize) {
                 Ok(buffer) => buffer,
                 Err(err) => {
@@ -321,6 +318,9 @@ impl StreamTrait for WasapiStream {
             };
 
             // Convert client buffer to a slice of bytes.
+            let client_buffer_len = self.buffersize as usize
+                * (self.params.bits_per_sample as usize / 8) as usize
+                * self.params.channels as usize;
             let data = std::slice::from_raw_parts_mut(client_buffer, client_buffer_len);
             match (self.callback)(data, client_buffer_len) {
                 Ok(result) => result,
@@ -340,7 +340,7 @@ impl StreamTrait for WasapiStream {
                 }
             };
 
-            let mut task_index : u32 = 0;
+            let mut task_index: u32 = 0;
             let task_index: *mut u32 = &mut task_index;
             self.threadhandle = match AvSetMmThreadCharacteristicsA(s!("Pro Audio"), task_index) {
                 Ok(handle) => handle,
