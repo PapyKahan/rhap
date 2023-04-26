@@ -78,6 +78,7 @@ pub struct WasapiStream {
     renderer: IAudioRenderClient,
     buffersize: u32,
     eventhandle: HANDLE,
+    threadhandle: HANDLE,
     callback: Box<dyn FnMut(&mut [u8], usize) -> Result<DataProcessing, String> + Send + 'static>,
 }
 
@@ -306,6 +307,7 @@ impl StreamTrait for WasapiStream {
                 client,
                 renderer,
                 buffersize,
+                threadhandle: HANDLE::default(),
                 eventhandle,
                 callback: Box::new(callback),
             })
@@ -319,17 +321,6 @@ impl StreamTrait for WasapiStream {
             * (self.params.bits_per_sample as usize / 8) as usize
             * self.params.channels as usize;
         unsafe {
-            //let taskindex = std::ptr::null_mut();
-            //let thread_handle = match AvSetMmThreadCharacteristicsA(s!("Pro Audio"), taskindex) {
-            //    Ok(handle) => handle,
-            //    Err(error) => {
-            //        return Err(format!(
-            //            "Error setting thread characteristics: {} - {}",
-            //            host_error(error.code()),
-            //            error
-            //        ));
-            //    }
-            //};
 
             let client_buffer = match self.renderer.GetBuffer(self.buffersize) {
                 Ok(buffer) => buffer,
@@ -357,6 +348,20 @@ impl StreamTrait for WasapiStream {
                     ));
                 }
             };
+
+            let mut task_index : u32 = 0;
+            let task_index: *mut u32 = &mut task_index;
+            self.threadhandle = match AvSetMmThreadCharacteristicsA(s!("Pro Audio"), task_index) {
+                Ok(handle) => handle,
+                Err(error) => {
+                    return Err(format!(
+                        "Error setting thread characteristics: {} - {}",
+                        host_error(error.code()),
+                        error
+                    ));
+                }
+            };
+
             match self.client.Start() {
                 Ok(_) => (),
                 Err(err) => {
@@ -419,8 +424,6 @@ impl StreamTrait for WasapiStream {
                     }
                 };
             }
-            //AvRevertMmThreadCharacteristics(thread_handle);
-            //CloseHandle(self.eventhandle);
         }
         Ok(())
     }
@@ -438,6 +441,8 @@ impl StreamTrait for WasapiStream {
                     ));
                 }
             };
+            AvRevertMmThreadCharacteristics(self.threadhandle);
+            CloseHandle(self.eventhandle);
         }
         Ok(())
     }
