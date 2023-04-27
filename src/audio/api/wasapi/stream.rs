@@ -53,14 +53,14 @@ fn _get_device(id: u16) -> Result<PCWSTR, String> {
     Ok(selected_device)
 }
 
-pub struct WasapiDevice {
+pub struct Device {
     id: PCWSTR,
     pub index: u16,
     pub name: String,
 }
 
-impl WasapiDevice {
-    pub fn new(inner_device_id: PCWSTR, index: u16, name: String) -> WasapiDevice {
+impl Device {
+    pub fn new(inner_device_id: PCWSTR, index: u16, name: String) -> Device {
         let this = Self {
             id: inner_device_id,
             index,
