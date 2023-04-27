@@ -15,8 +15,8 @@ use std::thread;
 mod audio;
 
 use crate::audio::{
-    api::wasapi::{enumerate_devices, stream::WasapiStream},
-    DataProcessing, Device, StreamParams, StreamTrait
+    api::wasapi::{enumerate_devices, stream::Stream},
+    StreamFlow, Device, StreamParams, StreamTrait
 };
 
 #[derive(Parser)]
@@ -95,11 +95,11 @@ fn main() -> Result<(), ()> {
     let vec_buffer = Arc::new(Mutex::new(VecDeque::new()));
     fill_buffer(flac_reader, vec_buffer.clone(), bytes);
 
-    let callback = move |data: &mut [u8], buffer_size: usize| -> Result<DataProcessing, String> {
-        let mut data_processing = DataProcessing::Continue;
+    let callback = move |data: &mut [u8], buffer_size: usize| -> Result<StreamFlow, String> {
+        let mut data_processing = StreamFlow::Continue;
         for i in 0..buffer_size {
             if vec_buffer.lock().unwrap().is_empty() {
-                data_processing = DataProcessing::Complete;
+                data_processing = StreamFlow::Complete;
                 break;
             }
             data[i] = vec_buffer.lock().unwrap().pop_front().unwrap();
@@ -107,7 +107,7 @@ fn main() -> Result<(), ()> {
         Ok(data_processing)
     };
 
-    let mut stream = match WasapiStream::new(
+    let mut stream = match Stream::new(
         StreamParams {
             device: Device {
                 id: cli.device.unwrap_or_default(),

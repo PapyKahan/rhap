@@ -73,7 +73,7 @@ pub struct Capabilities {
     min_channel_count: u8,
 }
 
-pub enum DataProcessing {
+pub enum StreamFlow {
     Continue,
     Complete,
     Abort,
@@ -83,7 +83,7 @@ pub trait StreamTrait {
     fn new<T>(params: StreamParams, callback : T) -> Result<Self, String>
     where
         Self: Sized,
-        T: FnMut(&mut [u8], usize) -> Result<DataProcessing, String> + Send + 'static;
+        T: FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static;
     fn start(&mut self) -> Result<(), String>;
     fn stop(&self) -> Result<(), String>;
     fn pause(&self) -> Result<(), String>;

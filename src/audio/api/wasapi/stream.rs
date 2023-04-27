@@ -21,7 +21,7 @@ use windows::Win32::System::Threading::{
 };
 
 use crate::audio::api::wasapi::utils::host_error;
-use crate::audio::{DataProcessing, StreamParams, StreamTrait};
+use crate::audio::{StreamFlow, StreamParams, StreamTrait};
 
 use super::enumerate_devices;
 
@@ -71,17 +71,17 @@ impl WasapiDevice {
     }
 }
 
-pub struct WasapiStream {
+pub struct Stream {
     params: StreamParams,
     client: IAudioClient,
     renderer: IAudioRenderClient,
     buffersize: u32,
     eventhandle: HANDLE,
     threadhandle: HANDLE,
-    callback: Box<dyn FnMut(&mut [u8], usize) -> Result<DataProcessing, String> + Send + 'static>,
+    callback: Box<dyn FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static>,
 }
 
-impl WasapiStream {
+impl Stream {
     // WAVEFORMATEX documentation: https://learn.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatex
     // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
     #[inline(always)]
@@ -112,10 +112,10 @@ impl WasapiStream {
     }
 }
 
-impl StreamTrait for WasapiStream {
+impl StreamTrait for Stream {
     fn new<T>(params: StreamParams, callback: T) -> Result<Self, String>
     where
-        T: FnMut(&mut [u8], usize) -> Result<DataProcessing, String> + Send + 'static,
+        T: FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static,
     {
         let selected_device = match _get_device(params.device.id) {
             Ok(device) => device,
@@ -171,7 +171,7 @@ impl StreamTrait for WasapiStream {
                 }
             };
 
-            let wave_format = WasapiStream::create_waveformat_from(params.clone());
+            let wave_format = Stream::create_waveformat_from(params.clone());
             let sharemode = match params.exclusive {
                 true => AUDCLNT_SHAREMODE_EXCLUSIVE,
                 false => AUDCLNT_SHAREMODE_SHARED,
@@ -395,13 +395,13 @@ impl StreamTrait for WasapiStream {
                 };
 
                 match result {
-                    DataProcessing::Complete => {
+                    StreamFlow::Complete => {
                         break;
                     }
-                    DataProcessing::Abort => {
+                    StreamFlow::Abort => {
                         break;
                     }
-                    DataProcessing::Continue => (),
+                    StreamFlow::Continue => (),
                 };
 
                 match self.renderer.ReleaseBuffer(self.buffersize, 0) {
