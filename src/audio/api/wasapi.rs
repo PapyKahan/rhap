@@ -3,50 +3,8 @@ pub mod stream;
 
 use std::{ffi::OsString, os::windows::prelude::OsStringExt, slice};
 use windows::{Win32::{System::Com::{CoInitializeEx, COINIT_MULTITHREADED, CLSCTX_ALL, STGM_READ, VT_LPWSTR, CoCreateInstance, StructuredStorage::PropVariantClear}, Media::Audio::{IMMDeviceEnumerator, MMDeviceEnumerator, IMMDeviceCollection, DEVICE_STATE_ACTIVE, eRender, IMMDevice}, UI::Shell::PropertiesSystem::IPropertyStore, Devices::FunctionDiscovery::PKEY_Device_FriendlyName}, core::PCWSTR};
-use crate::audio::{StreamTrait, StreamParams, Stream, DataProcessing};
 
-use self::stream::{WasapiStream, WasapiDevice};
-
-impl Stream<WasapiStream> {
-    pub fn new<T>(params : StreamParams, callback : T) -> Result<Self, String>
-        where T: FnMut(&mut [u8], usize) -> Result<DataProcessing, String> + Send + 'static,
-    {
-        let inner_stream = match WasapiStream::new(params.clone(), callback) {
-            Ok(stream) => stream,
-            Err(err) => return Err(err)
-        };
-
-        Ok(Self {
-            params,
-            inner_stream
-        })
-    }
-
-    pub fn start(&mut self) -> Result<(), String> {
-        self.inner_stream.start()
-    }
-
-    pub fn stop(&self) -> Result<(), String> {
-        self.inner_stream.stop()
-    }
-
-    pub fn pause(&self) -> Result<(), String> {
-        self.inner_stream.pause()
-    }
-
-    pub fn resume(&self) -> Result<(), String> {
-        self.inner_stream.resume()
-    }
-
-    pub fn get_stream_params(&self) -> &StreamParams {
-        self.inner_stream.get_stream_params()
-    }
-
-    pub fn set_stream_params(&mut self, stream_paramters : StreamParams) {
-        self.inner_stream.set_stream_params(stream_paramters);
-    }
-}
-
+use self::stream::WasapiDevice;
 pub fn enumerate_devices() -> Result<Vec<WasapiDevice>, String> {
     let mut enumerated_devices = vec![];
 

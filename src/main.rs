@@ -16,13 +16,13 @@ mod audio;
 
 use crate::audio::{
     api::wasapi::{enumerate_devices, stream::WasapiStream},
-    DataProcessing, Device, Stream, StreamParams,
+    DataProcessing, Device, StreamParams, StreamTrait
 };
 
 #[derive(Parser)]
 struct Cli {
     #[clap(short, long)]
-    list: Option<bool>,
+    list: bool,
     #[clap(short, long)]
     file: Option<String>,
     #[clap(short, long)]
@@ -64,16 +64,13 @@ fn fill_buffer(mut flac_reader: FlacReader<File>, vec_buffer: Arc<Mutex<VecDeque
                 }
             }
         }
-        println!("Buffer filled");
     });
-    println!("Waiting for buffer to be filled");
     thread::sleep(std::time::Duration::from_secs(1));
-    println!("Waiting done");
 }
 
 fn main() -> Result<(), ()> {
     let cli = Cli::parse();
-    if cli.list.unwrap_or(false) {
+    if cli.list {
         let devices = enumerate_devices().unwrap();
         for dev in devices {
             println!("Device: id={}, name={}", dev.index, dev.name);
@@ -110,7 +107,7 @@ fn main() -> Result<(), ()> {
         Ok(data_processing)
     };
 
-    let mut stream = match Stream::<WasapiStream>::new(
+    let mut stream = match WasapiStream::new(
         StreamParams {
             device: Device {
                 id: cli.device.unwrap_or_default(),
@@ -119,7 +116,7 @@ fn main() -> Result<(), ()> {
             samplerate: samplerate.into(),
             channels,
             bits_per_sample: bits_per_sample.into(),
-            buffer_length: 1000,
+            buffer_length: 0,
             exclusive: true,
         },
         callback,

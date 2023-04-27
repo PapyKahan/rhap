@@ -73,11 +73,6 @@ pub struct Capabilities {
     min_channel_count: u8,
 }
 
-pub struct Stream<T: StreamTrait> {
-    params: StreamParams,
-    inner_stream: T,
-}
-
 pub enum DataProcessing {
     Continue,
     Complete,
