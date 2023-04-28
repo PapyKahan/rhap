@@ -169,7 +169,7 @@ impl StreamTrait for Stream {
                 streamflags,
                 default_device_period,
                 default_device_period,
-                wave_format as *const WAVEFORMATEX,
+                (&(*wave_format).Format) as *const WAVEFORMATEX,
                 None,
             );
 
