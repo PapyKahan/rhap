@@ -1,11 +1,14 @@
 //
-// TODO add commandline parsing : https://docs.rs/clap/latest/clap/
 // reference : Shared mode streaming : https://learn.microsoft.com/en-us/windows/win32/coreaudio/rendering-a-stream
 // reference : Exclusive mode streaming : https://learn.microsoft.com/en-us/windows/win32/coreaudio/exclusive-mode-streams
 // reference : https://www.hresult.info/FACILITY_AUDCLNT
 //
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
+use rand::seq::SliceRandom;
+use rand::thread_rng;
+use std::path::PathBuf;
+use walkdir::WalkDir;
 
 mod audio;
 mod player;
@@ -17,7 +20,7 @@ struct Cli {
     #[clap(short, long)]
     list: bool,
     #[clap(short, long)]
-    file: Option<String>,
+    path: Option<PathBuf>,
     #[clap(short, long)]
     device: Option<u16>,
 }
@@ -30,18 +33,42 @@ fn main() -> Result<(), ()> {
             println!("Device: id={}, name={}", dev.index, dev.name);
         }
         return Ok(());
-    } else if cli.file.is_none() {
+    } else if cli.path.is_none() {
         let mut cmd = Cli::command();
-            cmd.error(
-                ErrorKind::MissingRequiredArgument,
-                "Can't do relative and absolute version change",
-            )
-            .exit();
+        cmd.error(
+            ErrorKind::MissingRequiredArgument,
+            "File or directory must be specified",
+        )
+        .exit();
     }
-    let file_path = cli.file.unwrap();
 
     let player = Player::new(cli.device.unwrap_or_default());
-    player.play(file_path).expect("Error playing file");
 
+    if cli.path.is_some() {
+        let path = cli.path.clone().unwrap();
+        if path.is_dir() {
+            let mut files = WalkDir::new(path.clone())
+                .follow_links(true)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .filter(|e| {
+                    e.file_type().is_file()
+                        && e.file_name()
+                            .to_str()
+                            .map(|s| s.ends_with(".flac"))
+                            .unwrap_or(false)
+                })
+                .map(|e| e.path().to_str().unwrap().to_string())
+                .collect::<Vec<String>>();
+            files.shuffle(&mut thread_rng());
+            for f in files {
+                player.play(f).expect("Error playing file");
+            }
+
+            println!("Directory: {}", path.to_str().unwrap());
+        } else if path.is_file() {
+            player.play(path.to_str().unwrap().to_string()).expect("Error playing file");
+        }
+    }
     return Ok(());
 }

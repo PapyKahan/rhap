@@ -20,8 +20,8 @@ use windows::Win32::System::Threading::{
     WaitForSingleObject,
 };
 
-use super::utils::host_error;
 use super::device::Device;
+use super::utils::host_error;
 use crate::audio::{StreamFlow, StreamParams, StreamTrait};
 
 const REFTIMES_PER_SEC: i64 = 10000000;
@@ -265,36 +265,6 @@ impl StreamTrait for Stream {
         println!("Starting stream with parameters: {:?}", self.params);
         // Compute client buffer size in bytes.
         unsafe {
-            let client_buffer = match self.renderer.GetBuffer(self.buffersize) {
-                Ok(buffer) => buffer,
-                Err(err) => {
-                    return Err(format!("Error getting client buffer: {}", err));
-                }
-            };
-
-            // Convert client buffer to a slice of bytes.
-            let client_buffer_len = self.buffersize as usize
-                * (self.params.bits_per_sample as usize / 8) as usize
-                * self.params.channels as usize;
-            let data = std::slice::from_raw_parts_mut(client_buffer, client_buffer_len);
-            match (self.callback)(data, client_buffer_len) {
-                Ok(result) => result,
-                Err(err) => {
-                    return Err(format!("Error calling callback: {}", err));
-                }
-            };
-
-            match self.renderer.ReleaseBuffer(self.buffersize, 0) {
-                Ok(_) => (),
-                Err(err) => {
-                    return Err(format!(
-                        "Error releasing client buffer: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
-            };
-
             let mut task_index: u32 = 0;
             let task_index: *mut u32 = &mut task_index;
             self.threadhandle = match AvSetMmThreadCharacteristicsA(s!("Pro Audio"), task_index) {
@@ -341,6 +311,9 @@ impl StreamTrait for Stream {
                 };
 
                 // Convert client buffer to a slice of bytes.
+                let client_buffer_len = self.buffersize as usize
+                    * (self.params.bits_per_sample as usize / 8) as usize
+                    * self.params.channels as usize;
                 let data = std::slice::from_raw_parts_mut(client_buffer, client_buffer_len);
                 let result = match (self.callback)(data, client_buffer_len) {
                     Ok(result) => result,
