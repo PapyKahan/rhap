@@ -1,10 +1,12 @@
 mod utils;
+mod device;
 pub mod stream;
 
 use std::{ffi::OsString, os::windows::prelude::OsStringExt, slice};
 use windows::{Win32::{System::Com::{CoInitializeEx, COINIT_MULTITHREADED, CLSCTX_ALL, STGM_READ, VT_LPWSTR, CoCreateInstance, StructuredStorage::PropVariantClear}, Media::Audio::{IMMDeviceEnumerator, MMDeviceEnumerator, IMMDeviceCollection, DEVICE_STATE_ACTIVE, eRender, IMMDevice}, UI::Shell::PropertiesSystem::IPropertyStore, Devices::FunctionDiscovery::PKEY_Device_FriendlyName}, core::PCWSTR};
 
-use self::stream::Device;
+use self::device::Device;
+
 pub fn enumerate_devices() -> Result<Vec<Device>, String> {
     let mut enumerated_devices = vec![];
 

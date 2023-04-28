@@ -20,56 +20,11 @@ use windows::Win32::System::Threading::{
     WaitForSingleObject,
 };
 
-use crate::audio::api::wasapi::utils::host_error;
+use super::utils::host_error;
+use super::device::Device;
 use crate::audio::{StreamFlow, StreamParams, StreamTrait};
 
-use super::enumerate_devices;
-
 const REFTIMES_PER_SEC: i64 = 10000000;
-
-fn _get_device(id: u16) -> Result<PCWSTR, String> {
-    let mut selected_device: PCWSTR = PCWSTR(std::ptr::null_mut());
-
-    let devices = match enumerate_devices() {
-        Ok(devices) => devices,
-        Err(err) => {
-            println!("Error enumerating devices: {}", err);
-            return Err(err);
-        }
-    };
-
-    for dev in devices {
-        if dev.index == id {
-            selected_device = dev.id;
-            break;
-        }
-    }
-
-    if selected_device.is_null() {
-        println!("Device not found");
-        return Err("Device not found".to_string());
-    }
-
-    Ok(selected_device)
-}
-
-pub struct Device {
-    id: PCWSTR,
-    pub index: u16,
-    pub name: String,
-}
-
-impl Device {
-    pub fn new(inner_device_id: PCWSTR, index: u16, name: String) -> Device {
-        let this = Self {
-            id: inner_device_id,
-            index,
-            name,
-        };
-
-        this
-    }
-}
 
 pub struct Stream {
     params: StreamParams,
@@ -117,7 +72,7 @@ impl StreamTrait for Stream {
     where
         T: FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static,
     {
-        let selected_device = match _get_device(params.device.id) {
+        let selected_device = match Device::get_device(params.device.id) {
             Ok(device) => device,
             Err(err) => {
                 return Err(format!("Error getting device: {}", err));
