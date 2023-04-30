@@ -29,7 +29,7 @@ use super::device::Device;
 use super::utils::host_error;
 use crate::audio::{StreamFlow, StreamParams, StreamTrait};
 
-const REFTIMES_PER_SEC: i64 = 10000000;
+const REFTIMES_PER_SEC: i64 = 10_000_000;
 
 pub struct Stream {
     params: StreamParams,
@@ -69,6 +69,37 @@ impl Stream {
             dwChannelMask: SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT,
             SubFormat: KSDATAFORMAT_SUBTYPE_PCM,
         }
+    }
+
+    // implement portaudio AlignFramesPerBuffer
+    fn align_frames_per_buffer(frames : u32, block_align : u32) -> u32 {
+         let mut bytes = frames * block_align;
+
+        // align to a HD Audio packet size
+        // ALIGN_BWD ((v - (align ? v % align : 0)));
+        bytes = bytes - (bytes % 128);
+
+        // atlest 1 frame must be available
+        if bytes < 128 {
+            bytes = 128;
+        }
+
+        let packets = bytes / 128;
+        bytes   = packets * 128;
+        let frames = bytes / block_align;
+
+
+        // WASAPI frames are always aligned to at least 8
+        // UINT32 remainder = (align ? (v % align) : 0);
+        //if (remainder == 0)
+        //    return v;
+        //return v + (align - remainder);
+        let remainer = frames % 8;
+        if remainer == 0 {
+            return frames;
+        }
+
+        return frames - (0 - remainer);
     }
 }
 
@@ -198,13 +229,17 @@ impl StreamTrait for Stream {
                         return Err(format!("Initialize: Error getting buffer size: {}", err));
                     }
                 };
-                let minimum_device_period =
-                    REFTIMES_PER_SEC / params.samplerate as i64 * buffer_size;
+                let aligned_buffer = Stream::align_frames_per_buffer(buffer_size as u32, wave_format.Format.nBlockAlign as u32);
+                let mut period = REFTIMES_PER_SEC / params.samplerate as i64 * aligned_buffer as i64;
+                if period < minimum_device_period {
+                    period = minimum_device_period;
+                }
+                println!("Minimum device period: {}", minimum_device_period);
                 match client.Initialize(
                     sharemode,
                     streamflags,
-                    minimum_device_period,
-                    minimum_device_period,
+                    period,
+                    period,
                     &wave_format.Format as *const WAVEFORMATEX,
                     Some(std::ptr::null()),
                 ) {
