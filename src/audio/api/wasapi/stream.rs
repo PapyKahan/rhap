@@ -133,13 +133,13 @@ impl StreamTrait for Stream {
             };
 
             let streamflags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
-            match client.IsFormatSupported(sharemode, wave_format as *const WAVEFORMATEX, None) {
+            match client.IsFormatSupported(sharemode, &(*wave_format).Format as *const WAVEFORMATEX, None) {
                 S_OK => true,
                 result => {
                     return Err(format!(
                         "Error checking format support: {} - {}",
                         host_error(result),
-                        "Unsuporrted format"
+                        "Unsuported format"
                     ));
                 }
             };
@@ -169,8 +169,8 @@ impl StreamTrait for Stream {
                 streamflags,
                 default_device_period,
                 default_device_period,
-                (&(*wave_format).Format) as *const WAVEFORMATEX,
-                None,
+                &(*wave_format).Format as *const WAVEFORMATEX,
+                Some(std::ptr::null()),
             );
 
             if result.is_err() {
@@ -196,8 +196,8 @@ impl StreamTrait for Stream {
                     streamflags,
                     minimum_device_period,
                     minimum_device_period,
-                    wave_format as *const WAVEFORMATEX,
-                    None,
+                    &(*wave_format).Format as *const WAVEFORMATEX,
+                    Some(std::ptr::null())
                 ) {
                     Ok(_) => (),
                     Err(err) => {
