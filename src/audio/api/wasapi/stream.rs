@@ -1,3 +1,8 @@
+//
+// reference : Shared mode streaming : https://learn.microsoft.com/en-us/windows/win32/coreaudio/rendering-a-stream
+// reference : Exclusive mode streaming : https://learn.microsoft.com/en-us/windows/win32/coreaudio/exclusive-mode-streams
+// reference : https://www.hresult.info/FACILITY_AUDCLNT
+//
 use std::mem::size_of;
 use windows::core::PCWSTR;
 use windows::s;
@@ -40,7 +45,7 @@ impl Stream {
     // WAVEFORMATEX documentation: https://learn.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatex
     // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
     #[inline(always)]
-    unsafe fn create_waveformat_from(params: StreamParams) -> *mut WAVEFORMATEXTENSIBLE {
+    fn create_waveformat_from(params: StreamParams) -> WAVEFORMATEXTENSIBLE {
         let formattag = WAVE_FORMAT_EXTENSIBLE;
         let channels = params.channels as u32;
         let sample_rate: u32 = params.samplerate as u32;
@@ -48,7 +53,7 @@ impl Stream {
         let block_align: u32 = channels * bits_per_sample / 8;
         let bytes_per_second = sample_rate * block_align;
 
-        &mut WAVEFORMATEXTENSIBLE {
+        WAVEFORMATEXTENSIBLE {
             Format: WAVEFORMATEX {
                 wFormatTag: formattag as u16,
                 nChannels: channels as u16,
@@ -133,7 +138,11 @@ impl StreamTrait for Stream {
             };
 
             let streamflags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
-            match client.IsFormatSupported(sharemode, &(*wave_format).Format as *const WAVEFORMATEX, None) {
+            match client.IsFormatSupported(
+                sharemode,
+                &wave_format.Format as *const WAVEFORMATEX,
+                None,
+            ) {
                 S_OK => true,
                 result => {
                     return Err(format!(
@@ -169,7 +178,7 @@ impl StreamTrait for Stream {
                 streamflags,
                 default_device_period,
                 default_device_period,
-                &(*wave_format).Format as *const WAVEFORMATEX,
+                &wave_format.Format as *const WAVEFORMATEX,
                 Some(std::ptr::null()),
             );
 
@@ -196,8 +205,8 @@ impl StreamTrait for Stream {
                     streamflags,
                     minimum_device_period,
                     minimum_device_period,
-                    &(*wave_format).Format as *const WAVEFORMATEX,
-                    Some(std::ptr::null())
+                    &wave_format.Format as *const WAVEFORMATEX,
+                    Some(std::ptr::null()),
                 ) {
                     Ok(_) => (),
                     Err(err) => {

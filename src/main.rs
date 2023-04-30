@@ -1,8 +1,3 @@
-//
-// reference : Shared mode streaming : https://learn.microsoft.com/en-us/windows/win32/coreaudio/rendering-a-stream
-// reference : Exclusive mode streaming : https://learn.microsoft.com/en-us/windows/win32/coreaudio/exclusive-mode-streams
-// reference : https://www.hresult.info/FACILITY_AUDCLNT
-//
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
 use rand::seq::SliceRandom;

@@ -36,11 +36,22 @@ impl Player {
                     Ok(packet) => packet,
                     Err(Error::ResetRequired) => {
                         unimplemented!();
-                    }
+                    },
+                    Err(Error::IoError(err)) => {
+                        // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
+                        match err.kind() {
+                            std::io::ErrorKind::UnexpectedEof => {
+                                break;
+                            },
+                            _ => {
+                                panic!("Error reading packet: {:?}", err);
+                            }
+                        }
+                    },
                     Err(err) => {
                         println!("Error reading packet: {:?}", err);
                         break;
-                    }
+                    },
                 };
 
                 // Consume any new metadata that has been read since the last packet.
@@ -88,11 +99,22 @@ impl Player {
                     Ok(packet) => packet,
                     Err(Error::ResetRequired) => {
                         unimplemented!();
-                    }
+                    },
+                    Err(Error::IoError(err)) => {
+                        // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
+                        match err.kind() {
+                            std::io::ErrorKind::UnexpectedEof => {
+                                break;
+                            },
+                            _ => {
+                                panic!("Error reading packet: {:?}", err);
+                            }
+                        }
+                    },
                     Err(err) => {
                         println!("Error reading packet: {:?}", err);
                         break;
-                    }
+                    },
                 };
 
                 // Consume any new metadata that has been read since the last packet.
@@ -140,11 +162,22 @@ impl Player {
                     Ok(packet) => packet,
                     Err(Error::ResetRequired) => {
                         unimplemented!();
-                    }
+                    },
+                    Err(Error::IoError(err)) => {
+                        // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
+                        match err.kind() {
+                            std::io::ErrorKind::UnexpectedEof => {
+                                break;
+                            },
+                            _ => {
+                                panic!("Error reading packet: {:?}", err);
+                            }
+                        }
+                    },
                     Err(err) => {
                         println!("Error reading packet: {:?}", err);
                         break;
-                    }
+                    },
                 };
 
                 // Consume any new metadata that has been read since the last packet.
@@ -182,7 +215,6 @@ impl Player {
     /// - params:
     ///    - file: path to the FLAC file
     pub fn play(&self, file: String) -> Result<(), String> {
-        println!("Playing {}", file);
         let src = std::fs::File::open(file.clone()).expect("failed to open media");
         let mss = MediaSourceStream::new(Box::new(src), Default::default());
         let hint = Hint::new();
