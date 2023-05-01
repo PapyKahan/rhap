@@ -10,22 +10,21 @@ use windows::Win32::Foundation::{
     CloseHandle, FALSE, HANDLE, S_OK, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows::Win32::Media::Audio::{
-    IAudioClient, IAudioRenderClient, IMMDeviceEnumerator, MMDeviceEnumerator,
+    IAudioClient, IAudioRenderClient, 
     AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED, AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED,
-    AUDCLNT_STREAMFLAGS_EVENTCALLBACK, WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0,
+    AUDCLNT_STREAMFLAGS_EVENTCALLBACK, WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0, IMMDevice,
 };
 use windows::Win32::Media::KernelStreaming::{
     KSDATAFORMAT_SUBTYPE_PCM, SPEAKER_FRONT_LEFT, SPEAKER_FRONT_RIGHT, WAVE_FORMAT_EXTENSIBLE,
 };
 use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
+    CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
 };
 use windows::Win32::System::Threading::{
     AvRevertMmThreadCharacteristics, AvSetMmThreadCharacteristicsA, CreateEventW,
     WaitForSingleObject,
 };
 
-use super::device::Device;
 use super::utils::host_error;
 use crate::audio::{StreamFlow, StreamParams, StreamTrait};
 
@@ -72,8 +71,8 @@ impl Stream {
     }
 
     // implement portaudio AlignFramesPerBuffer
-    fn align_frames_per_buffer(frames : u32, block_align : u32) -> u32 {
-         let mut bytes = frames * block_align;
+    pub(super) fn align_frames_per_buffer(frames: u32, block_align: u32) -> u32 {
+        let mut bytes = frames * block_align;
 
         // align to a HD Audio packet size
         // ALIGN_BWD ((v - (align ? v % align : 0)));
@@ -85,9 +84,8 @@ impl Stream {
         }
 
         let packets = bytes / 128;
-        bytes   = packets * 128;
+        bytes = packets * 128;
         let frames = bytes / block_align;
-
 
         // WASAPI frames are always aligned to at least 8
         // UINT32 remainder = (align ? (v % align) : 0);
@@ -101,57 +99,48 @@ impl Stream {
 
         return frames - (0 - remainer);
     }
-}
 
-impl StreamTrait for Stream {
-    fn new<T>(params: StreamParams, callback: T) -> Result<Self, String>
+    pub(super) fn build_from_device<T>(
+        device: &IMMDevice,
+        params: StreamParams,
+        callback: T,
+    ) -> Result<Stream, String>
     where
         T: FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static,
     {
-        let selected_device = match Device::get_device(params.device.id) {
-            Ok(device) => device,
-            Err(err) => {
-                return Err(format!("Error getting device: {}", err));
-            }
-        };
-
         unsafe {
             match CoInitializeEx(None, COINIT_MULTITHREADED) {
                 Ok(_) => (),
                 Err(err) => {
-                    return Err(format!(
-                        "Error initializing COM: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
+                    return Err(format!("Error initializing COM: {} - {}", err.code(), err));
                 }
             };
 
-            let enumerator: IMMDeviceEnumerator =
-                match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
-                    Ok(device_enumerator) => device_enumerator,
-                    Err(err) => {
-                        return Err(format!(
-                            "Error getting device enumerator: {} - {}",
-                            host_error(err.code()),
-                            err
-                        ));
-                    }
-                };
+            //let enumerator: IMMDeviceEnumerator =
+            //    match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+            //        Ok(device_enumerator) => device_enumerator,
+            //        Err(err) => {
+            //            return Err(format!(
+            //                "Error getting device enumerator: {} - {}",
+            //                host_error(err.code()),
+            //                err
+            //            ));
+            //        }
+            //    };
 
-            let device = match enumerator.GetDevice(selected_device) {
-                Ok(device) => device,
-                Err(err) => {
-                    return Err(format!(
-                        "Error getting device: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
-            };
+            //let device = match enumerator.GetDevice(selected_device) {
+            //    Ok(device) => device,
+            //    Err(err) => {
+            //        return Err(format!(
+            //            "Error getting device: {} - {}",
+            //            host_error(err.code()),
+            //            err
+            //        ));
+            //    }
+            //};
 
-            // Crée un périphérique audio WASAPI exclusif.
-            let client: IAudioClient = match device.Activate::<IAudioClient>(CLSCTX_ALL, None) {
+            let client: IAudioClient = match (*device).Activate::<IAudioClient>(CLSCTX_ALL, None)
+            {
                 Ok(client) => client,
                 Err(err) => {
                     return Err(format!(
@@ -229,8 +218,12 @@ impl StreamTrait for Stream {
                         return Err(format!("Initialize: Error getting buffer size: {}", err));
                     }
                 };
-                let aligned_buffer = Stream::align_frames_per_buffer(buffer_size as u32, wave_format.Format.nBlockAlign as u32);
-                let mut period = REFTIMES_PER_SEC / params.samplerate as i64 * aligned_buffer as i64;
+                let aligned_buffer = Stream::align_frames_per_buffer(
+                    buffer_size as u32,
+                    wave_format.Format.nBlockAlign as u32,
+                );
+                let mut period =
+                    REFTIMES_PER_SEC / params.samplerate as i64 * aligned_buffer as i64;
                 if period < minimum_device_period {
                     period = minimum_device_period;
                 }
@@ -293,7 +286,7 @@ impl StreamTrait for Stream {
                     ));
                 }
             };
-            Ok(Self {
+            Ok(Stream {
                 params,
                 client,
                 renderer,
@@ -304,6 +297,14 @@ impl StreamTrait for Stream {
             })
         }
     }
+}
+
+impl StreamTrait for Stream {
+    //fn new<T>(params: StreamParams, callback: T) -> Result<Self, String>
+    //where
+    //    T: FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static,
+    //{
+    //}
 
     fn start(&mut self) -> Result<(), String> {
         println!("Starting stream with parameters: {:?}", self.params);

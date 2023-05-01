@@ -48,7 +48,6 @@ impl From<u8> for BitsPerSample {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StreamParams {
-    pub device: Device,
     pub channels: u8,
     pub samplerate: SampleRate,
     pub bits_per_sample: BitsPerSample,
@@ -58,7 +57,7 @@ pub struct StreamParams {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Device {
-    pub id: u16,
+    pub id: u32,
     pub name: String,
     //capabilities: Capabilities,
 }
@@ -80,10 +79,10 @@ pub enum StreamFlow {
 }
 
 pub trait StreamTrait {
-    fn new<T>(params: StreamParams, callback : T) -> Result<Self, String>
-    where
-        Self: Sized,
-        T: FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static;
+    //fn new<T>(params: StreamParams, callback : T) -> Result<Self, String>
+    //where
+    //    Self: Sized,
+    //    T: FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static;
     fn start(&mut self) -> Result<(), String>;
     fn stop(&self) -> Result<(), String>;
     fn pause(&self) -> Result<(), String>;
@@ -92,6 +91,12 @@ pub trait StreamTrait {
     fn set_stream_params(&mut self, stream_paramters: StreamParams);
 }
 
-//pub trait Device {
-//    fn get_name(&self) -> &str;
-//}
+pub trait DeviceTrait {
+    fn get_name(&self) -> String;
+    fn new(id : u32) -> Result<Self, String>
+    where
+        Self: Sized;
+    fn build_stream<T>(&self, params: StreamParams, callback : T) -> Result<Box<dyn StreamTrait>, String>
+    where
+        T: FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static;
+}

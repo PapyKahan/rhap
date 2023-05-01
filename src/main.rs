@@ -8,6 +8,7 @@ use walkdir::WalkDir;
 mod audio;
 mod player;
 
+use crate::audio::DeviceTrait;
 use crate::player::Player;
 use crate::audio::api::wasapi::host::Host;
 
@@ -18,7 +19,7 @@ struct Cli {
     #[clap(short, long)]
     path: Option<PathBuf>,
     #[clap(short, long)]
-    device: Option<u16>,
+    device: Option<u32>,
 }
 
 fn main() -> Result<(), ()> {
@@ -26,7 +27,7 @@ fn main() -> Result<(), ()> {
     if cli.list {
         let devices = Host::enumerate_devices().unwrap();
         for dev in devices {
-            println!("Device: id={}, name={}", dev.index, dev.name);
+            println!("Device: id={}, name={}", dev.index, dev.get_name());
         }
         return Ok(());
     } else if cli.path.is_none() {

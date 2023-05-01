@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::thread ;
 use symphonia::core::audio::RawSampleBuffer;
 use symphonia::core::codecs::{Decoder, DecoderOptions};
 use symphonia::core::errors::Error;
@@ -10,15 +10,14 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
-use crate::audio::api::wasapi::stream::Stream;
-use crate::audio::{Device, StreamFlow, StreamParams, StreamTrait, BitsPerSample};
+use crate::audio::{StreamFlow, StreamParams, DeviceTrait, BitsPerSample};
 
 pub struct Player {
-    device_id: u16,
+    device_id: u32,
 }
 
 impl Player {
-    pub fn new(device_id: u16) -> Self {
+    pub fn new(device_id: u32) -> Self {
         Player { device_id }
     }
 
@@ -148,23 +147,24 @@ impl Player {
             Ok(data_processing)
         };
 
-        let mut stream = match Stream::new(
-            StreamParams {
-                device: Device {
-                    id: self.device_id,
-                    name: String::from(""),
-                },
+        let device = match crate::audio::api::wasapi::device::Device::new(self.device_id) {
+            Ok(device) => device,
+            Err(e) => {
+                return Err(format!("Failed to open device: {}", e));
+            }
+        };
+
+        let streamparams = StreamParams {
                 samplerate: samplerate.into(),
                 channels,
                 bits_per_sample: bits_per_sample.into(),
                 buffer_length: 0,
                 exclusive: true,
-            },
-            callback,
-        ) {
-            Ok(s) => s,
+            };
+        let mut stream = match device.build_stream(streamparams, callback) {
+            Ok(stream) => stream,
             Err(e) => {
-                return Err(format!("Failed to create stream: {}", e));
+                return Err(format!("Failed to build stream: {}", e));
             }
         };
 

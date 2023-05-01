@@ -1,17 +1,14 @@
-use std::{ffi::OsString, os::windows::prelude::OsStringExt, slice};
 use windows::{
     core::PCWSTR,
     Win32::{
-        Devices::FunctionDiscovery::PKEY_Device_FriendlyName,
         Media::Audio::{
             eRender, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator,
             MMDeviceEnumerator, DEVICE_STATE_ACTIVE, eMultimedia,
         },
         System::Com::{
-            CoCreateInstance, CoInitializeEx, CoUninitialize, StructuredStorage::PropVariantClear,
-            CLSCTX_ALL, COINIT_MULTITHREADED, STGM_READ, VT_LPWSTR,
+            CoCreateInstance, CoInitializeEx, CoUninitialize,
+            CLSCTX_ALL, COINIT_MULTITHREADED,
         },
-        UI::Shell::PropertiesSystem::IPropertyStore
     },
 };
 
@@ -66,51 +63,6 @@ impl Host {
                     }
                 };
 
-                let property_store: IPropertyStore = device.OpenPropertyStore(STGM_READ).unwrap();
-                let mut name_property_value =
-                    match property_store.GetValue(&PKEY_Device_FriendlyName) {
-                        Ok(name_property_value) => name_property_value,
-                        Err(err) => {
-                            println!("Error getting device name: {}", err);
-                            return Err("Error getting device name".to_string());
-                        }
-                    };
-
-                let prop_variant = &name_property_value.Anonymous.Anonymous;
-
-                // Read the friendly-name from the union data field, expecting a *const u16.
-                if prop_variant.vt != VT_LPWSTR {
-                    let description = format!(
-                        "property store produced invalid data: {:?}",
-                        prop_variant.vt
-                    );
-                    return Err(description);
-                }
-                let ptr_utf16 = *(&prop_variant.Anonymous as *const _ as *const *const u16);
-
-                // Find the length of the friendly name.
-                let mut len = 0;
-                while *ptr_utf16.offset(len) != 0 {
-                    len += 1;
-                }
-
-                // Create the utf16 slice and convert it into a string.
-                let name_slice = slice::from_raw_parts(ptr_utf16, len as usize);
-                let name_os_string: OsString = OsStringExt::from_wide(name_slice);
-                let name = match name_os_string.into_string() {
-                    Ok(string) => string,
-                    Err(os_string) => os_string.to_string_lossy().into(),
-                };
-
-                // Clean up the property.
-                match PropVariantClear(&mut name_property_value) {
-                    Ok(_) => (),
-                    Err(err) => {
-                        println!("Error clearing property: {}", err);
-                        return Err("Error clearing property".to_string());
-                    }
-                };
-
                 let id = match device.GetId() {
                     Ok(id) => PCWSTR::from_raw(id.as_ptr()),
                     Err(err) => {
@@ -119,7 +71,13 @@ impl Host {
                     }
                 };
 
-                enumerated_devices.push(Device::new(id, index as u16, name.clone()));
+                let is_default = id == PCWSTR::from_raw(default_device.GetId().unwrap().as_ptr());
+
+                enumerated_devices.push(Device {
+                    index,
+                    device,
+                    is_default,
+                });
             }
 
             CoUninitialize();
