@@ -91,3 +91,7 @@ pub trait StreamTrait {
     fn get_stream_params(&self) -> &StreamParams;
     fn set_stream_params(&mut self, stream_paramters: StreamParams);
 }
+
+//pub trait Device {
+//    fn get_name(&self) -> &str;
+//}

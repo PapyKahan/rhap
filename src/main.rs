@@ -7,8 +7,9 @@ use walkdir::WalkDir;
 
 mod audio;
 mod player;
-use crate::audio::api::wasapi::enumerate_devices;
+
 use crate::player::Player;
+use crate::audio::api::wasapi::host::Host;
 
 #[derive(Parser)]
 struct Cli {
@@ -23,7 +24,7 @@ struct Cli {
 fn main() -> Result<(), ()> {
     let cli = Cli::parse();
     if cli.list {
-        let devices = enumerate_devices().unwrap();
+        let devices = Host::enumerate_devices().unwrap();
         for dev in devices {
             println!("Device: id={}, name={}", dev.index, dev.name);
         }

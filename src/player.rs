@@ -267,7 +267,7 @@ impl Player {
                 samplerate: samplerate.into(),
                 channels,
                 bits_per_sample: bits_per_sample.into(),
-                buffer_length: 0,
+                buffer_length: 1000,
                 exclusive: true,
             },
             callback,
