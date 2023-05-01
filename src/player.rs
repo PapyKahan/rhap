@@ -11,7 +11,7 @@ use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
 use crate::audio::api::wasapi::stream::Stream;
-use crate::audio::{Device, StreamFlow, StreamParams, StreamTrait};
+use crate::audio::{Device, StreamFlow, StreamParams, StreamTrait, BitsPerSample};
 
 pub struct Player {
     device_id: u16,
@@ -23,161 +23,35 @@ impl Player {
     }
 
     #[inline(always)]
-    fn fill_buffer_32bits(
+    fn fill_buffer(
         &self,
         mut decoder: Box<dyn Decoder>,
         mut format: Box<dyn FormatReader>,
-        vec_buffer: Arc<Mutex<VecDeque<u8>>>
+        vec_buffer: Arc<Mutex<VecDeque<u8>>>,
+        bits_per_sample: BitsPerSample
     ) {
         thread::spawn(move || {
-            let mut sample_buffer = None;
             loop {
                 let packet = match format.next_packet() {
                     Ok(packet) => packet,
                     Err(Error::ResetRequired) => {
                         unimplemented!();
-                    },
+                    }
                     Err(Error::IoError(err)) => {
                         // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
                         match err.kind() {
                             std::io::ErrorKind::UnexpectedEof => {
                                 break;
-                            },
+                            }
                             _ => {
                                 panic!("Error reading packet: {:?}", err);
-                            }
-                        }
-                    },
-                    Err(err) => {
-                        println!("Error reading packet: {:?}", err);
-                        break;
-                    },
-                };
-
-                // Consume any new metadata that has been read since the last packet.
-                while !format.metadata().is_latest() {
-                    format.metadata().pop();
-                }
-
-                match decoder.decode(&packet) {
-                    Ok(_decoded) => {
-                        if sample_buffer.is_none() {
-                            // Get the audio buffer specification.
-                            let spec = *_decoded.spec();
-                            // Get the capacity of the decoded buffer. Note: This is capacity, not length!
-                            let duration = _decoded.capacity() as u64;
-                            // Create the f32 sample buffer.
-                            sample_buffer = Some(RawSampleBuffer::<i32>::new(duration, spec));
-                        }
-
-                        if let Some(buf) = &mut sample_buffer {
-                            buf.copy_interleaved_ref(_decoded);
-                            for i in buf.as_bytes().iter() {
-                                vec_buffer.lock().unwrap().push_back(*i)
                             }
                         }
                     }
-                    Err(Error::DecodeError(_)) => (),
-                    Err(_) => break,
-                }
-            }
-        });
-        thread::sleep(std::time::Duration::from_secs(1));
-    }
-
-    #[inline(always)]
-    fn fill_buffer_24bits(
-        &self,
-        mut decoder: Box<dyn Decoder>,
-        mut format: Box<dyn FormatReader>,
-        vec_buffer: Arc<Mutex<VecDeque<u8>>>
-    ) {
-        thread::spawn(move || {
-            let mut sample_buffer = None;
-            loop {
-                let packet = match format.next_packet() {
-                    Ok(packet) => packet,
-                    Err(Error::ResetRequired) => {
-                        unimplemented!();
-                    },
-                    Err(Error::IoError(err)) => {
-                        // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
-                        match err.kind() {
-                            std::io::ErrorKind::UnexpectedEof => {
-                                break;
-                            },
-                            _ => {
-                                panic!("Error reading packet: {:?}", err);
-                            }
-                        }
-                    },
                     Err(err) => {
                         println!("Error reading packet: {:?}", err);
                         break;
-                    },
-                };
-
-                // Consume any new metadata that has been read since the last packet.
-                while !format.metadata().is_latest() {
-                    format.metadata().pop();
-                }
-
-                match decoder.decode(&packet) {
-                    Ok(_decoded) => {
-                        if sample_buffer.is_none() {
-                            // Get the audio buffer specification.
-                            let spec = *_decoded.spec();
-                            // Get the capacity of the decoded buffer. Note: This is capacity, not length!
-                            let duration = _decoded.capacity() as u64;
-                            // Create the f32 sample buffer.
-                            sample_buffer = Some(RawSampleBuffer::<i24>::new(duration, spec));
-                        }
-
-                        if let Some(buf) = &mut sample_buffer {
-                            buf.copy_interleaved_ref(_decoded);
-                            for i in buf.as_bytes().iter() {
-                                vec_buffer.lock().unwrap().push_back(*i)
-                            }
-                        }
                     }
-                    Err(Error::DecodeError(_)) => (),
-                    Err(_) => break,
-                }
-            }
-        });
-        thread::sleep(std::time::Duration::from_secs(1));
-    }
-
-    #[inline(always)]
-    fn fill_buffer_16bits(
-        &self,
-        mut decoder: Box<dyn Decoder>,
-        mut format: Box<dyn FormatReader>,
-        vec_buffer: Arc<Mutex<VecDeque<u8>>>
-    ) {
-        thread::spawn(move || {
-            let mut sample_buffer = None;
-            loop {
-                let packet = match format.next_packet() {
-                    Ok(packet) => packet,
-                    Err(Error::ResetRequired) => {
-                        unimplemented!();
-                    },
-                    Err(Error::IoError(err)) => {
-                        // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
-                        match err.kind() {
-                            std::io::ErrorKind::UnexpectedEof => {
-                                break;
-                            },
-                            _ => {
-                                panic!("Error reading packet: {:?}", err);
-                            }
-                        }
-                    },
-                    Err(err) => {
-                        println!("Error reading packet: {:?}", err);
-                        break;
-                    },
                 };
 
                 // Consume any new metadata that has been read since the last packet.
@@ -187,21 +61,42 @@ impl Player {
 
                 match decoder.decode(&packet) {
                     Ok(_decoded) => {
-                        if sample_buffer.is_none() {
-                            // Get the audio buffer specification.
-                            let spec = *_decoded.spec();
-                            // Get the capacity of the decoded buffer. Note: This is capacity, not length!
-                            let duration = _decoded.capacity() as u64;
-                            // Create the f32 sample buffer.
-                            sample_buffer = Some(RawSampleBuffer::<i16>::new(duration, spec));
-                        }
+                        let spec = *_decoded.spec();
+                        let duration = _decoded.capacity() as u64;
 
-                        if let Some(buf) = &mut sample_buffer {
-                            buf.copy_interleaved_ref(_decoded);
-                            for i in buf.as_bytes().iter() {
-                                vec_buffer.lock().unwrap().push_back(*i)
-                            }
-                        }
+                        // Not very efficient, but i can't create a RawSampleBuffer dynamically
+                        // so i have to create one for each possible bits_per_sample and at eatch iteration
+                        match bits_per_sample {
+                            BitsPerSample::Bits8 => {
+                                let mut sample_buffer = RawSampleBuffer::<u8>::new(duration, spec);
+                                sample_buffer.copy_interleaved_ref(_decoded);
+                                for i in sample_buffer.as_bytes().iter() {
+                                    vec_buffer.lock().unwrap().push_back(*i);
+                                }
+                            },
+                            BitsPerSample::Bits16 => {
+                                let mut sample_buffer = RawSampleBuffer::<i16>::new(duration, spec);
+                                sample_buffer.copy_interleaved_ref(_decoded);
+                                for i in sample_buffer.as_bytes().iter() {
+                                    vec_buffer.lock().unwrap().push_back(*i);
+                                }
+                            },
+                            BitsPerSample::Bits24 => {
+                                let mut sample_buffer = RawSampleBuffer::<i24>::new(duration, spec);
+                                sample_buffer.copy_interleaved_ref(_decoded);
+                                for i in sample_buffer.as_bytes().iter() {
+                                    vec_buffer.lock().unwrap().push_back(*i);
+                                }
+                            },
+                            BitsPerSample::Bits32 => {
+                                let mut sample_buffer = RawSampleBuffer::<i32>::new(duration, spec);
+                                sample_buffer.copy_interleaved_ref(_decoded);
+                                for i in sample_buffer.as_bytes().iter() {
+                                    vec_buffer.lock().unwrap().push_back(*i);
+                                }
+                            },
+                        };
+
                     }
                     Err(Error::DecodeError(_)) => (),
                     Err(_) => break,
@@ -239,12 +134,7 @@ impl Player {
             .expect("unsupported codec");
 
         let vec_buffer = Arc::new(Mutex::new(VecDeque::new()));
-        match bits_per_sample {
-            16 => self.fill_buffer_16bits(decoder, format, vec_buffer.clone()),
-            24 => self.fill_buffer_24bits(decoder, format, vec_buffer.clone()),
-            32 => self.fill_buffer_32bits(decoder, format, vec_buffer.clone()),
-            _ => panic!("Unsupported bits per sample"),
-        }
+        self.fill_buffer(decoder, format, vec_buffer.clone(), BitsPerSample::from(bits_per_sample));
 
         let callback = move |data: &mut [u8], buffer_size: usize| -> Result<StreamFlow, String> {
             let mut data_processing = StreamFlow::Continue;
@@ -267,7 +157,7 @@ impl Player {
                 samplerate: samplerate.into(),
                 channels,
                 bits_per_sample: bits_per_sample.into(),
-                buffer_length: 1000,
+                buffer_length: 0,
                 exclusive: true,
             },
             callback,
