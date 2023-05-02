@@ -7,7 +7,7 @@
             "request": "launch",
             "cwd": "${workspaceFolder}",
             "program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}",
-            "args": ["-l"],
+            "args": ["-p ~/Music/Tranquille/", "-d 0"],
             "stopAtEntry": true
         },
         {

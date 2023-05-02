@@ -300,15 +300,8 @@ impl Stream {
 }
 
 impl StreamTrait for Stream {
-    //fn new<T>(params: StreamParams, callback: T) -> Result<Self, String>
-    //where
-    //    T: FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static,
-    //{
-    //}
-
     fn start(&mut self) -> Result<(), String> {
         println!("Starting stream with parameters: {:?}", self.params);
-        // Compute client buffer size in bytes.
         unsafe {
             let mut task_index: u32 = 0;
             let task_index: *mut u32 = &mut task_index;

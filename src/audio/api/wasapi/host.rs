@@ -6,7 +6,7 @@ use windows::{
             MMDeviceEnumerator, DEVICE_STATE_ACTIVE, eMultimedia,
         },
         System::Com::{
-            CoCreateInstance, CoInitializeEx, CoUninitialize,
+            CoCreateInstance, CoInitializeEx,
             CLSCTX_ALL, COINIT_MULTITHREADED,
         },
     },
@@ -79,8 +79,6 @@ impl Host {
                     is_default,
                 });
             }
-
-            CoUninitialize();
 
             Ok(enumerated_devices)
         }
