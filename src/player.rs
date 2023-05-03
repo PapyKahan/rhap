@@ -10,6 +10,7 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
+use crate::audio::api::wasapi::host::Host;
 use crate::audio::{StreamFlow, StreamParams, DeviceTrait, BitsPerSample};
 
 pub struct Player {
@@ -147,13 +148,18 @@ impl Player {
             Ok(data_processing)
         };
 
-        let device = match crate::audio::api::wasapi::device::Device::new(self.device_id) {
-            Ok(device) => device,
+        let host = match Host::new() {
+            Ok(host) => host,
             Err(e) => {
-                return Err(format!("Failed to open device: {}", e));
+                return Err(format!("Failed to create host: {}", e));
             }
         };
-
+        let device = match host.create_device(self.device_id) {
+            Ok(device) => device,
+            Err(e) => {
+                return Err(format!("Failed to create device: {}", e));
+            }
+        };
         let streamparams = StreamParams {
                 samplerate: samplerate.into(),
                 channels,

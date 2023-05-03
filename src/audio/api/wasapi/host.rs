@@ -1,32 +1,68 @@
 use windows::{
     core::PCWSTR,
     Win32::{
+        Foundation::RPC_E_CHANGED_MODE,
         Media::Audio::{
-            eRender, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator,
-            MMDeviceEnumerator, DEVICE_STATE_ACTIVE, eMultimedia,
+            eMultimedia, eRender, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator,
+            MMDeviceEnumerator, DEVICE_STATE_ACTIVE,
         },
-        System::Com::{
-            CoCreateInstance, CoInitializeEx,
-            CLSCTX_ALL, COINIT_MULTITHREADED,
-        },
+        System::Com::{CoCreateInstance, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED, CoInitializeEx},
     },
 };
 
 use super::device::Device;
 
-pub struct Host;
+pub struct Host {
+    com_initialize_result: windows::core::Result<()>,
+}
+
+impl Drop for Host {
+    fn drop(&mut self) {
+        unsafe {
+            if self.com_initialize_result.is_ok() {
+                CoUninitialize();
+            }
+        }
+    }
+}
+
 impl Host {
-    pub fn enumerate_devices() -> Result<Vec<Device>, String> {
-        let mut enumerated_devices = vec![];
+    pub fn new() -> Result<Self, String> {
         unsafe {
             // Initialise les sous-systèmes COM
-            match CoInitializeEx(None, COINIT_MULTITHREADED) {
-                Ok(_) => (),
+            let result = match CoInitializeEx(None, COINIT_MULTITHREADED) {
+                Ok(_) => Ok(()),
                 Err(err) => {
-                    return Err(format!("Error initialising COM: {}", err));
+                    if err.code() == RPC_E_CHANGED_MODE {
+                        Ok(())
+                    } else {
+                        panic!("Failed to initialize COM: {}", err);
+                    }
                 }
             };
+            Ok(Self {
+                com_initialize_result: result,
+            })
+        }
+    }
 
+    pub(crate) fn create_device(&self, id: Option<u32>) -> Result<Device, String> {
+        match Device::new(id) {
+            Ok(device) => Ok(device),
+            Err(e) => Err(format!("Failed to open device: {}", e)),
+        }
+    }
+
+    pub(crate) fn get_devices(&self) -> Result<Vec<Device>, String> {
+        match Self::enumerate_devices() {
+            Ok(devices) => Ok(devices),
+            Err(e) => Err(format!("Failed to enumerate devices: {}", e)),
+        }
+    }
+
+    pub(super) fn enumerate_devices() -> Result<Vec<Device>, String> {
+        let mut enumerated_devices = vec![];
+        unsafe {
             let enumerator: IMMDeviceEnumerator =
                 match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
                     Ok(device_enumerator) => device_enumerator,

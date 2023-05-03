@@ -10,23 +10,21 @@ use windows::Win32::Foundation::{
     CloseHandle, FALSE, HANDLE, S_OK, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows::Win32::Media::Audio::{
-    IAudioClient, IAudioRenderClient, 
-    AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED, AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED,
-    AUDCLNT_STREAMFLAGS_EVENTCALLBACK, WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0, IMMDevice,
+    IAudioClient, IAudioRenderClient, IMMDevice, AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED,
+    AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+    WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0,
 };
 use windows::Win32::Media::KernelStreaming::{
     KSDATAFORMAT_SUBTYPE_PCM, SPEAKER_FRONT_LEFT, SPEAKER_FRONT_RIGHT, WAVE_FORMAT_EXTENSIBLE,
 };
-use windows::Win32::System::Com::{
-    CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
-};
+use windows::Win32::System::Com::CLSCTX_ALL;
 use windows::Win32::System::Threading::{
     AvRevertMmThreadCharacteristics, AvSetMmThreadCharacteristicsA, CreateEventW,
     WaitForSingleObject,
 };
 
-use super::utils::{host_error, align_frames_per_buffer, align_bwd};
-use crate::audio::api::wasapi::utils::{make_hns_period, make_frames_from_hns};
+use super::utils::{align_bwd, align_frames_per_buffer, host_error};
+use crate::audio::api::wasapi::utils::{make_frames_from_hns, make_hns_period};
 use crate::audio::{StreamFlow, StreamParams, StreamTrait};
 
 pub struct Stream {
@@ -78,15 +76,7 @@ impl Stream {
         T: FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static,
     {
         unsafe {
-            match CoInitializeEx(None, COINIT_MULTITHREADED) {
-                Ok(_) => (),
-                Err(err) => {
-                    return Err(format!("Error initializing COM: {} - {}", err.code(), err));
-                }
-            };
-
-            let client: IAudioClient = match (*device).Activate::<IAudioClient>(CLSCTX_ALL, None)
-            {
+            let client: IAudioClient = match (*device).Activate::<IAudioClient>(CLSCTX_ALL, None) {
                 Ok(client) => client,
                 Err(err) => {
                     return Err(format!(
@@ -164,15 +154,28 @@ impl Stream {
                         return Err(format!("Initialize: Error getting buffer size: {}", err));
                     }
                 };
-                let frames_per_latency = make_frames_from_hns(default_device_period as u32, wave_format.Format.nSamplesPerSec);
-                let frames_per_latency = align_frames_per_buffer(frames_per_latency, wave_format.Format.nBlockAlign as u32, align_bwd);
+                let frames_per_latency = make_frames_from_hns(
+                    default_device_period as u32,
+                    wave_format.Format.nSamplesPerSec,
+                );
+                let frames_per_latency = align_frames_per_buffer(
+                    frames_per_latency,
+                    wave_format.Format.nBlockAlign as u32,
+                    align_bwd,
+                );
                 let period = make_hns_period(frames_per_latency, wave_format.Format.nSamplesPerSec);
 
                 let period = if buffer_size as u32 >= (frames_per_latency * 2) {
                     let ratio = buffer_size as u32 / frames_per_latency;
-                    let frames_per_latency = make_hns_period(period / ratio, wave_format.Format.nSamplesPerSec);
-                    let frames_per_latency = align_frames_per_buffer(frames_per_latency, wave_format.Format.nBlockAlign as u32, align_bwd);
-                    let period = make_hns_period(frames_per_latency, wave_format.Format.nSamplesPerSec);
+                    let frames_per_latency =
+                        make_hns_period(period / ratio, wave_format.Format.nSamplesPerSec);
+                    let frames_per_latency = align_frames_per_buffer(
+                        frames_per_latency,
+                        wave_format.Format.nBlockAlign as u32,
+                        align_bwd,
+                    );
+                    let period =
+                        make_hns_period(frames_per_latency, wave_format.Format.nSamplesPerSec);
                     if period < minimum_device_period as u32 {
                         minimum_device_period as u32
                     } else {

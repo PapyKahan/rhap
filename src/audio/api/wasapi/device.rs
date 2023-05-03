@@ -1,17 +1,16 @@
 use std::{ffi::OsString, os::windows::prelude::OsStringExt, slice};
-
-use crate::audio::{DeviceTrait, StreamParams};
-
-use super::{host::Host, stream::Stream};
 use windows::Win32::{
     Devices::FunctionDiscovery::PKEY_Device_FriendlyName,
     Media::Audio::{eMultimedia, eRender, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator},
     System::Com::{
-        CoCreateInstance, CoInitializeEx, CoUninitialize, StructuredStorage::PropVariantClear,
-        CLSCTX_ALL, COINIT_MULTITHREADED, STGM_READ, VT_LPWSTR,
+        CoCreateInstance, CoUninitialize, StructuredStorage::PropVariantClear, CLSCTX_ALL,
+        STGM_READ, VT_LPWSTR,
     },
     UI::Shell::PropertiesSystem::IPropertyStore,
 };
+
+use super::{host::Host, stream::Stream};
+use crate::audio::{DeviceTrait, StreamParams};
 
 pub struct Device {
     pub index: u32,
@@ -24,38 +23,6 @@ impl DeviceTrait for Device {
         match Self::get_device_name(&self.device) {
             Ok(name) => name,
             Err(_) => String::from(""),
-        }
-    }
-
-    fn new(id: Option<u32>) -> Result<Self, String> {
-        unsafe {
-            match CoInitializeEx(None, COINIT_MULTITHREADED) {
-                Ok(_) => (),
-                Err(err) => {
-                    return Err(format!("Error initializing COM: {} - {}", err.code(), err))
-                }
-            };
-
-            let device = match id {
-                Some(id) => match Self::get_device(id) {
-                    Ok(device) => device,
-                    Err(err) => {
-                        return Err(format!("Error getting device: {}", err));
-                    }
-                },
-                _ => match Self::get_default_device() {
-                    Ok(device) => device,
-                    Err(err) => {
-                        return Err(format!("Error getting default device: {}", err));
-                    }
-                },
-            };
-
-            Ok(Self {
-                device,
-                index: Option::unwrap_or(id, 0),
-                is_default: false,
-            })
         }
     }
 
@@ -78,6 +45,29 @@ impl DeviceTrait for Device {
 }
 
 impl Device {
+    pub(super) fn new(id: Option<u32>) -> Result<Self, String> {
+        let device = match id {
+            Some(id) => match Self::get_device(id) {
+                Ok(device) => device,
+                Err(err) => {
+                    return Err(format!("Error getting device: {}", err));
+                }
+            },
+            _ => match Self::get_default_device() {
+                Ok(device) => device,
+                Err(err) => {
+                    return Err(format!("Error getting default device: {}", err));
+                }
+            },
+        };
+
+        Ok(Self {
+            device,
+            index: Option::unwrap_or(id, 0),
+            is_default: false,
+        })
+    }
+
     fn get_device_name(device: &IMMDevice) -> Result<String, String> {
         unsafe {
             let property_store: IPropertyStore = (*device).OpenPropertyStore(STGM_READ).unwrap();
@@ -146,14 +136,6 @@ impl Device {
 
     fn get_default_device() -> Result<IMMDevice, String> {
         unsafe {
-            // Initialise les sous-systèmes COM
-            match CoInitializeEx(None, COINIT_MULTITHREADED) {
-                Ok(_) => (),
-                Err(err) => {
-                    return Err(format!("Error initialising COM: {}", err));
-                }
-            };
-
             let enumerator: IMMDeviceEnumerator =
                 match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
                     Ok(device_enumerator) => device_enumerator,
@@ -171,14 +153,6 @@ impl Device {
 
     pub fn get_capabilities(&self) -> Result<(), String> {
         unsafe {
-            // Initialise les sous-systèmes COM
-            match CoInitializeEx(None, COINIT_MULTITHREADED) {
-                Ok(_) => (),
-                Err(_) => {
-                    return Err("Error initialising COM".to_string());
-                }
-            };
-
             //let device = Self::get_device(self.index).unwrap();
 
             //// Get Device capabilities
