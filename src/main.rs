@@ -53,6 +53,10 @@ fn main() -> Result<(), ()> {
     }
 
     let player = Player::new(cli.device);
+    ctrlc::set_handler(move || {
+        player.stop();
+        std::process::exit(0);
+    });
 
     if cli.path.is_some() {
         let path = cli.path.clone().unwrap();

@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::thread ;
 use symphonia::core::audio::RawSampleBuffer;
@@ -11,15 +12,16 @@ use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
 use crate::audio::api::wasapi::host::Host;
-use crate::audio::{StreamFlow, StreamParams, DeviceTrait, BitsPerSample};
+use crate::audio::{StreamFlow, StreamParams, DeviceTrait, BitsPerSample, StreamTrait};
 
 pub struct Player {
     device_id: Option<u32>,
+    current_stream : Option<Rc<dyn StreamTrait>>,
 }
 
 impl Player {
     pub fn new(device_id: Option<u32>) -> Self {
-        Player { device_id }
+        Player { device_id, current_stream: None }
     }
 
     #[inline(always)]
@@ -167,24 +169,37 @@ impl Player {
                 buffer_length: 0,
                 exclusive: true,
             };
-        let mut stream = match device.build_stream(streamparams, callback) {
-            Ok(stream) => stream,
+        if self.current_stream.is_some() {
+            self.current_stream.as_ref().unwrap().stop();
+        }
+        self.current_stream = match device.build_stream(streamparams, callback) {
+            Ok(stream) => Some(stream),
             Err(e) => {
                 return Err(format!("Failed to build stream: {}", e));
             }
         };
 
         println!("Playing file path: {}", file);
-        match stream.start() {
+        match self.current_stream.unwrap().start() {
             Ok(_) => {}
             Err(e) => return Err(format!("Failed to start stream: {}", e)),
         };
 
-        match stream.stop() {
+        match self.current_stream.unwrap().stop() {
             Ok(_) => Ok(()),
             Err(e) => {
                 return Err(format!("Failed to stop stream: {}", e));
             }
+        }
+    }
+
+    pub(crate) fn stop(&self) -> Result<(), String> {
+        match self.current_stream {
+            Some(ref stream) => match stream.stop() {
+                Ok(_) => Ok(()),
+                Err(e) => Err(format!("Failed to stop stream: {}", e)),
+            },
+            None => Ok(()),
         }
     }
 }

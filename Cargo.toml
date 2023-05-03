@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.2.4", features = ["derive"] }
+ctrlc = "3.2.5"
 rand = "0.8.5"
 symphonia = { version = "0.5.2", features = ["all-formats", "all-codecs"] }
 walkdir = "2.3.3"

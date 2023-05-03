@@ -1,3 +1,5 @@
+use std::{rc::Rc, sync::Arc};
+
 pub mod api;
 
 #[repr(u32)]
@@ -89,7 +91,7 @@ pub trait StreamTrait {
 
 pub trait DeviceTrait {
     fn get_name(&self) -> String;
-    fn build_stream<T>(&self, params: StreamParams, callback : T) -> Result<Box<dyn StreamTrait>, String>
+    fn build_stream<T>(&self, params: StreamParams, callback : T) -> Result<Arc<dyn StreamTrait>, String>
     where
         T: FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static;
 }
