@@ -25,11 +25,9 @@ use windows::Win32::System::Threading::{
     WaitForSingleObject,
 };
 
-use super::utils::{host_error, align_frames_per_buffer, align_fwd, align_bwd};
+use super::utils::{host_error, align_frames_per_buffer, align_bwd};
 use crate::audio::api::wasapi::utils::{make_hns_period, make_frames_from_hns};
 use crate::audio::{StreamFlow, StreamParams, StreamTrait};
-
-const REFTIMES_PER_SEC: i64 = 10_000_000;
 
 pub struct Stream {
     params: StreamParams,

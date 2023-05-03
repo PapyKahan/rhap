@@ -3,17 +3,14 @@ use std::{ffi::OsString, os::windows::prelude::OsStringExt, slice};
 use crate::audio::{DeviceTrait, StreamParams};
 
 use super::{host::Host, stream::Stream};
-use windows::{
-    core::PCWSTR,
-    Win32::{
-        Devices::FunctionDiscovery::PKEY_Device_FriendlyName,
-        Media::Audio::{IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator},
-        System::Com::{
-            CoCreateInstance, CoInitializeEx, CoUninitialize, StructuredStorage::PropVariantClear,
-            CLSCTX_ALL, COINIT_MULTITHREADED, STGM_READ, VT_LPWSTR,
-        },
-        UI::Shell::PropertiesSystem::IPropertyStore,
+use windows::Win32::{
+    Devices::FunctionDiscovery::PKEY_Device_FriendlyName,
+    Media::Audio::{eMultimedia, eRender, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator},
+    System::Com::{
+        CoCreateInstance, CoInitializeEx, CoUninitialize, StructuredStorage::PropVariantClear,
+        CLSCTX_ALL, COINIT_MULTITHREADED, STGM_READ, VT_LPWSTR,
     },
+    UI::Shell::PropertiesSystem::IPropertyStore,
 };
 
 pub struct Device {
@@ -30,13 +27,7 @@ impl DeviceTrait for Device {
         }
     }
 
-    fn new(id: u32) -> Result<Self, String> {
-        let selected_device = match Self::get_device(id) {
-            Ok(device) => device,
-            Err(err) => {
-                return Err(format!("Error getting device: {}", err));
-            }
-        };
+    fn new(id: Option<u32>) -> Result<Self, String> {
         unsafe {
             match CoInitializeEx(None, COINIT_MULTITHREADED) {
                 Ok(_) => (),
@@ -45,28 +36,24 @@ impl DeviceTrait for Device {
                 }
             };
 
-            let enumerator: IMMDeviceEnumerator =
-                match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
-                    Ok(device_enumerator) => device_enumerator,
+            let device = match id {
+                Some(id) => match Self::get_device(id) {
+                    Ok(device) => device,
                     Err(err) => {
-                        return Err(format!(
-                            "Error getting device enumerator: {} - {}",
-                            err.code(),
-                            err
-                        ));
+                        return Err(format!("Error getting device: {}", err));
                     }
-                };
-
-            let device = match enumerator.GetDevice(selected_device) {
-                Ok(device) => device,
-                Err(err) => {
-                    return Err(format!("Error getting device: {} - {}", err.code(), err));
-                }
+                },
+                _ => match Self::get_default_device() {
+                    Ok(device) => device,
+                    Err(err) => {
+                        return Err(format!("Error getting default device: {}", err));
+                    }
+                },
             };
 
             Ok(Self {
                 device,
-                index: id,
+                index: Option::unwrap_or(id, 0),
                 is_default: false,
             })
         }
@@ -140,7 +127,7 @@ impl Device {
         }
     }
 
-    pub fn get_device(id: u32) -> Result<PCWSTR, String> {
+    fn get_device(id: u32) -> Result<IMMDevice, String> {
         let devices = match Host::enumerate_devices() {
             Ok(devices) => devices,
             Err(err) => {
@@ -151,14 +138,35 @@ impl Device {
 
         for dev in devices {
             if dev.index == id {
-                return Ok(dev.get_id());
+                return Ok(dev.device);
             }
         }
         Err("Device not found".to_string())
     }
 
-    fn get_id(&self) -> PCWSTR {
-        unsafe { PCWSTR::from_raw(self.device.GetId().unwrap().as_ptr()) }
+    fn get_default_device() -> Result<IMMDevice, String> {
+        unsafe {
+            // Initialise les sous-systèmes COM
+            match CoInitializeEx(None, COINIT_MULTITHREADED) {
+                Ok(_) => (),
+                Err(err) => {
+                    return Err(format!("Error initialising COM: {}", err));
+                }
+            };
+
+            let enumerator: IMMDeviceEnumerator =
+                match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+                    Ok(device_enumerator) => device_enumerator,
+                    Err(err) => {
+                        return Err(format!("Error getting device enumerator: {}", err));
+                    }
+                };
+
+            match enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia) {
+                Ok(device) => Ok(device),
+                Err(err) => Err(format!("Error getting default device {}", err)),
+            }
+        }
     }
 
     pub fn get_capabilities(&self) -> Result<(), String> {

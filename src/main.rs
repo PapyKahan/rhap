@@ -27,7 +27,7 @@ fn main() -> Result<(), ()> {
     if cli.list {
         let devices = Host::enumerate_devices().unwrap();
         for dev in devices {
-            println!("Device: id={}, name={}", dev.index, dev.get_name());
+            println!("{} [{}]: {}", if dev.is_default { "->" } else { "  " }, dev.index, dev.get_name());
         }
         return Ok(());
     } else if cli.path.is_none() {
@@ -39,7 +39,7 @@ fn main() -> Result<(), ()> {
         .exit();
     }
 
-    let player = Player::new(cli.device.unwrap_or_default());
+    let player = Player::new(cli.device);
 
     if cli.path.is_some() {
         let path = cli.path.clone().unwrap();

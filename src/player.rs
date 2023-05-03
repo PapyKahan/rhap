@@ -13,11 +13,11 @@ use symphonia::core::sample::i24;
 use crate::audio::{StreamFlow, StreamParams, DeviceTrait, BitsPerSample};
 
 pub struct Player {
-    device_id: u32,
+    device_id: Option<u32>,
 }
 
 impl Player {
-    pub fn new(device_id: u32) -> Self {
+    pub fn new(device_id: Option<u32>) -> Self {
         Player { device_id }
     }
 

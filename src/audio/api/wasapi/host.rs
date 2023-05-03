@@ -23,8 +23,7 @@ impl Host {
             match CoInitializeEx(None, COINIT_MULTITHREADED) {
                 Ok(_) => (),
                 Err(err) => {
-                    println!("Error initialising COM: {}", err);
-                    return Err("Error initialising COM".to_string());
+                    return Err(format!("Error initialising COM: {}", err));
                 }
             };
 
@@ -32,8 +31,7 @@ impl Host {
                 match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
                     Ok(device_enumerator) => device_enumerator,
                     Err(err) => {
-                        println!("Error getting device enumerator: {}", err);
-                        return Err("Error getting device enumerator".to_string());
+                        return Err(format!("Error getting device enumerator: {}", err));
                     }
                 };
 
@@ -41,16 +39,28 @@ impl Host {
                 match enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE) {
                     Ok(devices) => devices,
                     Err(err) => {
-                        println!("Error getting device list: {}", err);
-                        return Err("Error getting device list".to_string());
+                        return Err(format!("Error getting device list: {}", err));
                     }
                 };
 
             let default_device = match enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia) {
                 Ok(device) => device,
                 Err(err) => {
-                    println!("Error getting default device: {}", err);
-                    return Err("Error getting default device".to_string());
+                    return Err(format!("Error getting default device: {}", err));
+                }
+            };
+
+            let default_device_id = match default_device.GetId() {
+                Ok(id) => PCWSTR::from_raw(id.as_ptr()),
+                Err(err) => {
+                    return Err(format!("Error getting default device id: {}", err));
+                }
+            };
+
+            let default_device_id_string = match default_device_id.to_string() {
+                Ok(id) => id,
+                Err(err) => {
+                    return Err(format!("Error converting default device id: {}", err));
                 }
             };
 
@@ -58,20 +68,25 @@ impl Host {
                 let device: IMMDevice = match devices.Item(index) {
                     Ok(device) => device,
                     Err(err) => {
-                        println!("Error getting device: {}", err);
-                        return Err("Error getting device".to_string());
+                        return Err(format!("Error getting device: {}", err));
                     }
                 };
 
                 let id = match device.GetId() {
                     Ok(id) => PCWSTR::from_raw(id.as_ptr()),
                     Err(err) => {
-                        println!("Error getting device id: {}", err);
-                        return Err("Error getting device id".to_string());
+                        return Err(format!("Error getting device id: {}", err));
                     }
                 };
 
-                let is_default = id == PCWSTR::from_raw(default_device.GetId().unwrap().as_ptr());
+                let device_id_string = match id.to_string() {
+                    Ok(id) => id,
+                    Err(err) => {
+                        return Err(format!("Error converting device id: {}", err));
+                    }
+                };
+
+                let is_default = device_id_string == default_device_id_string;
 
                 enumerated_devices.push(Device {
                     index,
