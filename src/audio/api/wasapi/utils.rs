@@ -3,7 +3,8 @@ use windows::Win32::Foundation::*;
 use windows::Win32::Media::Audio::*;
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 
-pub fn host_error<'life>(errorcode: HRESULT) -> &'life str {
+#[inline(always)]
+pub(super) fn host_error<'life>(errorcode: HRESULT) -> &'life str {
     match errorcode {
         S_OK => "S_OK",
         E_POINTER => "E_POINTER",
@@ -49,7 +50,10 @@ pub fn host_error<'life>(errorcode: HRESULT) -> &'life str {
     }
 }
 
-pub fn print_wave_format(wave_format: *const WAVEFORMATEX) {
+/// Debug fonction to print WAVEFORMATEX values.
+#[inline(always)]
+#[allow(dead_code)]
+pub(super) fn print_wave_format(wave_format: *const WAVEFORMATEX) {
     unsafe {
         let formattag = (*wave_format).wFormatTag;
         println!("Format tag: {:?}", formattag);
@@ -75,4 +79,48 @@ pub fn print_wave_format(wave_format: *const WAVEFORMATEX) {
             println!("Channel mask: {:?}", channel_mask);
         }
     }
+}
+
+/// Compute HNS perdiod from frames and samplerate.
+#[inline(always)]
+pub(super) fn make_hns_period(frames: u32, samplerate: u32) -> u32 {
+    10000 * 1000 / samplerate * frames// + 0.5
+}
+
+/// Converts HNS period to frames.
+#[inline(always)]
+pub(super) fn make_frames_from_hns(hns: u32, samplerate: u32) -> u32 {
+    hns * samplerate / 1000 / 10000
+}
+
+/// Aligns x backward
+#[inline(always)]
+pub(super) fn align_bwd(x: u32, align: u32) -> u32 {
+    x - x % align
+}
+
+/// Aligns x forward
+#[inline(always)]
+pub(super) fn align_fwd(x: u32, align: u32) -> u32 {
+    let remainer = x % align;
+    if remainer == 0 {
+        x
+    } else {
+        x + (align - remainer)
+    }
+}
+
+/// Aligns frames per buffer
+#[inline(always)]
+pub(super) fn align_frames_per_buffer(frames: u32, block_align : u32, alignfn: fn(bytes: u32, align: u32) -> u32) -> u32 {
+    let bytes = alignfn(frames * block_align, 128);
+    //let bytes = match backward {
+    //    true => align_bwd(bytes, align),
+    //    false => align_fwd(bytes, align),
+    //};
+    let bytes = if bytes < 128 { 128 } else { bytes };
+    let packets = bytes / 128;
+    let bytes = packets * 128;
+    let frames = bytes / block_align;
+    align_fwd(frames, 8)
 }

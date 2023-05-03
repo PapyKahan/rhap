@@ -25,7 +25,8 @@ use windows::Win32::System::Threading::{
     WaitForSingleObject,
 };
 
-use super::utils::host_error;
+use super::utils::{host_error, align_frames_per_buffer, align_fwd, align_bwd};
+use crate::audio::api::wasapi::utils::{make_hns_period, make_frames_from_hns};
 use crate::audio::{StreamFlow, StreamParams, StreamTrait};
 
 const REFTIMES_PER_SEC: i64 = 10_000_000;
@@ -70,36 +71,6 @@ impl Stream {
         }
     }
 
-    // implement portaudio AlignFramesPerBuffer
-    pub(super) fn align_frames_per_buffer(frames: u32, block_align: u32) -> u32 {
-        let mut bytes = frames * block_align;
-
-        // align to a HD Audio packet size
-        // ALIGN_BWD ((v - (align ? v % align : 0)));
-        bytes = bytes - (bytes % 128);
-
-        // atlest 1 frame must be available
-        if bytes < 128 {
-            bytes = 128;
-        }
-
-        let packets = bytes / 128;
-        bytes = packets * 128;
-        let frames = bytes / block_align;
-
-        // WASAPI frames are always aligned to at least 8
-        // UINT32 remainder = (align ? (v % align) : 0);
-        //if (remainder == 0)
-        //    return v;
-        //return v + (align - remainder);
-        let remainer = frames % 8;
-        if remainer == 0 {
-            return frames;
-        }
-
-        return frames - (0 - remainer);
-    }
-
     pub(super) fn build_from_device<T>(
         device: &IMMDevice,
         params: StreamParams,
@@ -115,29 +86,6 @@ impl Stream {
                     return Err(format!("Error initializing COM: {} - {}", err.code(), err));
                 }
             };
-
-            //let enumerator: IMMDeviceEnumerator =
-            //    match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
-            //        Ok(device_enumerator) => device_enumerator,
-            //        Err(err) => {
-            //            return Err(format!(
-            //                "Error getting device enumerator: {} - {}",
-            //                host_error(err.code()),
-            //                err
-            //            ));
-            //        }
-            //    };
-
-            //let device = match enumerator.GetDevice(selected_device) {
-            //    Ok(device) => device,
-            //    Err(err) => {
-            //        return Err(format!(
-            //            "Error getting device: {} - {}",
-            //            host_error(err.code()),
-            //            err
-            //        ));
-            //    }
-            //};
 
             let client: IAudioClient = match (*device).Activate::<IAudioClient>(CLSCTX_ALL, None)
             {
@@ -218,21 +166,29 @@ impl Stream {
                         return Err(format!("Initialize: Error getting buffer size: {}", err));
                     }
                 };
-                let aligned_buffer = Stream::align_frames_per_buffer(
-                    buffer_size as u32,
-                    wave_format.Format.nBlockAlign as u32,
-                );
-                let mut period =
-                    REFTIMES_PER_SEC / params.samplerate as i64 * aligned_buffer as i64;
-                if period < minimum_device_period {
-                    period = minimum_device_period;
-                }
-                println!("Minimum device period: {}", minimum_device_period);
+                let frames_per_latency = make_frames_from_hns(default_device_period as u32, wave_format.Format.nSamplesPerSec);
+                let frames_per_latency = align_frames_per_buffer(frames_per_latency, wave_format.Format.nBlockAlign as u32, align_bwd);
+                let period = make_hns_period(frames_per_latency, wave_format.Format.nSamplesPerSec);
+
+                let period = if buffer_size as u32 >= (frames_per_latency * 2) {
+                    let ratio = buffer_size as u32 / frames_per_latency;
+                    let frames_per_latency = make_hns_period(period / ratio, wave_format.Format.nSamplesPerSec);
+                    let frames_per_latency = align_frames_per_buffer(frames_per_latency, wave_format.Format.nBlockAlign as u32, align_bwd);
+                    let period = make_hns_period(frames_per_latency, wave_format.Format.nSamplesPerSec);
+                    if period < minimum_device_period as u32 {
+                        minimum_device_period as u32
+                    } else {
+                        period as u32
+                    }
+                } else {
+                    period
+                };
+
                 match client.Initialize(
                     sharemode,
                     streamflags,
-                    period,
-                    period,
+                    period as i64,
+                    period as i64,
                     &wave_format.Format as *const WAVEFORMATEX,
                     Some(std::ptr::null()),
                 ) {
