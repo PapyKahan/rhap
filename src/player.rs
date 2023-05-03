@@ -148,13 +148,13 @@ impl Player {
             Ok(data_processing)
         };
 
-        let host = match Host::new() {
+        let wasapi = match Host::new() {
             Ok(host) => host,
             Err(e) => {
                 return Err(format!("Failed to create host: {}", e));
             }
         };
-        let device = match host.create_device(self.device_id) {
+        let device = match wasapi.create_device(self.device_id) {
             Ok(device) => device,
             Err(e) => {
                 return Err(format!("Failed to create device: {}", e));

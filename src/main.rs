@@ -23,15 +23,15 @@ struct Cli {
 }
 
 fn main() -> Result<(), ()> {
-    let wasapi = match Host::new() {
-        Ok(wasapi) => wasapi,
-        Err(err) => {
-            println!("Error initializing WASAPI: {:?}", err);
-            return Err(());
-        }
-    };
     let cli = Cli::parse();
     if cli.list {
+        let wasapi = match Host::new() {
+            Ok(wasapi) => wasapi,
+            Err(err) => {
+                println!("Error initializing WASAPI: {:?}", err);
+                return Err(());
+            }
+        };
         let devices = match wasapi.get_devices() {
             Ok(devices) => devices,
             Err(err) => {
