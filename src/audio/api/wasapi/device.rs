@@ -1,15 +1,15 @@
 use std::{ffi::OsString, os::windows::prelude::OsStringExt, slice};
 use windows::Win32::{
     Devices::FunctionDiscovery::PKEY_Device_FriendlyName,
-    Media::Audio::{eMultimedia, eRender, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator},
+    Media::Audio::{eMultimedia, eRender, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, IAudioClient, AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, WAVEFORMATEX},
     System::Com::{
-        CoCreateInstance, CoUninitialize, StructuredStorage::PropVariantClear, CLSCTX_ALL,
+        CoCreateInstance, StructuredStorage::PropVariantClear, CLSCTX_ALL,
         STGM_READ, VT_LPWSTR,
     },
-    UI::Shell::PropertiesSystem::IPropertyStore,
+    UI::Shell::PropertiesSystem::IPropertyStore, Foundation::S_OK,
 };
 
-use super::{host::Host, stream::Stream};
+use super::{host::Host, stream::Stream, utils::host_error};
 use crate::audio::{DeviceTrait, StreamParams};
 
 pub struct Device {
@@ -153,47 +153,41 @@ impl Device {
 
     pub fn get_capabilities(&self) -> Result<(), String> {
         unsafe {
-            //let device = Self::get_device(self.index).unwrap();
+            let device = Self::get_device(self.index)?;
 
-            //// Get Device capabilities
-            //let audio_client: IAudioClient = match device.Activate(CLSCTX_ALL, None) {
-            //    Ok(audio_client) => audio_client,
-            //    Err(err) => {
-            //        return Err("Error getting audio client".to_string());
-            //    }
-            //};
+            let audio_client: IAudioClient = match device.Activate(CLSCTX_ALL, None) {
+                Ok(audio_client) => audio_client,
+                Err(err) => {
+                    return Err(format!("Error activating audio client: {}", err));
+                }
+            };
 
-            //let wave_format = Stream::create_waveformat_from(StreamParams {
-            //    device: crate::audio::Device {
-            //        id: 0,
-            //        name: String::from("")
-            //    },
-            //    channels: 2,
-            //    samplerate: crate::audio::SampleRate::Rate44100Hz,
-            //    bits_per_sample: crate::audio::BitsPerSample::Bits16,
-            //    buffer_length: 0,
-            //    exclusive: false,
-            //});
+            let wave_format = Stream::create_waveformat_from(StreamParams {
+                channels: 2,
+                samplerate: crate::audio::SampleRate::Rate44100Hz,
+                bits_per_sample: crate::audio::BitsPerSample::Bits16,
+                buffer_length: 0,
+                exclusive: true,
+            });
 
-            //let sharemode = match true {
-            //    true => AUDCLNT_SHAREMODE_EXCLUSIVE,
-            //    false => AUDCLNT_SHAREMODE_SHARED,
-            //};
-            //match audio_client.IsFormatSupported(
-            //    sharemode,
-            //    &wave_format.Format as *const WAVEFORMATEX,
-            //    None,
-            //) {
-            //    S_OK => true,
-            //    result => {
-            //        return Err(format!(
-            //            "Error checking format support: {} - {}",
-            //            host_error(result),
-            //            "Unsuported format"
-            //        ));
-            //    }
-            //};
-            CoUninitialize();
+            let sharemode = match true {
+                true => AUDCLNT_SHAREMODE_EXCLUSIVE,
+                false => AUDCLNT_SHAREMODE_SHARED,
+            };
+            match audio_client.IsFormatSupported(
+                sharemode,
+                &wave_format.Format as *const WAVEFORMATEX,
+                None,
+            ) {
+                S_OK => true,
+                result => {
+                    return Err(format!(
+                        "Error checking format support: {} - {}",
+                        host_error(result),
+                        "Unsuported format"
+                    ));
+                }
+            };
         }
         Ok(())
     }
