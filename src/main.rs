@@ -1,3 +1,4 @@
+
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
 use rand::seq::SliceRandom;
@@ -52,11 +53,16 @@ fn main() -> Result<(), ()> {
         .exit();
     }
 
-    let player = Player::new(cli.device);
-    ctrlc::set_handler(move || {
-        player.stop();
+    let mut player = Player::new(cli.device);
+    match ctrlc::set_handler(move|| {
         std::process::exit(0);
-    });
+    }) {
+        Ok(_) => {}
+        Err(err) => {
+            println!("Error setting Ctrl-C handler: {:?}", err);
+            return Err(());
+        }
+    }
 
     if cli.path.is_some() {
         let path = cli.path.clone().unwrap();

@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::thread ;
 use symphonia::core::audio::RawSampleBuffer;
@@ -14,9 +13,11 @@ use symphonia::core::sample::i24;
 use crate::audio::api::wasapi::host::Host;
 use crate::audio::{StreamFlow, StreamParams, DeviceTrait, BitsPerSample, StreamTrait};
 
-pub struct Player {
+pub struct Player
+{
+
     device_id: Option<u32>,
-    current_stream : Option<Rc<dyn StreamTrait>>,
+    current_stream : Option<Box<dyn StreamTrait>>,
 }
 
 impl Player {
@@ -111,7 +112,7 @@ impl Player {
     /// Plays a FLAC file
     /// - params:
     ///    - file: path to the FLAC file
-    pub fn play(&self, file: String) -> Result<(), String> {
+    pub fn play(&mut self, file: String) -> Result<(), String> {
         let src = std::fs::File::open(file.clone()).expect("failed to open media");
         let mss = MediaSourceStream::new(Box::new(src), Default::default());
         let hint = Hint::new();
@@ -169,9 +170,9 @@ impl Player {
                 buffer_length: 0,
                 exclusive: true,
             };
-        if self.current_stream.is_some() {
-            self.current_stream.as_ref().unwrap().stop();
-        }
+
+        self.stop()?;
+
         self.current_stream = match device.build_stream(streamparams, callback) {
             Ok(stream) => Some(stream),
             Err(e) => {
@@ -180,18 +181,17 @@ impl Player {
         };
 
         println!("Playing file path: {}", file);
-        match self.current_stream.unwrap().start() {
-            Ok(_) => {}
-            Err(e) => return Err(format!("Failed to start stream: {}", e)),
+        let _ = match self.current_stream {
+            Some(ref mut stream) => match stream.start() {
+                Ok(_) => Ok(()),
+                Err(e) => Err(format!("Failed to start stream: {}", e)),
+            },
+            None => Ok(()),
         };
 
-        match self.current_stream.unwrap().stop() {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                return Err(format!("Failed to stop stream: {}", e));
-            }
-        }
+        self.stop()
     }
+
 
     pub(crate) fn stop(&self) -> Result<(), String> {
         match self.current_stream {

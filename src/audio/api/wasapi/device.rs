@@ -1,4 +1,4 @@
-use std::{ffi::OsString, os::windows::prelude::OsStringExt, slice, rc::Rc, sync::Arc};
+use std::{ffi::OsString, os::windows::prelude::OsStringExt, slice};
 use windows::Win32::{
     Devices::FunctionDiscovery::PKEY_Device_FriendlyName,
     Media::Audio::{eMultimedia, eRender, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, IAudioClient, AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, WAVEFORMATEX},
@@ -30,7 +30,7 @@ impl DeviceTrait for Device {
         &self,
         params: StreamParams,
         callback: T,
-    ) -> Result<Arc<dyn crate::audio::StreamTrait>, String>
+    ) -> Result<Box<dyn crate::audio::StreamTrait>, String>
     where
         T: FnMut(&mut [u8], usize) -> Result<crate::audio::StreamFlow, String> + Send + 'static,
     {
@@ -40,7 +40,7 @@ impl DeviceTrait for Device {
                 return Err(err);
             }
         };
-        Ok(Arc::new(stream))
+        Ok(Box::new(stream))
     }
 }
 
