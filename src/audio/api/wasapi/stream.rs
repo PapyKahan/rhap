@@ -201,8 +201,8 @@ impl Stream {
                 match client.Initialize(
                     sharemode,
                     streamflags,
-                    period as i64,
-                    period as i64,
+                    period,
+                    period,
                     &wave_format.Format as *const WAVEFORMATEX,
                     Some(std::ptr::null()),
                 ) {
