@@ -83,25 +83,25 @@ pub(super) fn print_wave_format(wave_format: *const WAVEFORMATEX) {
 
 /// Compute HNS perdiod from frames and samplerate.
 #[inline(always)]
-pub(super) fn make_hns_period(frames: u32, samplerate: u32) -> u32 {
+pub(super) fn make_hns_period(frames: i64, samplerate: i64) -> i64 {
     10000 * 1000 / samplerate * frames// + 0.5
 }
 
 /// Converts HNS period to frames.
 #[inline(always)]
-pub(super) fn make_frames_from_hns(hns: u32, samplerate: u32) -> u32 {
+pub(super) fn make_frames_from_hns(hns: i64, samplerate: i64) -> i64 {
     hns * samplerate / 1000 / 10000
 }
 
 /// Aligns x backward
 #[inline(always)]
-pub(super) fn align_bwd(x: u32, align: u32) -> u32 {
+pub(super) fn align_bwd(x: i64, align: i64) -> i64 {
     x - x % align
 }
 
 /// Aligns x forward
 #[inline(always)]
-pub(super) fn align_fwd(x: u32, align: u32) -> u32 {
+pub(super) fn align_fwd(x: i64, align: i64) -> i64 {
     let remainer = x % align;
     if remainer == 0 {
         x
@@ -112,7 +112,7 @@ pub(super) fn align_fwd(x: u32, align: u32) -> u32 {
 
 /// Aligns frames per buffer
 #[inline(always)]
-pub(super) fn align_frames_per_buffer(frames: u32, block_align : u32, alignfn: fn(bytes: u32, align: u32) -> u32) -> u32 {
+pub(super) fn align_frames_per_buffer(frames: i64, block_align : i64, alignfn: fn(bytes: i64, align: i64) -> i64) -> i64 {
     let bytes = alignfn(frames * block_align, 128);
     //let bytes = match backward {
     //    true => align_bwd(bytes, align),

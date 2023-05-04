@@ -168,31 +168,31 @@ impl Stream {
                     }
                 };
                 let frames_per_latency = make_frames_from_hns(
-                    default_device_period as u32,
-                    wave_format.Format.nSamplesPerSec,
+                    default_device_period,
+                    wave_format.Format.nSamplesPerSec as i64,
                 );
                 let frames_per_latency = align_frames_per_buffer(
                     frames_per_latency,
-                    wave_format.Format.nBlockAlign as u32,
+                    wave_format.Format.nBlockAlign as i64,
                     align_bwd,
                 );
-                let period = make_hns_period(frames_per_latency, wave_format.Format.nSamplesPerSec);
+                let period = make_hns_period(frames_per_latency, wave_format.Format.nSamplesPerSec as i64);
 
-                let period = if buffer_size as u32 >= (frames_per_latency * 2) {
-                    let ratio = buffer_size as u32 / frames_per_latency;
+                let period = if buffer_size >= (frames_per_latency * 2) {
+                    let ratio = buffer_size / frames_per_latency;
                     let frames_per_latency =
-                        make_hns_period(period / ratio, wave_format.Format.nSamplesPerSec);
+                        make_hns_period(period / ratio, wave_format.Format.nSamplesPerSec as i64);
                     let frames_per_latency = align_frames_per_buffer(
                         frames_per_latency,
-                        wave_format.Format.nBlockAlign as u32,
+                        wave_format.Format.nBlockAlign as i64,
                         align_bwd,
                     );
                     let period =
-                        make_hns_period(frames_per_latency, wave_format.Format.nSamplesPerSec);
-                    if period < minimum_device_period as u32 {
-                        minimum_device_period as u32
+                        make_hns_period(frames_per_latency, wave_format.Format.nSamplesPerSec as i64);
+                    if period < minimum_device_period {
+                        minimum_device_period
                     } else {
-                        period as u32
+                        period
                     }
                 } else {
                     period
