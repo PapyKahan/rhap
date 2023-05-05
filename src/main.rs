@@ -1,4 +1,3 @@
-
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
 use rand::seq::SliceRandom;
@@ -53,7 +52,13 @@ fn main() -> Result<(), ()> {
         .exit();
     }
 
-    let mut player = Player::new(cli.device);
+    let mut player = match Player::new(cli.device) {
+        Ok(player) => player,
+        Err(err) => {
+            println!("Error initializing player: {:?}", err);
+            return Err(());
+        }
+    };
     match ctrlc::set_handler(move|| {
         std::process::exit(0);
     }) {

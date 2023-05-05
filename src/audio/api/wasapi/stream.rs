@@ -351,6 +351,7 @@ impl StreamTrait for Stream {
                     }
                 };
             }
+            self.stop()?;
         }
         Ok(())
     }

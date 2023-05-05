@@ -20,7 +20,6 @@ impl Drop for Host {
     fn drop(&mut self) {
         unsafe {
             if self.com_initialize_result.is_ok() {
-                println!("Uninitializing COM");
                 CoUninitialize();
             }
         }

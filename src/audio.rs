@@ -1,7 +1,7 @@
 pub mod api;
 
 #[repr(u32)]
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum SampleRate {
     Rate44100Hz = 44100,
     Rate48000Hz = 48000,
@@ -26,7 +26,7 @@ impl From<u32> for SampleRate {
 }
 
 #[repr(u8)]
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum BitsPerSample {
     Bits8 = 8,
     Bits16 = 16,
@@ -46,7 +46,7 @@ impl From<u8> for BitsPerSample {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, Clone)]
 pub struct StreamParams {
     pub channels: u8,
     pub samplerate: SampleRate,
@@ -55,22 +55,22 @@ pub struct StreamParams {
     pub exclusive: bool,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug)]
 pub struct Device {
     pub id: u32,
     pub name: String,
     //capabilities: Capabilities,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Capabilities {
-    max_sample_rate: SampleRate,
-    min_sample_rate: SampleRate,
-    max_bits_per_sample: BitsPerSample,
-    min_bits_per_sample: BitsPerSample,
-    max_channel_count: u8,
-    min_channel_count: u8,
-}
+//#[derive(Debug)]
+//pub struct Capabilities {
+//    max_sample_rate: SampleRate,
+//    min_sample_rate: SampleRate,
+//    max_bits_per_sample: BitsPerSample,
+//    min_bits_per_sample: BitsPerSample,
+//    max_channel_count: u8,
+//    min_channel_count: u8,
+//}
 
 pub enum StreamFlow {
     Continue,

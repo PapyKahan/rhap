@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
-use std::thread ;
+use std::thread;
 use symphonia::core::audio::RawSampleBuffer;
 use symphonia::core::codecs::{Decoder, DecoderOptions};
 use symphonia::core::errors::Error;
@@ -11,18 +11,19 @@ use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
 use crate::audio::api::wasapi::host::Host;
-use crate::audio::{StreamFlow, StreamParams, DeviceTrait, BitsPerSample, StreamTrait};
+use crate::audio::{BitsPerSample, DeviceTrait, StreamFlow, StreamParams};
 
-pub struct Player
-{
-
+pub struct Player {
     device_id: Option<u32>,
-    current_stream : Option<Box<dyn StreamTrait>>,
+    host: Host,
 }
 
 impl Player {
-    pub fn new(device_id: Option<u32>) -> Self {
-        Player { device_id, current_stream: None }
+    pub fn new(device_id: Option<u32>) -> Result<Self, String> {
+        Ok(Player {
+            device_id,
+            host: Host::new()?,
+        })
     }
 
     #[inline(always)]
@@ -31,7 +32,7 @@ impl Player {
         mut decoder: Box<dyn Decoder>,
         mut format: Box<dyn FormatReader>,
         vec_buffer: Arc<Mutex<VecDeque<u8>>>,
-        bits_per_sample: BitsPerSample
+        bits_per_sample: BitsPerSample,
     ) {
         thread::spawn(move || {
             loop {
@@ -76,30 +77,29 @@ impl Player {
                                 for i in sample_buffer.as_bytes().iter() {
                                     vec_buffer.lock().unwrap().push_back(*i);
                                 }
-                            },
+                            }
                             BitsPerSample::Bits16 => {
                                 let mut sample_buffer = RawSampleBuffer::<i16>::new(duration, spec);
                                 sample_buffer.copy_interleaved_ref(_decoded);
                                 for i in sample_buffer.as_bytes().iter() {
                                     vec_buffer.lock().unwrap().push_back(*i);
                                 }
-                            },
+                            }
                             BitsPerSample::Bits24 => {
                                 let mut sample_buffer = RawSampleBuffer::<i24>::new(duration, spec);
                                 sample_buffer.copy_interleaved_ref(_decoded);
                                 for i in sample_buffer.as_bytes().iter() {
                                     vec_buffer.lock().unwrap().push_back(*i);
                                 }
-                            },
+                            }
                             BitsPerSample::Bits32 => {
                                 let mut sample_buffer = RawSampleBuffer::<i32>::new(duration, spec);
                                 sample_buffer.copy_interleaved_ref(_decoded);
                                 for i in sample_buffer.as_bytes().iter() {
                                     vec_buffer.lock().unwrap().push_back(*i);
                                 }
-                            },
+                            }
                         };
-
                     }
                     Err(Error::DecodeError(_)) => (),
                     Err(_) => break,
@@ -151,55 +151,18 @@ impl Player {
             Ok(data_processing)
         };
 
-        let wasapi = match Host::new() {
-            Ok(host) => host,
-            Err(e) => {
-                return Err(format!("Failed to create host: {}", e));
-            }
-        };
-        let device = match wasapi.create_device(self.device_id) {
-            Ok(device) => device,
-            Err(e) => {
-                return Err(format!("Failed to create device: {}", e));
-            }
-        };
+        let device = self.host.create_device(self.device_id)?;
+
         let streamparams = StreamParams {
-                samplerate: samplerate.into(),
-                channels,
-                bits_per_sample: bits_per_sample.into(),
-                buffer_length: 0,
-                exclusive: true,
-            };
-
-        self.stop()?;
-
-        self.current_stream = match device.build_stream(streamparams, callback) {
-            Ok(stream) => Some(stream),
-            Err(e) => {
-                return Err(format!("Failed to build stream: {}", e));
-            }
+            samplerate: samplerate.into(),
+            channels,
+            bits_per_sample: bits_per_sample.into(),
+            buffer_length: 0,
+            exclusive: true,
         };
 
         println!("Playing file path: {}", file);
-        let _ = match self.current_stream {
-            Some(ref mut stream) => match stream.start() {
-                Ok(_) => Ok(()),
-                Err(e) => Err(format!("Failed to start stream: {}", e)),
-            },
-            None => Ok(()),
-        };
-
-        self.stop()
-    }
-
-
-    pub(crate) fn stop(&self) -> Result<(), String> {
-        match self.current_stream {
-            Some(ref stream) => match stream.stop() {
-                Ok(_) => Ok(()),
-                Err(e) => Err(format!("Failed to stop stream: {}", e)),
-            },
-            None => Ok(()),
-        }
+        let mut current_stream = device.build_stream(streamparams, callback)?;
+        current_stream.start()
     }
 }
