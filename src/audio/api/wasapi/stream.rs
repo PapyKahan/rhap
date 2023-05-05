@@ -38,6 +38,8 @@ pub struct Stream {
     callback: Box<dyn FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static>,
 }
 
+unsafe impl Send for Stream {}
+
 impl DerefMut for Stream {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self
@@ -369,6 +371,27 @@ impl StreamTrait for Stream {
                     ));
                 }
             };
+            match self.renderer.ReleaseBuffer(self.buffersize, 0) {
+                Ok(_) => (),
+                Err(err) => {
+                    return Err(format!(
+                        "Error releasing client buffer: {} - {}",
+                        host_error(err.code()),
+                        err
+                    ));
+                }
+            };
+            match self.client.Reset() {
+                Ok(_) => (),
+                Err(err) => {
+                    return Err(format!(
+                        "Error resetting client: {} - {}",
+                        host_error(err.code()),
+                        err
+                    ));
+                }
+            };
+
             AvRevertMmThreadCharacteristics(self.threadhandle);
             CloseHandle(self.eventhandle);
         }

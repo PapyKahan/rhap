@@ -1,12 +1,15 @@
 use std::{ffi::OsString, os::windows::prelude::OsStringExt, slice};
 use windows::Win32::{
     Devices::FunctionDiscovery::PKEY_Device_FriendlyName,
-    Media::Audio::{eMultimedia, eRender, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, IAudioClient, AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, WAVEFORMATEX},
-    System::Com::{
-        CoCreateInstance, StructuredStorage::PropVariantClear, CLSCTX_ALL,
-        STGM_READ, VT_LPWSTR,
+    Foundation::S_OK,
+    Media::Audio::{
+        eMultimedia, eRender, IAudioClient, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator,
+        AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, WAVEFORMATEX,
     },
-    UI::Shell::PropertiesSystem::IPropertyStore, Foundation::S_OK,
+    System::Com::{
+        CoCreateInstance, StructuredStorage::PropVariantClear, CLSCTX_ALL, STGM_READ, VT_LPWSTR,
+    },
+    UI::Shell::PropertiesSystem::IPropertyStore,
 };
 
 use super::{host::Host, stream::Stream, utils::host_error};

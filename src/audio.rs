@@ -78,7 +78,7 @@ pub enum StreamFlow {
     Abort,
 }
 
-pub trait StreamTrait {
+pub trait StreamTrait : Send {
     fn start(&mut self) -> Result<(), String>;
     fn stop(&self) -> Result<(), String>;
     fn pause(&self) -> Result<(), String>;

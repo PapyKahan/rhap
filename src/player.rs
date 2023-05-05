@@ -11,11 +11,12 @@ use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
 use crate::audio::api::wasapi::host::Host;
-use crate::audio::{BitsPerSample, DeviceTrait, StreamFlow, StreamParams};
+use crate::audio::{BitsPerSample, DeviceTrait, StreamFlow, StreamParams, StreamTrait};
 
 pub struct Player {
     device_id: Option<u32>,
     host: Host,
+    current_stream: Option<Box<dyn StreamTrait>>,
 }
 
 impl Player {
@@ -23,6 +24,7 @@ impl Player {
         Ok(Player {
             device_id,
             host: Host::new()?,
+            current_stream : None
         })
     }
 
@@ -162,7 +164,18 @@ impl Player {
         };
 
         println!("Playing file path: {}", file);
-        let mut current_stream = device.build_stream(streamparams, callback)?;
-        current_stream.start()
+        self.current_stream = Some(device.build_stream(streamparams, callback)?);
+        //let mut current_stream = device.build_stream(streamparams, callback)?;
+        match self.current_stream {
+            Some(ref mut stream) => Ok(stream.start()?),
+            None => Ok(())
+        }
+    }
+
+    pub(crate) fn stop(&self) -> Result<(), String> {
+        match self.current_stream {
+            Some(ref stream) => stream.stop(),
+            None => Ok(())
+        }
     }
 }
