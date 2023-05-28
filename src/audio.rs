@@ -79,7 +79,7 @@ pub enum StreamFlow {
 }
 
 pub trait StreamTrait : Send {
-    fn start(&mut self) -> Result<(), String>;
+    fn start(&mut self, callback : &mut dyn FnMut(&mut [u8], usize) -> Result<StreamFlow, String>) -> Result<(), String>;
     fn stop(&self) -> Result<(), String>;
     fn pause(&self) -> Result<(), String>;
     fn resume(&self) -> Result<(), String>;
@@ -89,7 +89,5 @@ pub trait StreamTrait : Send {
 
 pub trait DeviceTrait {
     fn get_name(&self) -> String;
-    fn build_stream<T>(&self, params: StreamParams, callback : T) -> Result<Box<dyn StreamTrait>, String>
-    where
-        T: FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static;
+    fn build_stream(&self, params: StreamParams) -> Result<Box<dyn StreamTrait + Send>, String>;
 }

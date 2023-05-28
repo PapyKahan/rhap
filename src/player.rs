@@ -16,7 +16,7 @@ use crate::audio::{BitsPerSample, DeviceTrait, StreamFlow, StreamParams, StreamT
 pub struct Player {
     device_id: Option<u32>,
     host: Host,
-    current_stream: Option<Box<dyn StreamTrait>>,
+    current_stream: Option<Box<dyn StreamTrait + Send>>,
 }
 
 impl Player {
@@ -141,7 +141,7 @@ impl Player {
         let vec_buffer = Arc::new(Mutex::new(VecDeque::new()));
         self.fill_buffer(decoder, format, vec_buffer.clone(), BitsPerSample::from(bits_per_sample));
 
-        let callback = move |data: &mut [u8], buffer_size: usize| -> Result<StreamFlow, String> {
+        let callback = &mut |data: &mut [u8], buffer_size: usize| -> Result<StreamFlow, String> {
             let mut data_processing = StreamFlow::Continue;
             for i in 0..buffer_size {
                 if vec_buffer.lock().unwrap().is_empty() {
@@ -164,10 +164,9 @@ impl Player {
         };
 
         println!("Playing file path: {}", file);
-        self.current_stream = Some(device.build_stream(streamparams, callback)?);
-        //let mut current_stream = device.build_stream(streamparams, callback)?;
+        self.current_stream = Some(device.build_stream(streamparams)?);
         match self.current_stream {
-            Some(ref mut stream) => Ok(stream.start()?),
+            Some(ref mut stream) => Ok(stream.start(callback)?),
             None => Ok(())
         }
     }

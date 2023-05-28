@@ -59,6 +59,7 @@ fn main() -> Result<(), ()> {
             return Err(());
         }
     };
+
     match ctrlc::set_handler(move|| {
         std::process::exit(0);
     }) {

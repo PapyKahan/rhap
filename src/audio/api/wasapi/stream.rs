@@ -35,7 +35,6 @@ pub struct Stream {
     buffersize: u32,
     eventhandle: HANDLE,
     threadhandle: HANDLE,
-    callback: Box<dyn FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static>,
 }
 
 unsafe impl Send for Stream {}
@@ -82,14 +81,10 @@ impl Stream {
         }
     }
 
-    pub(super) fn build_from_device<T>(
+    pub(super) fn build_from_device(
         device: &IMMDevice,
         params: StreamParams,
-        callback: T,
-    ) -> Result<Stream, String>
-    where
-        T: FnMut(&mut [u8], usize) -> Result<StreamFlow, String> + Send + 'static,
-    {
+    ) -> Result<Stream, String> {
         unsafe {
             let client: IAudioClient = match (*device).Activate::<IAudioClient>(CLSCTX_ALL, None) {
                 Ok(client) => client,
@@ -265,14 +260,13 @@ impl Stream {
                 buffersize,
                 threadhandle: HANDLE::default(),
                 eventhandle,
-                callback: Box::new(callback),
             })
         }
     }
 }
 
 impl StreamTrait for Stream {
-    fn start(&mut self) -> Result<(), String> {
+    fn start(&mut self, callback : &mut dyn FnMut(&mut [u8], usize) -> Result<StreamFlow, String>) -> Result<(), String> {
         println!("Starting stream with parameters: {:?}", self.params);
         unsafe {
             let mut task_index: u32 = 0;
@@ -325,7 +319,7 @@ impl StreamTrait for Stream {
                     * (self.params.bits_per_sample as usize / 8) as usize
                     * self.params.channels as usize;
                 let data = std::slice::from_raw_parts_mut(client_buffer, client_buffer_len);
-                let result = match (self.callback)(data, client_buffer_len) {
+                let result = match callback(data, client_buffer_len) {
                     Ok(result) => result,
                     Err(err) => {
                         return Err(format!("Error calling callback: {}", err));

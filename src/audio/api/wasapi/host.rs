@@ -1,49 +1,24 @@
 use windows::{
     core::PCWSTR,
     Win32::{
-        Foundation::RPC_E_CHANGED_MODE,
         Media::Audio::{
             eMultimedia, eRender, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator,
             MMDeviceEnumerator, DEVICE_STATE_ACTIVE,
         },
-        System::Com::{CoCreateInstance, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED, CoInitializeEx},
+        System::Com::{CoCreateInstance, CLSCTX_ALL},
     },
 };
 
-use super::device::Device;
+use super::{device::Device, com::com_initialize};
 
+#[derive(Debug, Clone)]
 pub struct Host {
-    com_initialize_result: windows::core::Result<()>,
-}
-
-impl Drop for Host {
-    fn drop(&mut self) {
-        unsafe {
-            if self.com_initialize_result.is_ok() {
-                CoUninitialize();
-            }
-        }
-    }
 }
 
 impl Host {
-    pub fn new() -> Result<Self, String> {
-        unsafe {
-            // Initialise les sous-systèmes COM
-            let result = match CoInitializeEx(None, COINIT_MULTITHREADED) {
-                Ok(_) => Ok(()),
-                Err(err) => {
-                    if err.code() == RPC_E_CHANGED_MODE {
-                        Ok(())
-                    } else {
-                        panic!("Failed to initialize COM: {}", err);
-                    }
-                }
-            };
-            Ok(Self {
-                com_initialize_result: result,
-            })
-        }
+    pub(crate) fn new() -> Result<Self, String> {
+        com_initialize();
+        Ok(Self {})
     }
 
     pub(crate) fn create_device(&self, id: Option<u32>) -> Result<Device, String> {

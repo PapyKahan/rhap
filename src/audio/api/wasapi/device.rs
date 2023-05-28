@@ -29,15 +29,9 @@ impl DeviceTrait for Device {
         }
     }
 
-    fn build_stream<T>(
-        &self,
-        params: StreamParams,
-        callback: T,
-    ) -> Result<Box<dyn crate::audio::StreamTrait>, String>
-    where
-        T: FnMut(&mut [u8], usize) -> Result<crate::audio::StreamFlow, String> + Send + 'static,
+    fn build_stream(&self, params: StreamParams) -> Result<Box<dyn crate::audio::StreamTrait + Send>, String>
     {
-        let stream = match Stream::build_from_device(&self.device, params, callback) {
+        let stream = match Stream::build_from_device(&self.device, params) {
             Ok(stream) => stream,
             Err(err) => {
                 return Err(err);
