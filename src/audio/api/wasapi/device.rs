@@ -31,12 +31,7 @@ impl DeviceTrait for Device {
 
     fn build_stream(&self, params: StreamParams) -> Result<Box<dyn crate::audio::StreamTrait>, String>
     {
-        let stream = match Stream::build_from_device(&self.device, params) {
-            Ok(stream) => stream,
-            Err(err) => {
-                return Err(err);
-            }
-        };
+        let stream = Stream::build_from_device(&self.device, params)?;
         Ok(Box::new(stream))
     }
 }
@@ -44,18 +39,8 @@ impl DeviceTrait for Device {
 impl Device {
     pub(super) fn new(id: Option<u32>) -> Result<Self, String> {
         let device = match id {
-            Some(id) => match Self::get_device(id) {
-                Ok(device) => device,
-                Err(err) => {
-                    return Err(format!("Error getting device: {}", err));
-                }
-            },
-            _ => match Self::get_default_device() {
-                Ok(device) => device,
-                Err(err) => {
-                    return Err(format!("Error getting default device: {}", err));
-                }
-            },
+            Some(id) => Self::get_device(id)?,
+            _ => Self::get_default_device()?,
         };
 
         Ok(Self {
@@ -115,20 +100,13 @@ impl Device {
     }
 
     fn get_device(id: u32) -> Result<IMMDevice, String> {
-        let devices = match Host::enumerate_devices() {
-            Ok(devices) => devices,
-            Err(err) => {
-                println!("Error enumerating devices: {}", err);
-                return Err(err);
-            }
-        };
-
+        let devices = Host::enumerate_devices()?;
         for dev in devices {
             if dev.index == id {
                 return Ok(dev.device);
             }
         }
-        Err("Device not found".to_string())
+        Err(format!("Device id={} not found", id))
     }
 
     fn get_default_device() -> Result<IMMDevice, String> {
