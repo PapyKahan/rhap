@@ -16,7 +16,7 @@ use crate::audio::{BitsPerSample, DeviceTrait, StreamFlow, StreamParams, StreamT
 pub struct Player {
     device_id: Option<u32>,
     host: Host,
-    current_stream: Option<Box<dyn StreamTrait + Send>>,
+    current_stream: Option<Box<dyn StreamTrait>>,
 }
 
 impl Player {

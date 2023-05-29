@@ -4,7 +4,6 @@
 // reference : https://www.hresult.info/FACILITY_AUDCLNT
 //
 use std::mem::size_of;
-use std::ops::{DerefMut, Deref};
 use windows::core::PCWSTR;
 use windows::s;
 use windows::Win32::Foundation::{
@@ -35,20 +34,6 @@ pub struct Stream {
     buffersize: u32,
     eventhandle: HANDLE,
     threadhandle: HANDLE,
-}
-
-unsafe impl Send for Stream {}
-
-impl DerefMut for Stream {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self
-    }
-}
-impl Deref for Stream {
-    type Target = dyn StreamTrait;
-    fn deref(&self) -> &Self::Target {
-        self
-    }
 }
 
 impl Stream {

@@ -29,7 +29,7 @@ impl DeviceTrait for Device {
         }
     }
 
-    fn build_stream(&self, params: StreamParams) -> Result<Box<dyn crate::audio::StreamTrait + Send>, String>
+    fn build_stream(&self, params: StreamParams) -> Result<Box<dyn crate::audio::StreamTrait>, String>
     {
         let stream = match Stream::build_from_device(&self.device, params) {
             Ok(stream) => stream,

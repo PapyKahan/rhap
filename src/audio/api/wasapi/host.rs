@@ -11,7 +11,7 @@ use windows::{
 
 use super::{device::Device, com::com_initialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Host {
 }
 

@@ -61,6 +61,7 @@ fn main() -> Result<(), ()> {
     };
 
     match ctrlc::set_handler(move|| {
+        println!("Stopping...");
         std::process::exit(0);
     }) {
         Ok(_) => {}
