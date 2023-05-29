@@ -282,12 +282,10 @@ impl StreamTrait for Stream {
                 match WaitForSingleObject(self.eventhandle, 2000) {
                     WAIT_OBJECT_0 => (),
                     WAIT_TIMEOUT => {
-                        println!("Timeout");
-                        break;
+                        return Err("Timeout waiting for event".to_string());
                     }
                     WAIT_FAILED => {
-                        println!("Wait failed");
-                        break;
+                        return Err("Wait failed".to_string());
                     }
                     _ => (),
                 }

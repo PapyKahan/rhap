@@ -141,7 +141,6 @@ impl Player {
         let vec_buffer = Arc::new(Mutex::new(VecDeque::new()));
         self.fill_buffer(decoder, format, vec_buffer.clone(), BitsPerSample::from(bits_per_sample));
 
-        let device = self.host.create_device(self.device_id)?;
 
         let streamparams = StreamParams {
             samplerate: samplerate.into(),
@@ -150,7 +149,10 @@ impl Player {
             buffer_length: 0,
             exclusive: true,
         };
+
+        let device = self.host.create_device(self.device_id)?;
         self.current_stream = Some(device.build_stream(streamparams)?);
+
         println!("Playing file path: {}", file);
         let callback = &mut |data: &mut [u8], buffer_size: usize| -> Result<StreamFlow, String> {
             let mut data_processing = StreamFlow::Continue;
