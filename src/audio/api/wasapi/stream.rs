@@ -23,7 +23,9 @@ use windows::Win32::System::Threading::{
     WaitForSingleObject,
 };
 
+use super::com::com_initialize;
 use super::utils::{align_bwd, align_frames_per_buffer, host_error};
+use crate::audio::api::wasapi::com::com_uninitialize;
 use crate::audio::api::wasapi::utils::{make_frames_from_hns, make_hns_period};
 use crate::audio::{StreamFlow, StreamParams, StreamTrait};
 
@@ -71,6 +73,7 @@ impl Stream {
         params: StreamParams,
     ) -> Result<Stream, String> {
         unsafe {
+            com_initialize();
             let client: IAudioClient = match (*device).Activate::<IAudioClient>(CLSCTX_ALL, None) {
                 Ok(client) => client,
                 Err(err) => {
@@ -371,6 +374,7 @@ impl StreamTrait for Stream {
 
             AvRevertMmThreadCharacteristics(self.threadhandle);
             CloseHandle(self.eventhandle);
+            com_uninitialize();
         }
         Ok(())
     }

@@ -30,14 +30,20 @@ impl Drop for ComWasapi {
         unsafe {
             if self.is_initialized {
                 CoUninitialize();
-                println!("Uninitialized COM");
                 self.is_initialized = false;
             }
         }
     }
 }
 
-#[inline]
+#[inline(always)]
 pub fn com_initialize() {
     WASAPI_COM_INIT.with(|_| {})
+}
+
+#[inline(always)]
+pub fn com_uninitialize() {
+    unsafe {
+        CoUninitialize();
+    }
 }

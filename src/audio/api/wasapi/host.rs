@@ -38,6 +38,7 @@ impl Host {
     pub(super) fn enumerate_devices() -> Result<Vec<Device>, String> {
         let mut enumerated_devices = vec![];
         unsafe {
+            com_initialize();
             let enumerator: IMMDeviceEnumerator =
                 match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
                     Ok(device_enumerator) => device_enumerator,

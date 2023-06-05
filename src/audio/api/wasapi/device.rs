@@ -12,7 +12,7 @@ use windows::Win32::{
     UI::Shell::PropertiesSystem::IPropertyStore,
 };
 
-use super::{host::Host, stream::Stream, utils::host_error};
+use super::{host::Host, stream::Stream, utils::host_error, com::com_initialize};
 use crate::audio::{DeviceTrait, StreamParams};
 
 pub struct Device {
@@ -110,6 +110,7 @@ impl Device {
     }
 
     fn get_default_device() -> Result<IMMDevice, String> {
+        com_initialize();
         unsafe {
             let enumerator: IMMDeviceEnumerator =
                 match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {

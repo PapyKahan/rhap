@@ -7,8 +7,8 @@
             "request": "launch",
             "cwd": "${workspaceFolder}",
             "program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}",
-            "args": ["-p ~/Music/Tranquille/", "-d 0"],
-            "stopAtEntry": true
+            "args": ["C:\\Users\\U118120\\Music\\Tranquille\\Agnes Obel - Aventine (2013) [24B-44.1kHz]\\20. The Curse.flac", "-d 0"],
+            "stopAtEntry": false
         },
         {
             "type": "lldb",
