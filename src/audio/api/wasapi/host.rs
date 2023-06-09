@@ -22,10 +22,7 @@ impl Host {
     }
 
     pub(crate) fn create_device(&self, id: Option<u32>) -> Result<Device, String> {
-        match Device::new(id) {
-            Ok(device) => Ok(device),
-            Err(e) => Err(format!("Failed to open device: {}", e)),
-        }
+        Device::new(id)
     }
 
     pub(crate) fn get_devices(&self) -> Result<Vec<Device>, String> {

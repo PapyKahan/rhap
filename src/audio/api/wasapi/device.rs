@@ -110,8 +110,8 @@ impl Device {
     }
 
     fn get_default_device() -> Result<IMMDevice, String> {
-        com_initialize();
         unsafe {
+            com_initialize();
             let enumerator: IMMDeviceEnumerator =
                 match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
                     Ok(device_enumerator) => device_enumerator,

@@ -25,7 +25,6 @@ use windows::Win32::System::Threading::{
 
 use super::com::com_initialize;
 use super::utils::{align_bwd, align_frames_per_buffer, host_error};
-use crate::audio::api::wasapi::com::com_uninitialize;
 use crate::audio::api::wasapi::utils::{make_frames_from_hns, make_hns_period};
 use crate::audio::{StreamFlow, StreamParams, StreamTrait};
 
@@ -74,7 +73,7 @@ impl Stream {
     ) -> Result<Stream, String> {
         unsafe {
             com_initialize();
-            let client: IAudioClient = match (*device).Activate::<IAudioClient>(CLSCTX_ALL, None) {
+            let client : IAudioClient = match (*device).Activate::<IAudioClient>(CLSCTX_ALL, None) {
                 Ok(client) => client,
                 Err(err) => {
                     return Err(format!(
@@ -341,16 +340,6 @@ impl StreamTrait for Stream {
     fn stop(&self) -> Result<(), String> {
         println!("Stopping stream with parameters: {:?}", self.params);
         unsafe {
-            match self.client.Stop() {
-                Ok(_) => (),
-                Err(err) => {
-                    return Err(format!(
-                        "Error stopping client: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
-            };
             match self.renderer.ReleaseBuffer(self.buffersize, 0) {
                 Ok(_) => (),
                 Err(err) => {
@@ -361,20 +350,29 @@ impl StreamTrait for Stream {
                     ));
                 }
             };
-            match self.client.Reset() {
+            match self.client.Stop() {
                 Ok(_) => (),
                 Err(err) => {
                     return Err(format!(
-                        "Error resetting client: {} - {}",
+                        "Error stopping client: {} - {}",
                         host_error(err.code()),
                         err
                     ));
                 }
             };
+            //match self.client.Reset() {
+            //    Ok(_) => (),
+            //    Err(err) => {
+            //        return Err(format!(
+            //            "Error resetting client: {} - {}",
+            //            host_error(err.code()),
+            //            err
+            //        ));
+            //    }
+            //};
 
             AvRevertMmThreadCharacteristics(self.threadhandle);
             CloseHandle(self.eventhandle);
-            com_uninitialize();
         }
         Ok(())
     }

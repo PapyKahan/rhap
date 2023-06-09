@@ -11,20 +11,22 @@ use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
 use crate::audio::api::wasapi::host::Host;
-use crate::audio::{BitsPerSample, DeviceTrait, StreamFlow, StreamParams, StreamTrait};
+use crate::audio::{BitsPerSample, DeviceTrait, StreamFlow, StreamParams};
 
 pub struct Player {
     device_id: Option<u32>,
+    device: Box<dyn DeviceTrait>,
     host: Host,
-    current_stream: Option<Box<dyn StreamTrait>>,
 }
 
 impl Player {
     pub fn new(device_id: Option<u32>) -> Result<Self, String> {
+        let host = Host::new()?;
+        let device = host.create_device(device_id)?;
         Ok(Player {
             device_id,
-            host: Host::new()?,
-            current_stream : None
+            host,
+            device: Box::new(device),
         })
     }
 
@@ -150,8 +152,7 @@ impl Player {
             exclusive: true,
         };
 
-        let device = self.host.create_device(self.device_id)?;
-        self.current_stream = Some(device.build_stream(streamparams)?);
+        let mut stream = self.device.build_stream(streamparams)?;
 
         println!("Playing file path: {}", file);
         let callback = &mut |data: &mut [u8], buffer_size: usize| -> Result<StreamFlow, String> {
@@ -165,16 +166,11 @@ impl Player {
             }
             Ok(data_processing)
         };
-        match self.current_stream {
-            Some(ref mut stream) => Ok(stream.start(callback)?),
-            None => Ok(())
-        }
+
+        stream.start(callback)
     }
 
     pub(crate) fn stop(&self) -> Result<(), String> {
-        match self.current_stream {
-            Some(ref stream) => stream.stop(),
-            None => Ok(())
-        }
+        Ok(())
     }
 }
