@@ -26,10 +26,7 @@ impl Host {
     }
 
     pub(crate) fn get_devices(&self) -> Result<Vec<Device>, String> {
-        match Self::enumerate_devices() {
-            Ok(devices) => Ok(devices),
-            Err(e) => Err(format!("Failed to enumerate devices: {}", e)),
-        }
+        Self::enumerate_devices()
     }
 
     pub(super) fn enumerate_devices() -> Result<Vec<Device>, String> {
