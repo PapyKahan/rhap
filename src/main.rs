@@ -3,6 +3,7 @@ use clap::{CommandFactory, Parser};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::path::PathBuf;
+use std::sync::Arc;
 use walkdir::WalkDir;
 
 mod audio;
@@ -52,16 +53,19 @@ fn main() -> Result<(), ()> {
         .exit();
     }
 
-    let mut player = match Player::new(cli.device) {
-        Ok(player) => player,
+
+    let player = match Player::new(cli.device) {
+        Ok(player) => Arc::new(player),
         Err(err) => {
             println!("Error initializing player: {:?}", err);
             return Err(());
         }
     };
 
+    let player_clone = player.clone();
     match ctrlc::set_handler(move|| {
         println!("Stopping...");
+        player_clone.stop().expect("Error stopping player");
         std::process::exit(0);
     }) {
         Ok(_) => {}

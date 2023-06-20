@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::ops::{DerefMut, Deref};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use symphonia::core::audio::RawSampleBuffer;
@@ -15,8 +16,22 @@ use crate::audio::{BitsPerSample, DeviceTrait, StreamFlow, StreamParams};
 
 pub struct Player {
     device_id: Option<u32>,
-    device: Box<dyn DeviceTrait>,
+    device: Box<dyn DeviceTrait + Send + Sync>,
     host: Host,
+}
+
+impl Deref for Player {
+    type Target = Box<dyn DeviceTrait + Send + Sync>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.device
+    }
+}
+
+impl DerefMut for Player {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.device
+    }
 }
 
 impl Player {
@@ -116,7 +131,7 @@ impl Player {
     /// Plays a FLAC file
     /// - params:
     ///    - file: path to the FLAC file
-    pub fn play(&mut self, file: String) -> Result<(), String> {
+    pub fn play(&self, file: String) -> Result<(), String> {
         let src = std::fs::File::open(file.clone()).expect("failed to open media");
         let mss = MediaSourceStream::new(Box::new(src), Default::default());
         let hint = Hint::new();

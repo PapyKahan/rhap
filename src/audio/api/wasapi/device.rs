@@ -21,6 +21,9 @@ pub struct Device {
     pub(super) device: IMMDevice,
 }
 
+unsafe impl Send for Device {}
+unsafe impl Sync for Device {}
+
 impl DeviceTrait for Device {
     fn get_name(&self) -> String {
         match Self::get_device_name(&self.device) {
