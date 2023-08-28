@@ -5,7 +5,7 @@
 //
 use std::mem::size_of;
 use windows::core::PCWSTR;
-use windows::s;
+use windows::core::s;
 use windows::Win32::Foundation::{
     CloseHandle, FALSE, HANDLE, S_OK, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
@@ -371,8 +371,26 @@ impl StreamTrait for Stream {
             //    }
             //};
 
-            AvRevertMmThreadCharacteristics(self.threadhandle);
-            CloseHandle(self.eventhandle);
+            match AvRevertMmThreadCharacteristics(self.threadhandle) {
+                Ok(_) => (),
+                Err(err) => {
+                    return Err(format!(
+                        "Error reverting multimerdia thread characteristics: {} - {}",
+                        host_error(err.code()),
+                        err
+                    ));
+                }
+            };
+            match CloseHandle(self.eventhandle) {
+                Ok(_) => (),
+                Err(err) => {
+                    return Err(format!(
+                        "Error closing event handle: {} - {}",
+                        host_error(err.code()),
+                        err
+                    ));
+                }
+            };
         }
         Ok(())
     }

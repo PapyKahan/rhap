@@ -7,7 +7,7 @@ use windows::Win32::{
         AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, WAVEFORMATEX,
     },
     System::Com::{
-        CoCreateInstance, StructuredStorage::PropVariantClear, CLSCTX_ALL, STGM_READ, VT_LPWSTR,
+        CoCreateInstance, StructuredStorage::PropVariantClear, CLSCTX_ALL, STGM_READ
     },
     UI::Shell::PropertiesSystem::IPropertyStore,
 };
@@ -65,15 +65,6 @@ impl Device {
             };
 
             let prop_variant = &name_property_value.Anonymous.Anonymous;
-
-            // Read the friendly-name from the union data field, expecting a *const u16.
-            if prop_variant.vt != VT_LPWSTR {
-                let description = format!(
-                    "property store produced invalid data: {:?}",
-                    prop_variant.vt
-                );
-                return Err(description);
-            }
             let ptr_utf16 = *(&prop_variant.Anonymous as *const _ as *const *const u16);
 
             // Find the length of the friendly name.
