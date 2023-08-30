@@ -10,7 +10,7 @@ use windows::Win32::{
     UI::Shell::PropertiesSystem::IPropertyStore,
 };
 
-use super::{host::Host, stream::Stream, utils::host_error, com::com_initialize};
+use super::{host::Host, stream::Stream, com::com_initialize};
 use crate::audio::{DeviceTrait, StreamParams};
 
 pub struct Device {
