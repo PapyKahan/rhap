@@ -1,10 +1,8 @@
 use widestring::U16CString;
 use windows::Win32::{
     Devices::FunctionDiscovery::PKEY_Device_FriendlyName,
-    Foundation::S_OK,
     Media::Audio::{
-        eMultimedia, eRender, IAudioClient, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator,
-        AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, WAVEFORMATEX,
+        eMultimedia, eRender, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator,
     },
     System::Com::{
         CoCreateInstance, StructuredStorage::{PropVariantClear, PropVariantToStringAlloc}, CLSCTX_ALL, STGM_READ
