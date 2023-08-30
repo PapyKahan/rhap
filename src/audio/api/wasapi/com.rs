@@ -2,14 +2,12 @@ use std::marker::PhantomData;
 
 use windows::Win32::{
     Foundation::RPC_E_CHANGED_MODE,
-    System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED},
+    System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED},
 };
 
 thread_local! {
     static WASAPI_COM_INIT: ComWasapi = {
-        unsafe {
-            println!("Initializing COM");
-            let result = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+            let result = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
             match result.clone() {
                 Ok(_) => ComWasapi { result, _ptr: PhantomData },
                 Err(err) => {
@@ -20,21 +18,19 @@ thread_local! {
                     }
                 }
             }
-        }
     }
 }
 
 struct ComWasapi {
-    result : windows::core::Result<()>,
-    _ptr: PhantomData<*mut ()>
+    result: windows::core::Result<()>,
+    _ptr: PhantomData<*mut ()>,
 }
 
 impl Drop for ComWasapi {
     #[inline]
     fn drop(&mut self) {
-        unsafe {
-            if self.result.is_ok() {
-                println!("Uninitializing COM");
+        if self.result.is_ok() {
+            unsafe {
                 CoUninitialize();
             }
         }

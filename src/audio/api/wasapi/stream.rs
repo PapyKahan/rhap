@@ -41,7 +41,7 @@ impl Stream {
     // WAVEFORMATEX documentation: https://learn.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatex
     // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
     #[inline(always)]
-    pub(crate) fn create_waveformat_from(params: StreamParams) -> WAVEFORMATEXTENSIBLE {
+    pub(super) fn create_waveformat_from(params: StreamParams) -> WAVEFORMATEXTENSIBLE {
         let formattag = WAVE_FORMAT_EXTENSIBLE;
         let channels = params.channels as u32;
         let sample_rate: u32 = params.samplerate as u32;
