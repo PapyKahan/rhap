@@ -1,4 +1,3 @@
-use std::{ffi::OsString, os::windows::prelude::OsStringExt, slice};
 use widestring::U16CString;
 use windows::Win32::{
     Devices::FunctionDiscovery::PKEY_Device_FriendlyName,
@@ -107,46 +106,5 @@ impl Device {
                 Err(err) => Err(format!("Error getting default device {}", err)),
             }
         }
-    }
-
-    pub fn get_capabilities(&self) -> Result<(), String> {
-        unsafe {
-            let device = Self::get_device(self.index)?;
-
-            let audio_client: IAudioClient = match device.Activate(CLSCTX_ALL, None) {
-                Ok(audio_client) => audio_client,
-                Err(err) => {
-                    return Err(format!("Error activating audio client: {}", err));
-                }
-            };
-
-            let wave_format = Stream::create_waveformat_from(StreamParams {
-                channels: 2,
-                samplerate: crate::audio::SampleRate::Rate44100Hz,
-                bits_per_sample: crate::audio::BitsPerSample::Bits16,
-                buffer_length: 0,
-                exclusive: true,
-            });
-
-            let sharemode = match true {
-                true => AUDCLNT_SHAREMODE_EXCLUSIVE,
-                false => AUDCLNT_SHAREMODE_SHARED,
-            };
-            match audio_client.IsFormatSupported(
-                sharemode,
-                &wave_format.Format as *const WAVEFORMATEX,
-                None,
-            ) {
-                S_OK => true,
-                result => {
-                    return Err(format!(
-                        "Error checking format support: {} - {}",
-                        host_error(result),
-                        "Unsuported format"
-                    ));
-                }
-            };
-        }
-        Ok(())
     }
 }
