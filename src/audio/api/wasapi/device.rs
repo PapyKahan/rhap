@@ -1,4 +1,5 @@
 use std::{ffi::OsString, os::windows::prelude::OsStringExt, slice};
+use widestring::U16CString;
 use windows::Win32::{
     Devices::FunctionDiscovery::PKEY_Device_FriendlyName,
     Foundation::S_OK,
@@ -7,7 +8,7 @@ use windows::Win32::{
         AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, WAVEFORMATEX,
     },
     System::Com::{
-        CoCreateInstance, StructuredStorage::PropVariantClear, CLSCTX_ALL, STGM_READ
+        CoCreateInstance, StructuredStorage::{PropVariantClear, PropVariantToStringAlloc}, CLSCTX_ALL, STGM_READ
     },
     UI::Shell::PropertiesSystem::IPropertyStore,
 };
@@ -64,22 +65,9 @@ impl Device {
                 }
             };
 
-            let prop_variant = &name_property_value.Anonymous.Anonymous;
-            let ptr_utf16 = *(&prop_variant.Anonymous as *const _ as *const *const u16);
-
-            // Find the length of the friendly name.
-            let mut len = 0;
-            while *ptr_utf16.offset(len) != 0 {
-                len += 1;
-            }
-
-            // Create the utf16 slice and convert it into a string.
-            let name_slice = slice::from_raw_parts(ptr_utf16, len as usize);
-            let name_os_string: OsString = OsStringExt::from_wide(name_slice);
-            let name = match name_os_string.into_string() {
-                Ok(string) => string,
-                Err(os_string) => os_string.to_string_lossy().into(),
-            };
+            let propstring = PropVariantToStringAlloc(&name_property_value).unwrap();
+            let wide_string = U16CString::from_ptr_str(propstring.0);
+            let name = wide_string.to_string_lossy();
 
             // Clean up the property.
             match PropVariantClear(&mut name_property_value) {
