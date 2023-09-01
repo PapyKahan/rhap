@@ -1,406 +1,235 @@
-//
+use std::collections::VecDeque;
 // reference : Shared mode streaming : https://learn.microsoft.com/en-us/windows/win32/coreaudio/rendering-a-stream
 // reference : Exclusive mode streaming : https://learn.microsoft.com/en-us/windows/win32/coreaudio/exclusive-mode-streams
 // reference : https://www.hresult.info/FACILITY_AUDCLNT
 //
 use std::mem::size_of;
-use windows::core::PCWSTR;
+use wasapi::calculate_period_100ns;
+use wasapi::AudioClient;
+use wasapi::AudioRenderClient;
+use wasapi::Direction;
+use wasapi::Handle;
+use wasapi::ShareMode;
+use wasapi::WaveFormat;
 use windows::core::s;
-use windows::Win32::Foundation::{
-    CloseHandle, FALSE, HANDLE, S_OK, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT,
-};
-use windows::Win32::Media::Audio::{
-    IAudioClient, IAudioRenderClient, IMMDevice, AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED,
-    AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-    WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0,
-};
-use windows::Win32::Media::KernelStreaming::{
-    KSDATAFORMAT_SUBTYPE_PCM, SPEAKER_FRONT_LEFT, SPEAKER_FRONT_RIGHT, WAVE_FORMAT_EXTENSIBLE,
-};
-use windows::Win32::System::Com::CLSCTX_ALL;
+use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT};
+use windows::Win32::Media::Audio::AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED;
 use windows::Win32::System::Threading::{
-    AvRevertMmThreadCharacteristics, AvSetMmThreadCharacteristicsA, CreateEventW,
-    WaitForSingleObject,
+    AvRevertMmThreadCharacteristics, AvSetMmThreadCharacteristicsA, WaitForSingleObject,
 };
 
 use super::com::com_initialize;
-use super::utils::{align_bwd, align_frames_per_buffer, host_error};
-use crate::audio::api::wasapi::utils::{make_frames_from_hns, make_hns_period};
+use super::device::Device;
+use super::utils::host_error;
 use crate::audio::{StreamFlow, StreamParams, StreamTrait};
 
 pub struct Stream {
     params: StreamParams,
-    client: IAudioClient,
-    renderer: IAudioRenderClient,
+    client: AudioClient,
+    renderer: AudioRenderClient,
     buffersize: u32,
-    eventhandle: HANDLE,
-    threadhandle: HANDLE,
+    eventhandle: Handle,
+    wave_format: WaveFormat,
+    threadhandle: Option<Handle>,
 }
 
 impl Stream {
     // WAVEFORMATEX documentation: https://learn.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatex
     // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
     #[inline(always)]
-    pub(super) fn create_waveformat_from(params: StreamParams) -> WAVEFORMATEXTENSIBLE {
-        let formattag = WAVE_FORMAT_EXTENSIBLE;
-        let channels = params.channels as u32;
-        let sample_rate: u32 = params.samplerate as u32;
-        let bits_per_sample: u32 = params.bits_per_sample as u32;
-        let block_align: u32 = channels * bits_per_sample / 8;
-        let bytes_per_second = sample_rate * block_align;
+    pub(super) fn create_waveformat_from(params: StreamParams) -> WaveFormat {
+        return WaveFormat::new(
+            params.bits_per_sample as usize,
+            params.bits_per_sample as usize,
+            &wasapi::SampleType::Int,
+            params.samplerate as usize,
+            params.channels as usize,
+            None,
+        );
+        //let formattag = WAVE_FORMAT_EXTENSIBLE;
+        //let channels = params.channels as u32;
+        //let sample_rate: u32 = params.samplerate as u32;
+        //let bits_per_sample: u32 = params.bits_per_sample as u32;
+        //let block_align: u32 = channels * bits_per_sample / 8;
+        //let bytes_per_second = sample_rate * block_align;
 
-        WAVEFORMATEXTENSIBLE {
-            Format: WAVEFORMATEX {
-                wFormatTag: formattag as u16,
-                nChannels: channels as u16,
-                nSamplesPerSec: sample_rate,
-                wBitsPerSample: bits_per_sample as u16,
-                nBlockAlign: block_align as u16,
-                nAvgBytesPerSec: bytes_per_second,
-                cbSize: size_of::<WAVEFORMATEXTENSIBLE>() as u16 - size_of::<WAVEFORMATEX>() as u16,
-            },
-            Samples: WAVEFORMATEXTENSIBLE_0 {
-                wValidBitsPerSample: bits_per_sample as u16,
-            },
-            dwChannelMask: SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT,
-            SubFormat: KSDATAFORMAT_SUBTYPE_PCM,
-        }
+        //WAVEFORMATEXTENSIBLE {
+        //    Format: WAVEFORMATEX {
+        //        wFormatTag: formattag as u16,
+        //        nChannels: channels as u16,
+        //        nSamplesPerSec: sample_rate,
+        //        wBitsPerSample: bits_per_sample as u16,
+        //        nBlockAlign: block_align as u16,
+        //        nAvgBytesPerSec: bytes_per_second,
+        //        cbSize: size_of::<WAVEFORMATEXTENSIBLE>() as u16 - size_of::<WAVEFORMATEX>() as u16,
+        //    },
+        //    Samples: WAVEFORMATEXTENSIBLE_0 {
+        //        wValidBitsPerSample: bits_per_sample as u16,
+        //    },
+        //    dwChannelMask: SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT,
+        //    SubFormat: KSDATAFORMAT_SUBTYPE_PCM,
+        //}
     }
 
     pub(super) fn build_from_device(
-        device: &IMMDevice,
+        device: &Device,
         params: StreamParams,
-    ) -> Result<Stream, String> {
-        unsafe {
-            com_initialize();
-            let client : IAudioClient = match (*device).Activate::<IAudioClient>(CLSCTX_ALL, None) {
-                Ok(client) => client,
-                Err(err) => {
-                    return Err(format!(
-                        "Error activating device: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
-            };
+    ) -> Result<Stream, Box<dyn std::error::Error>> {
+        com_initialize();
+        let mut client = device.inner_device.get_iaudioclient()?;
+        let wave_format = Stream::create_waveformat_from(params.clone());
+        let sharemode = match params.exclusive {
+            true => ShareMode::Exclusive,
+            false => ShareMode::Shared,
+        };
 
-            let wave_format = Stream::create_waveformat_from(params.clone());
-            let sharemode = match params.exclusive {
-                true => AUDCLNT_SHAREMODE_EXCLUSIVE,
-                false => AUDCLNT_SHAREMODE_SHARED,
-            };
-
-            let streamflags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
-            match client.IsFormatSupported(
-                sharemode,
-                &wave_format.Format as *const WAVEFORMATEX,
-                None,
-            ) {
-                S_OK => true,
-                result => {
-                    return Err(format!(
-                        "Error checking format support: {} - {}",
-                        host_error(result),
-                        "Unsuported format"
-                    ));
-                }
-            };
-
-            let mut default_device_period: i64 = 0;
-            let mut minimum_device_period: i64 = 0;
-            if params.buffer_length == 0 {
-                match client.GetDevicePeriod(
-                    Some(&mut default_device_period as *mut i64),
-                    Some(&mut minimum_device_period as *mut i64),
-                ) {
-                    Ok(_) => (),
-                    Err(err) => {
-                        return Err(format!(
-                            "Error getting device period: {} - {}",
-                            host_error(err.code()),
-                            err
-                        ));
-                    }
-                };
-            } else {
-                default_device_period = (params.buffer_length * 1000000) / 100 as i64;
-            }
-
-            let result = client.Initialize(
-                sharemode,
-                streamflags,
-                default_device_period,
-                default_device_period,
-                &wave_format.Format as *const WAVEFORMATEX,
-                Some(std::ptr::null()),
-            );
-
-            if result.is_err() {
-                if result.as_ref().err().unwrap().code() != AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED {
-                    let err = result.err().unwrap();
-                    return Err(format!(
-                        "Error initializing client: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
-                println!("Buffer size not aligned");
-                let buffer_size = match client.GetBufferSize() {
-                    Ok(buffer_size) => buffer_size as i64,
-                    Err(err) => {
-                        return Err(format!("Initialize: Error getting buffer size: {}", err));
-                    }
-                };
-                let frames_per_latency = make_frames_from_hns(
-                    default_device_period,
-                    wave_format.Format.nSamplesPerSec as i64,
-                );
-                let frames_per_latency = align_frames_per_buffer(
-                    frames_per_latency,
-                    wave_format.Format.nBlockAlign as i64,
-                    align_bwd,
-                );
-                let period = make_hns_period(frames_per_latency, wave_format.Format.nSamplesPerSec as i64);
-
-                let period = if buffer_size >= (frames_per_latency * 2) {
-                    let ratio = buffer_size / frames_per_latency;
-                    let frames_per_latency =
-                        make_hns_period(period / ratio, wave_format.Format.nSamplesPerSec as i64);
-                    let frames_per_latency = align_frames_per_buffer(
-                        frames_per_latency,
-                        wave_format.Format.nBlockAlign as i64,
-                        align_bwd,
-                    );
-                    let period =
-                        make_hns_period(frames_per_latency, wave_format.Format.nSamplesPerSec as i64);
-                    if period < minimum_device_period {
-                        minimum_device_period
-                    } else {
-                        period
-                    }
-                } else {
-                    period
-                };
-
-                match client.Initialize(
-                    sharemode,
-                    streamflags,
-                    period,
-                    period,
-                    &wave_format.Format as *const WAVEFORMATEX,
-                    Some(std::ptr::null()),
-                ) {
-                    Ok(_) => (),
-                    Err(err) => {
-                        return Err(format!("Error initializing client: {}", err));
-                    }
-                }
-            }
-
-            let eventhandle = match CreateEventW(None, FALSE, FALSE, PCWSTR::null()) {
-                Ok(eventhandle) => eventhandle,
-                Err(err) => {
-                    return Err(format!(
-                        "Error creating event handle: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
-            };
-
-            match client.SetEventHandle(eventhandle) {
-                Ok(_) => (),
-                Err(err) => {
-                    return Err(format!(
-                        "Error setting event handle: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
-            }
-
-            let buffersize = match client.GetBufferSize() {
-                Ok(buffer_size) => buffer_size,
-                Err(err) => {
-                    return Err(format!(
-                        "Size: Error getting buffer size: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
-            };
-
-            let renderer: IAudioRenderClient = match client.GetService::<IAudioRenderClient>() {
-                Ok(client_renderer) => client_renderer,
-                Err(err) => {
-                    return Err(format!(
-                        "Error getting client renderer: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
-            };
-            Ok(Stream {
-                params,
-                client,
-                renderer,
-                buffersize,
-                threadhandle: HANDLE::default(),
-                eventhandle,
-            })
+        let (mut default_device_period, minimum_device_period) = client.get_periods()?;
+        if params.buffer_length != 0 {
+            default_device_period = (params.buffer_length * 1000000) / 100 as i64;
         }
+
+        let result = client.initialize_client(
+            &wave_format,
+            default_device_period,
+            &device.inner_device.get_direction(),
+            &sharemode,
+            false,
+        );
+
+        match result {
+            Ok(()) => println!("IAudioClient::Initialize ok"),
+            Err(e) => {
+                if let Some(werr) = e.downcast_ref::<windows::core::Error>() {
+                    // Some of the possible errors. See the documentation for the full list and descriptions.
+                    // https://docs.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize
+                    match werr.code() {
+                        E_INVALIDARG => println!("IAudioClient::Initialize: Invalid argument"),
+                        AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED => {
+                            println!("IAudioClient::Initialize: Unaligned buffer, trying to adjust the period.");
+                            // Try to recover following the example in the docs.
+                            // https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize#examples
+                            // Just panic on errors to keep it short and simple.
+                            // 1. Call IAudioClient::GetBufferSize and receive the next-highest-aligned buffer size (in frames).
+                            let buffersize = client.get_bufferframecount()?;
+                            println!(
+                                "Client next-highest-aligned buffer size: {} frames",
+                                buffersize
+                            );
+                            // 2. Call IAudioClient::Release, skipped since this will happen automatically when we drop the client.
+                            // 3. Calculate the aligned buffer size in 100-nanosecond units.
+                            let aligned_period = calculate_period_100ns(
+                                buffersize as i64,
+                                wave_format.get_samplespersec() as i64,
+                            );
+                            println!("Aligned period in 100ns units: {}", aligned_period);
+                            // 4. Get a new IAudioClient
+                            client = device.inner_device.get_iaudioclient()?;
+                            // 5. Call Initialize again on the created audio client.
+                            client
+                                .initialize_client(
+                                    &wave_format,
+                                    aligned_period as i64,
+                                    &Direction::Render,
+                                    &ShareMode::Exclusive,
+                                    false,
+                                )
+                                .unwrap();
+                            println!("IAudioClient::Initialize ok");
+                        }
+                        AUDCLNT_E_DEVICE_IN_USE => {
+                            println!("IAudioClient::Initialize: The device is already in use");
+                            panic!("IAudioClient::Initialize failed");
+                        }
+                        AUDCLNT_E_UNSUPPORTED_FORMAT => {
+                            println!("IAudioClient::Initialize The device does not support the audio format");
+                            panic!("IAudioClient::Initialize failed");
+                        }
+                        AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED => {
+                            println!("IAudioClient::Initialize: Exclusive mode is not allowed");
+                            panic!("IAudioClient::Initialize failed");
+                        }
+                        AUDCLNT_E_ENDPOINT_CREATE_FAILED => {
+                            println!("IAudioClient::Initialize: Failed to create endpoint");
+                            panic!("IAudioClient::Initialize failed");
+                        }
+                        _ => {
+                            println!("IAudioClient::Initialize: Other error, HRESULT: {:#010x}, info: {:?}", werr.code().0, werr.message());
+                            panic!("IAudioClient::Initialize failed");
+                        }
+                    };
+                } else {
+                    panic!("IAudioClient::Initialize: Other error {:?}", e);
+                }
+            }
+        };
+
+        let eventhandle = client.set_get_eventhandle()?;
+        let buffersize = client.get_bufferframecount()?;
+        let renderer = client.get_audiorenderclient()?;
+        Ok(Stream {
+            params,
+            client,
+            renderer,
+            buffersize,
+            wave_format,
+            threadhandle: None,
+            eventhandle,
+        })
     }
 }
 
 impl StreamTrait for Stream {
-    fn start(&mut self, callback : &mut dyn FnMut(&mut [u8], usize) -> Result<StreamFlow, String>) -> Result<(), String> {
+    fn start(
+        &mut self,
+        callback: &mut dyn FnMut(
+            &mut [u8],
+            usize,
+        ) -> Result<StreamFlow, Box<dyn std::error::Error>>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         println!("Starting stream with parameters: {:?}", self.params);
-        unsafe {
-            let mut task_index: u32 = 0;
-            let task_index: *mut u32 = &mut task_index;
-            self.threadhandle = match AvSetMmThreadCharacteristicsA(s!("Pro Audio"), task_index) {
-                Ok(handle) => handle,
-                Err(error) => {
-                    return Err(format!(
-                        "Error setting thread characteristics: {} - {}",
-                        host_error(error.code()),
-                        error
-                    ));
+        self.client.start_stream()?;
+
+        loop {
+            let client_buffer_len = self.client.get_available_space_in_frames()?;
+            let mut data = vec![0 as u8; client_buffer_len as usize];
+            let data = data.as_mut_slice();
+            let result = callback(data, client_buffer_len as usize)?;
+            self.renderer.write_to_device(
+                client_buffer_len as usize,
+                self.wave_format.get_blockalign() as usize,
+                data,
+                None,
+            );
+            match result {
+                StreamFlow::Complete => {
+                    break;
                 }
+                StreamFlow::Abort => {
+                    break;
+                }
+                StreamFlow::Continue => (),
             };
-
-            match self.client.Start() {
-                Ok(_) => (),
-                Err(err) => {
-                    return Err(format!(
-                        "Error starting client: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
+            if self.eventhandle.wait_for_event(1000).is_err() {
+                println!("error, stopping playback");
+                self.client.stop_stream()?;
+                break;
             }
-
-            loop {
-                match WaitForSingleObject(self.eventhandle, 2000) {
-                    WAIT_OBJECT_0 => (),
-                    WAIT_TIMEOUT => {
-                        return Err("Timeout waiting for event".to_string());
-                    }
-                    WAIT_FAILED => {
-                        return Err("Wait failed".to_string());
-                    }
-                    _ => (),
-                }
-
-                let client_buffer = match self.renderer.GetBuffer(self.buffersize) {
-                    Ok(buffer) => buffer,
-                    Err(err) => {
-                        return Err(format!("Error getting client buffer: {}", err));
-                    }
-                };
-
-                // Convert client buffer to a slice of bytes.
-                let client_buffer_len = self.buffersize as usize
-                    * (self.params.bits_per_sample as usize / 8) as usize
-                    * self.params.channels as usize;
-                let data = std::slice::from_raw_parts_mut(client_buffer, client_buffer_len);
-                let result = match callback(data, client_buffer_len) {
-                    Ok(result) => result,
-                    Err(err) => {
-                        return Err(format!("Error calling callback: {}", err));
-                    }
-                };
-
-                match result {
-                    StreamFlow::Complete => {
-                        break;
-                    }
-                    StreamFlow::Abort => {
-                        break;
-                    }
-                    StreamFlow::Continue => (),
-                };
-
-                match self.renderer.ReleaseBuffer(self.buffersize, 0) {
-                    Ok(_) => (),
-                    Err(err) => {
-                        return Err(format!(
-                            "Error releasing client buffer: {} - {}",
-                            host_error(err.code()),
-                            err
-                        ));
-                    }
-                };
-            }
-            self.stop()?;
         }
+        self.client.stop_stream()?;
         Ok(())
     }
 
-    fn stop(&self) -> Result<(), String> {
+    fn stop(&self) -> Result<(), Box<dyn std::error::Error>> {
         println!("Stopping stream with parameters: {:?}", self.params);
-        unsafe {
-            match self.renderer.ReleaseBuffer(self.buffersize, 0) {
-                Ok(_) => (),
-                Err(err) => {
-                    return Err(format!(
-                        "Error releasing client buffer: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
-            };
-            match self.client.Stop() {
-                Ok(_) => (),
-                Err(err) => {
-                    return Err(format!(
-                        "Error stopping client: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
-            };
-            //match self.client.Reset() {
-            //    Ok(_) => (),
-            //    Err(err) => {
-            //        return Err(format!(
-            //            "Error resetting client: {} - {}",
-            //            host_error(err.code()),
-            //            err
-            //        ));
-            //    }
-            //};
-
-            match AvRevertMmThreadCharacteristics(self.threadhandle) {
-                Ok(_) => (),
-                Err(err) => {
-                    return Err(format!(
-                        "Error reverting multimerdia thread characteristics: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
-            };
-            match CloseHandle(self.eventhandle) {
-                Ok(_) => (),
-                Err(err) => {
-                    return Err(format!(
-                        "Error closing event handle: {} - {}",
-                        host_error(err.code()),
-                        err
-                    ));
-                }
-            };
-        }
-        Ok(())
+        self.client.stop_stream()
     }
 
-    fn pause(&self) -> Result<(), String> {
+    fn pause(&self) -> Result<(), Box<dyn std::error::Error>> {
         println!("Pausing stream with parameters: {:?}", self.params);
         Ok(())
     }
 
-    fn resume(&self) -> Result<(), String> {
+    fn resume(&self) -> Result<(), Box<dyn std::error::Error>> {
         println!("Resuming stream with parameters: {:?}", self.params);
         Ok(())
     }

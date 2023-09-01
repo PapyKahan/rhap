@@ -55,13 +55,6 @@ pub struct StreamParams {
     pub exclusive: bool,
 }
 
-#[derive(Debug)]
-pub struct Device {
-    pub id: u32,
-    pub name: String,
-    //capabilities: Capabilities,
-}
-
 //#[derive(Debug)]
 //pub struct Capabilities {
 //    max_sample_rate: SampleRate,
@@ -79,15 +72,16 @@ pub enum StreamFlow {
 }
 
 pub trait StreamTrait {
-    fn start(&mut self, callback : &mut dyn FnMut(&mut [u8], usize) -> Result<StreamFlow, String>) -> Result<(), String>;
-    fn stop(&self) -> Result<(), String>;
-    fn pause(&self) -> Result<(), String>;
-    fn resume(&self) -> Result<(), String>;
+    fn start(&mut self, callback : &mut dyn FnMut(&mut [u8], usize) -> Result<StreamFlow, Box<dyn std::error::Error>>) -> Result<(), Box<dyn std::error::Error>>;
+    fn stop(&self) -> Result<(), Box<dyn std::error::Error>>;
+    fn pause(&self) -> Result<(), Box<dyn std::error::Error>>;
+    fn resume(&self) -> Result<(), Box<dyn std::error::Error>>;
     fn get_stream_params(&self) -> &StreamParams;
     fn set_stream_params(&mut self, stream_paramters: StreamParams);
 }
 
 pub trait DeviceTrait {
-    fn get_name(&self) -> String;
-    fn build_stream(&self, params: StreamParams) -> Result<Box<dyn StreamTrait>, String>;
+    fn is_default(&self) -> bool;
+    fn name(&self) -> String;
+    fn build_stream(&self, params: StreamParams) -> Result<Box<dyn StreamTrait>, Box<dyn std::error::Error>>;
 }

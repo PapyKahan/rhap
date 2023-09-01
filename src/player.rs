@@ -17,7 +17,6 @@ use crate::audio::{BitsPerSample, DeviceTrait, StreamFlow, StreamParams};
 pub struct Player {
     device_id: Option<u32>,
     device: Box<dyn DeviceTrait + Send + Sync>,
-    host: Host,
 }
 
 impl Deref for Player {
@@ -35,12 +34,10 @@ impl DerefMut for Player {
 }
 
 impl Player {
-    pub fn new(device_id: Option<u32>) -> Result<Self, String> {
-        let host = Host::new()?;
-        let device = host.create_device(device_id)?;
+    pub fn new(device_id: Option<u32>) -> Result<Self, Box<dyn std::error::Error>> {
+        let device = Host::get_device(device_id)?;
         Ok(Player {
             device_id,
-            host,
             device: Box::new(device),
         })
     }
@@ -131,7 +128,7 @@ impl Player {
     /// Plays a FLAC file
     /// - params:
     ///    - file: path to the FLAC file
-    pub fn play(&self, file: String) -> Result<(), String> {
+    pub fn play(&self, file: String) -> Result<(), Box<dyn std::error::Error>> {
         let src = std::fs::File::open(file.clone()).expect("failed to open media");
         let mss = MediaSourceStream::new(Box::new(src), Default::default());
         let hint = Hint::new();
@@ -170,7 +167,7 @@ impl Player {
         let mut stream = self.device.build_stream(streamparams)?;
 
         println!("Playing file path: {}", file);
-        let callback = &mut |data: &mut [u8], buffer_size: usize| -> Result<StreamFlow, String> {
+        let callback = &mut |data: &mut [u8], buffer_size: usize| -> Result<StreamFlow, Box<dyn std::error::Error>> {
             let mut data_processing = StreamFlow::Continue;
             for i in 0..buffer_size {
                 if vec_buffer.lock().unwrap().is_empty() {
