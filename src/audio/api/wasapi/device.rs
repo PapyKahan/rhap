@@ -1,7 +1,7 @@
 use super::stream::Stream;
 use crate::audio::{DeviceTrait, StreamParams};
 
-pub struct Device<'a> {
+pub struct Device {
     pub is_default: bool,
     pub(super) inner_device: wasapi::Device,
 }

@@ -33,7 +33,7 @@ fn main() -> Result<(), ()> {
                 return Err(());
             }
         };
-        let index = 0;
+        let mut index = 0;
         for dev in devices {
             println!("{} [{}]: {}", if dev.is_default { "->" } else { "  " }, index, dev.name());
             index = index + 1;

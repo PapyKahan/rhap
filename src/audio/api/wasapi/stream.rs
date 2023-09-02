@@ -1,9 +1,3 @@
-use std::collections::VecDeque;
-// reference : Shared mode streaming : https://learn.microsoft.com/en-us/windows/win32/coreaudio/rendering-a-stream
-// reference : Exclusive mode streaming : https://learn.microsoft.com/en-us/windows/win32/coreaudio/exclusive-mode-streams
-// reference : https://www.hresult.info/FACILITY_AUDCLNT
-//
-use std::mem::size_of;
 use wasapi::calculate_period_100ns;
 use wasapi::AudioClient;
 use wasapi::AudioRenderClient;
@@ -11,16 +5,15 @@ use wasapi::Direction;
 use wasapi::Handle;
 use wasapi::ShareMode;
 use wasapi::WaveFormat;
-use windows::core::s;
-use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT};
+use windows::Win32::Foundation::E_INVALIDARG;
 use windows::Win32::Media::Audio::AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED;
-use windows::Win32::System::Threading::{
-    AvRevertMmThreadCharacteristics, AvSetMmThreadCharacteristicsA, WaitForSingleObject,
-};
+use windows::Win32::Media::Audio::AUDCLNT_E_DEVICE_IN_USE;
+use windows::Win32::Media::Audio::AUDCLNT_E_ENDPOINT_CREATE_FAILED;
+use windows::Win32::Media::Audio::AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED;
+use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 
 use super::com::com_initialize;
 use super::device::Device;
-use super::utils::host_error;
 use crate::audio::{StreamFlow, StreamParams, StreamTrait};
 
 pub struct Stream {
@@ -199,7 +192,7 @@ impl StreamTrait for Stream {
                 self.wave_format.get_blockalign() as usize,
                 data,
                 None,
-            );
+            )?;
             match result {
                 StreamFlow::Complete => {
                     break;

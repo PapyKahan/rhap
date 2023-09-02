@@ -14,9 +14,10 @@ impl Host {
             Some(index) => devices_collection.get_device_at_index(index)?,
             _ => get_default_device(&Direction::Render)?
         };
+        let id = device.get_id()?;
         Ok(Device {
             inner_device: device,
-            is_default: device.get_id()? == default_device.get_id()?,
+            is_default: id == default_device.get_id()?,
         })
     }
 
@@ -27,9 +28,10 @@ impl Host {
         let mut enumerated_devices = vec![];
         for i in 0..devices_collection.get_nbr_devices()? {
             let device = devices_collection.get_device_at_index(i)?;
+            let device_id = device.get_id()?;
             enumerated_devices.push(Device {
                 inner_device: device,
-                is_default: device.get_id()? == default_device.get_id()?
+                is_default: device_id == default_device.get_id()?
             });
         }
         Ok(enumerated_devices)
