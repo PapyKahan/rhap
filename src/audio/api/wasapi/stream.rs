@@ -183,12 +183,13 @@ impl StreamTrait for Stream {
         self.client.start_stream()?;
 
         loop {
-            let client_buffer_len = self.client.get_available_space_in_frames()?;
-            let mut data = vec![0 as u8; client_buffer_len as usize];
+            let available_frames = self.client.get_available_space_in_frames()?;
+            let buffer_len = available_frames as usize * self.wave_format.get_blockalign() as usize;
+            let mut data = vec![0 as u8; buffer_len as usize];
             let data = data.as_mut_slice();
-            let result = callback(data, client_buffer_len as usize)?;
+            let result = callback(data, buffer_len)?;
             self.renderer.write_to_device(
-                client_buffer_len as usize,
+                available_frames as usize,
                 self.wave_format.get_blockalign() as usize,
                 data,
                 None,
