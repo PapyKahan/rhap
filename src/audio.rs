@@ -68,7 +68,6 @@ pub struct StreamParams {
 pub enum StreamFlow {
     Continue,
     Complete,
-    Abort,
 }
 
 pub trait StreamTrait {

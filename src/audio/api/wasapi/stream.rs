@@ -20,10 +20,8 @@ pub struct Stream {
     params: StreamParams,
     client: AudioClient,
     renderer: AudioRenderClient,
-    buffersize: u32,
     eventhandle: Handle,
     wave_format: WaveFormat,
-    threadhandle: Option<Handle>,
 }
 
 impl Stream {
@@ -143,15 +141,12 @@ impl Stream {
         };
 
         let eventhandle = client.set_get_eventhandle()?;
-        let buffersize = client.get_bufferframecount()?;
         let renderer = client.get_audiorenderclient()?;
         Ok(Stream {
             params,
             client,
             renderer,
-            buffersize,
             wave_format,
-            threadhandle: None,
             eventhandle,
         })
     }
@@ -182,9 +177,6 @@ impl StreamTrait for Stream {
             )?;
             match result {
                 StreamFlow::Complete => {
-                    break;
-                }
-                StreamFlow::Abort => {
                     break;
                 }
                 StreamFlow::Continue => (),

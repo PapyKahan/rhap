@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::ops::{DerefMut, Deref};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use symphonia::core::audio::RawSampleBuffer;
@@ -15,30 +14,13 @@ use crate::audio::api::wasapi::host::Host;
 use crate::audio::{BitsPerSample, DeviceTrait, StreamFlow, StreamParams};
 
 pub struct Player {
-    device_id: Option<u32>,
     device: Box<dyn DeviceTrait + Send + Sync>,
-}
-
-impl Deref for Player {
-    type Target = Box<dyn DeviceTrait + Send + Sync>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.device
-    }
-}
-
-impl DerefMut for Player {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.device
-    }
 }
 
 impl Player {
     pub fn new(device_id: Option<u32>) -> Result<Self, Box<dyn std::error::Error>> {
-        let device = Host::get_device(device_id)?;
         Ok(Player {
-            device_id,
-            device: Box::new(device),
+            device: Box::new(Host::get_device(device_id)?),
         })
     }
 
@@ -109,7 +91,7 @@ impl Player {
                                 }
                             }
                             BitsPerSample::Bits32 => {
-                                let mut sample_buffer = RawSampleBuffer::<i32>::new(duration, spec);
+                                let mut sample_buffer = RawSampleBuffer::<f32>::new(duration, spec);
                                 sample_buffer.copy_interleaved_ref(_decoded);
                                 for i in sample_buffer.as_bytes().iter() {
                                     vec_buffer.lock().unwrap().push_back(*i);
@@ -153,8 +135,12 @@ impl Player {
             .expect("unsupported codec");
 
         let vec_buffer = Arc::new(Mutex::new(VecDeque::new()));
-        self.fill_buffer(decoder, format, vec_buffer.clone(), BitsPerSample::from(bits_per_sample));
-
+        self.fill_buffer(
+            decoder,
+            format,
+            vec_buffer.clone(),
+            BitsPerSample::from(bits_per_sample),
+        );
 
         let streamparams = StreamParams {
             samplerate: samplerate.into(),
@@ -167,7 +153,9 @@ impl Player {
         let mut stream = self.device.build_stream(streamparams)?;
 
         println!("Playing file path: {}", file);
-        let callback = &mut |data: &mut [u8], buffer_size: usize| -> Result<StreamFlow, Box<dyn std::error::Error>> {
+        let callback = &mut |data: &mut [u8],
+                             buffer_size: usize|
+         -> Result<StreamFlow, Box<dyn std::error::Error>> {
             let mut data_processing = StreamFlow::Continue;
             for i in 0..buffer_size {
                 if vec_buffer.lock().unwrap().is_empty() {
