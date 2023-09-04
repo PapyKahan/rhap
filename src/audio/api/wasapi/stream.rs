@@ -31,37 +31,20 @@ impl Stream {
     // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
     #[inline(always)]
     pub(super) fn create_waveformat_from(params: StreamParams) -> WaveFormat {
+        let sample_type = match params.bits_per_sample {
+            crate::audio::BitsPerSample::Bits8 => &wasapi::SampleType::Int,
+            crate::audio::BitsPerSample::Bits16 => &wasapi::SampleType::Int,
+            crate::audio::BitsPerSample::Bits24 => &wasapi::SampleType::Int,
+            crate::audio::BitsPerSample::Bits32 => &wasapi::SampleType::Float,
+        };
         return WaveFormat::new(
             params.bits_per_sample as usize,
             params.bits_per_sample as usize,
-            &wasapi::SampleType::Int,
+            sample_type,
             params.samplerate as usize,
             params.channels as usize,
             None,
         );
-        //let formattag = WAVE_FORMAT_EXTENSIBLE;
-        //let channels = params.channels as u32;
-        //let sample_rate: u32 = params.samplerate as u32;
-        //let bits_per_sample: u32 = params.bits_per_sample as u32;
-        //let block_align: u32 = channels * bits_per_sample / 8;
-        //let bytes_per_second = sample_rate * block_align;
-
-        //WAVEFORMATEXTENSIBLE {
-        //    Format: WAVEFORMATEX {
-        //        wFormatTag: formattag as u16,
-        //        nChannels: channels as u16,
-        //        nSamplesPerSec: sample_rate,
-        //        wBitsPerSample: bits_per_sample as u16,
-        //        nBlockAlign: block_align as u16,
-        //        nAvgBytesPerSec: bytes_per_second,
-        //        cbSize: size_of::<WAVEFORMATEXTENSIBLE>() as u16 - size_of::<WAVEFORMATEX>() as u16,
-        //    },
-        //    Samples: WAVEFORMATEXTENSIBLE_0 {
-        //        wValidBitsPerSample: bits_per_sample as u16,
-        //    },
-        //    dwChannelMask: SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT,
-        //    SubFormat: KSDATAFORMAT_SUBTYPE_PCM,
-        //}
     }
 
     pub(super) fn build_from_device(
@@ -76,14 +59,17 @@ impl Stream {
             false => ShareMode::Shared,
         };
 
-        let (mut default_device_period, minimum_device_period) = client.get_periods()?;
-        if params.buffer_length != 0 {
-            default_device_period = (params.buffer_length * 1000000) / 100 as i64;
-        }
+        let (default_device_period, _) = client.get_periods()?;
+        let default_device_period = if params.buffer_length != 0 {
+            (params.buffer_length * 1000000) / 100 as i64
+        } else { default_device_period };
 
+        // Calculatre desired period for better device compatibility. For our use case we don't
+        // care about having a low lattency playback thats why we don't use minimum device period.
+        let desired_period = client.calculate_aligned_period_near(3 * default_device_period / 2, Some(128), &wave_format)?;
         let result = client.initialize_client(
             &wave_format,
-            default_device_period,
+            desired_period,
             &device.inner_device.get_direction(),
             &sharemode,
             false,
