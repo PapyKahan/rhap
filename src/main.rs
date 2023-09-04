@@ -26,22 +26,17 @@ struct Cli {
 fn main() -> Result<(), ()> {
     let cli = Cli::parse();
     if cli.list {
-        let wasapi = match Host::new() {
-            Ok(wasapi) => wasapi,
-            Err(err) => {
-                println!("Error initializing WASAPI: {:?}", err);
-                return Err(());
-            }
-        };
-        let devices = match wasapi.get_devices() {
+        let devices = match Host::get_devices() {
             Ok(devices) => devices,
             Err(err) => {
                 println!("Error enumerating devices: {:?}", err);
                 return Err(());
             }
         };
+        let mut index = 0;
         for dev in devices {
-            println!("{} [{}]: {}", if dev.is_default { "->" } else { "  " }, dev.index, dev.get_name());
+            println!("{} [{}]: {}", if dev.is_default { "->" } else { "  " }, index, dev.name());
+            index = index + 1;
         }
         return Ok(());
     } else if cli.path.is_none() {
