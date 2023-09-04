@@ -60,11 +60,17 @@ impl Stream {
         let (default_device_period, _) = client.get_periods()?;
         let default_device_period = if params.buffer_length != 0 {
             (params.buffer_length * 1000000) / 100 as i64
-        } else { default_device_period };
+        } else {
+            default_device_period
+        };
 
         // Calculatre desired period for better device compatibility. For our use case we don't
         // care about having a low lattency playback thats why we don't use minimum device period.
-        let desired_period = client.calculate_aligned_period_near(3 * default_device_period / 2, Some(128), &wave_format)?;
+        let desired_period = client.calculate_aligned_period_near(
+            3 * default_device_period / 2,
+            Some(128),
+            &wave_format,
+        )?;
         let result = client.initialize_client(
             &wave_format,
             desired_period,
@@ -162,33 +168,32 @@ impl StreamTrait for Stream {
     ) -> Result<(), Box<dyn std::error::Error>> {
         println!("Starting stream with parameters: {:?}", self.params);
         self.client.start_stream()?;
-
+        let client_buffer_size = self.client.get_bufferframecount()? * self.wave_format.get_blockalign();
+        let mut data = vec![0 as u8; client_buffer_size as usize];
+        let data = data.as_mut_slice();
         loop {
             let available_frames = self.client.get_available_space_in_frames()?;
-            let buffer_len = available_frames as usize * self.wave_format.get_blockalign() as usize;
-            let mut data = vec![0 as u8; buffer_len as usize];
-            let data = data.as_mut_slice();
-            let result = callback(data, buffer_len)?;
-            self.renderer.write_to_device(
-                available_frames as usize,
-                self.wave_format.get_blockalign() as usize,
-                data,
-                None,
-            )?;
-            match result {
+            let available_buffer_len = available_frames as usize * self.wave_format.get_blockalign() as usize;
+            match callback(data, available_buffer_len)? {
                 StreamFlow::Complete => {
                     break;
                 }
-                StreamFlow::Continue => (),
-            };
-            if self.eventhandle.wait_for_event(1000).is_err() {
-                println!("error, stopping playback");
-                self.client.stop_stream()?;
-                break;
+                StreamFlow::Continue => {
+                    self.renderer.write_to_device(
+                        available_frames as usize,
+                        self.wave_format.get_blockalign() as usize,
+                        data,
+                        None,
+                    )?;
+
+                    if self.eventhandle.wait_for_event(1000).is_err() {
+                        println!("error, stopping playback");
+                        break;
+                    }
+                }
             }
         }
-        self.client.stop_stream()?;
-        Ok(())
+        self.client.stop_stream()
     }
 
     fn stop(&self) -> Result<(), Box<dyn std::error::Error>> {

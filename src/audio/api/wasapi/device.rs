@@ -1,5 +1,6 @@
+use std::error::Error;
 use super::stream::Stream;
-use crate::audio::{DeviceTrait, StreamParams};
+use crate::audio::{StreamTrait, DeviceTrait, StreamParams};
 
 pub struct Device {
     pub is_default: bool,
@@ -17,7 +18,7 @@ impl DeviceTrait for Device{
         self.inner_device.get_friendlyname().unwrap_or_default()
     }
 
-    fn build_stream(&self, params: StreamParams) -> Result<Box<dyn crate::audio::StreamTrait>, Box<dyn std::error::Error>>
+    fn build_stream(&self, params: StreamParams) -> Result<Box<dyn StreamTrait>, Box<dyn Error>>
     {
         let stream = Stream::build_from_device(&self, params)?;
         Ok(Box::new(stream))
