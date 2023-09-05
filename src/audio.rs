@@ -55,15 +55,15 @@ pub struct StreamParams {
     pub exclusive: bool,
 }
 
-//#[derive(Debug)]
-//pub struct Capabilities {
-//    max_sample_rate: SampleRate,
-//    min_sample_rate: SampleRate,
-//    max_bits_per_sample: BitsPerSample,
-//    min_bits_per_sample: BitsPerSample,
-//    max_channel_count: u8,
-//    min_channel_count: u8,
-//}
+#[derive(Debug)]
+pub struct Capabilities {
+    max_sample_rate: SampleRate,
+    min_sample_rate: SampleRate,
+    max_bits_per_sample: BitsPerSample,
+    min_bits_per_sample: BitsPerSample,
+    max_channel_count: u8,
+    min_channel_count: u8,
+}
 
 pub enum StreamFlow {
     Continue,
@@ -82,6 +82,7 @@ pub trait StreamTrait {
 pub trait DeviceTrait {
     fn is_default(&self) -> bool;
     fn name(&self) -> String;
+    fn get_capabilities(&self) -> Result<Vec<Capabilities>, Box<dyn std::error::Error>>;
     fn build_stream(&self, params: StreamParams) -> Result<Box<dyn StreamTrait>, Box<dyn std::error::Error>>;
 }
 

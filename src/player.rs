@@ -149,7 +149,6 @@ impl Player {
         };
 
         let mut stream = self.device.build_stream(streamparams)?;
-
         println!("Playing file path: {}", file);
         let callback = &mut |data: &mut [u8],
                              buffer_size: usize|
