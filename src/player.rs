@@ -10,18 +10,16 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
-use crate::audio::api::wasapi::host::Host;
-use crate::audio::{BitsPerSample, DeviceTrait, StreamFlow, StreamParams};
+use crate::audio::{BitsPerSample, DeviceTrait, StreamFlow, StreamParams, HostTrait};
 
 pub struct Player {
     device: Box<dyn DeviceTrait + Send + Sync>,
 }
 
 impl Player {
-    pub fn new(device_id: Option<u32>) -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(Player {
-            device: Box::new(Host::get_device(device_id)?),
-        })
+    pub fn new(host : Box<dyn HostTrait>, device_id: Option<u32>) -> Result<Self, Box<dyn std::error::Error>> {
+        let device : Box<dyn DeviceTrait + Send + Sync> = host.create_device(device_id)?;
+        Ok(Player { device })
     }
 
     #[inline(always)]

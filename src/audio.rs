@@ -84,3 +84,15 @@ pub trait DeviceTrait {
     fn name(&self) -> String;
     fn build_stream(&self, params: StreamParams) -> Result<Box<dyn StreamTrait>, Box<dyn std::error::Error>>;
 }
+
+pub trait HostTrait {
+    fn create_device(&self, id: Option<u32>) -> Result<Box<dyn DeviceTrait + Send + Sync>, Box<dyn std::error::Error>>;
+    fn get_devices(&self) -> Result<Vec<Box<dyn DeviceTrait>>, Box<dyn std::error::Error>>;
+}
+
+pub(crate) fn create_host(host_name : &str) -> Box<dyn HostTrait> {
+    match host_name {
+        "wasapi" => Box::new(api::wasapi::host::Host::new()),
+        _ => Box::new(api::wasapi::host::Host::new())
+    }
+}

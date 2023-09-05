@@ -1,3 +1,4 @@
+use audio::create_host;
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
 use rand::seq::SliceRandom;
@@ -9,9 +10,7 @@ use walkdir::WalkDir;
 mod audio;
 mod player;
 
-use crate::audio::DeviceTrait;
 use crate::player::Player;
-use crate::audio::api::wasapi::host::Host;
 
 #[derive(Parser)]
 struct Cli {
@@ -25,8 +24,9 @@ struct Cli {
 
 fn main() -> Result<(), ()> {
     let cli = Cli::parse();
+    let host = create_host("wasapi");
     if cli.list {
-        let devices = match Host::get_devices() {
+        let devices = match host.get_devices() {
             Ok(devices) => devices,
             Err(err) => {
                 println!("Error enumerating devices: {:?}", err);
@@ -35,7 +35,7 @@ fn main() -> Result<(), ()> {
         };
         let mut index = 0;
         for dev in devices {
-            println!("{} [{}]: {}", if dev.is_default { "->" } else { "  " }, index, dev.name());
+            println!("{} [{}]: {}", if dev.is_default() { "->" } else { "  " }, index, dev.name());
             index = index + 1;
         }
         return Ok(());
@@ -49,7 +49,7 @@ fn main() -> Result<(), ()> {
     }
 
 
-    let player = match Player::new(cli.device) {
+    let player = match Player::new(host, cli.device) {
         Ok(player) => Arc::new(player),
         Err(err) => {
             println!("Error initializing player: {:?}", err);
