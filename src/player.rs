@@ -159,7 +159,7 @@ impl Player {
                     data_processing = StreamFlow::Complete;
                     break;
                 }
-                data[i] = vec_buffer.lock().unwrap().pop_front().unwrap();
+                data[i] = vec_buffer.lock().unwrap().pop_front().unwrap_or_default();
             }
             Ok(data_processing)
         };
