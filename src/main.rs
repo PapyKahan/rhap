@@ -21,7 +21,8 @@ struct Cli {
     device: Option<u32>,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let host = audio::create_host("wasapi");
     if cli.list {
@@ -47,13 +48,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let player = Arc::new(Player::new(host, cli.device)?);
-
     let player_clone = player.clone();
-    ctrlc::set_handler(move || {
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c().await.expect("failed to listen for CTRL+C signal");
         println!("Stopping...");
         player_clone.stop().expect("Error stopping player");
         std::process::exit(0);
-    })?;
+    });
 
     let path = cli.path.expect("Error: A file or a path is expected");
     if path.is_dir() {
@@ -72,12 +73,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .collect::<Vec<String>>();
         files.shuffle(&mut thread_rng());
         for f in files {
-            player.play(f)?;
+            player.play(f).await?;
         }
 
         println!("Directory: {}", path.to_str().unwrap());
     } else if path.is_file() {
-        player.play(path.to_str().unwrap().to_string())?;
+        player.play(path.to_str().unwrap().to_string()).await?;
     }
     return Ok(());
 }

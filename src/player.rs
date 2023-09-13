@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
-use std::thread;
 use symphonia::core::audio::RawSampleBuffer;
 use symphonia::core::codecs::{Decoder, DecoderOptions};
 use symphonia::core::errors::Error;
@@ -10,27 +9,30 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
-use crate::audio::{BitsPerSample, DeviceTrait, StreamFlow, StreamParams, HostTrait};
+use crate::audio::{BitsPerSample, DeviceTrait, HostTrait, StreamFlow, StreamParams};
 
 pub struct Player {
     device: Box<dyn DeviceTrait + Send + Sync>,
 }
 
 impl Player {
-    pub fn new(host : Box<dyn HostTrait>, device_id: Option<u32>) -> Result<Self, Box<dyn std::error::Error>> {
-        let device : Box<dyn DeviceTrait + Send + Sync> = host.create_device(device_id)?;
+    pub fn new(
+        host: Box<dyn HostTrait>,
+        device_id: Option<u32>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let device: Box<dyn DeviceTrait + Send + Sync> = host.create_device(device_id)?;
         Ok(Player { device })
     }
 
     #[inline(always)]
-    fn fill_buffer(
+    async fn fill_buffer(
         &self,
         mut decoder: Box<dyn Decoder>,
         mut format: Box<dyn FormatReader>,
         vec_buffer: Arc<Mutex<VecDeque<u8>>>,
         bits_per_sample: BitsPerSample,
     ) {
-        thread::spawn(move || {
+        tokio::spawn(async move {
             loop {
                 let packet = match format.next_packet() {
                     Ok(packet) => packet,
@@ -102,15 +104,15 @@ impl Player {
                 }
             }
         });
-        thread::sleep(std::time::Duration::from_secs(1));
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
 
     /// Plays a FLAC file
     /// - params:
     ///    - file: path to the FLAC file
-    pub fn play(&self, file: String) -> Result<(), Box<dyn std::error::Error>> {
-        let src = std::fs::File::open(file.clone()).expect("failed to open media");
-        let mss = MediaSourceStream::new(Box::new(src), Default::default());
+    pub async fn play(&self, file: String) -> Result<(), Box<dyn std::error::Error>> {
+        let source = std::fs::File::open(file.clone())?;
+        let mss = MediaSourceStream::new(Box::new(source), Default::default());
         let hint = Hint::new();
         let meta_opts: MetadataOptions = Default::default();
         let fmt_opts: FormatOptions = Default::default();
@@ -128,9 +130,7 @@ impl Player {
         let dec_opts: DecoderOptions = DecoderOptions { verify: true };
 
         // Create a decoder for the track.
-        let decoder = symphonia::default::get_codecs()
-            .make(&track.codec_params, &dec_opts)
-            .expect("unsupported codec");
+        let decoder = symphonia::default::get_codecs().make(&track.codec_params, &dec_opts)?;
 
         let vec_buffer = Arc::new(Mutex::new(VecDeque::new()));
         self.fill_buffer(
@@ -138,7 +138,7 @@ impl Player {
             format,
             vec_buffer.clone(),
             BitsPerSample::from(bits_per_sample),
-        );
+        ).await;
 
         let streamparams = StreamParams {
             samplerate: samplerate.into(),
