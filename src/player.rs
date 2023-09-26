@@ -1,3 +1,4 @@
+use anyhow::Result;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use symphonia::core::audio::RawSampleBuffer;
@@ -12,16 +13,23 @@ use symphonia::core::sample::i24;
 use crate::audio::{BitsPerSample, DeviceTrait, HostTrait, StreamFlow, StreamParams};
 
 pub struct Player {
+    _is_playing: bool,
+    _is_paused: bool,
+    _is_stoped: bool,
     device: Box<dyn DeviceTrait + Send + Sync>,
 }
 
 impl Player {
-    pub fn new(
-        host: Box<dyn HostTrait>,
-        device_id: Option<u32>,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        let device: Box<dyn DeviceTrait + Send + Sync> = host.create_device(device_id)?;
-        Ok(Player { device })
+    pub fn new(host: Box<dyn HostTrait>, device_id: Option<u32>) -> Result<Self> {
+        let device: Box<dyn DeviceTrait + Send + Sync> = host
+            .create_device(device_id)
+            .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+        Ok(Player {
+            device,
+            _is_playing: false,
+            _is_stoped: true,
+            _is_paused: false,
+        })
     }
 
     #[inline(always)]
@@ -110,8 +118,8 @@ impl Player {
     /// Plays a FLAC file
     /// - params:
     ///    - file: path to the FLAC file
-    pub async fn play(&self, file: String) -> Result<(), Box<dyn std::error::Error>> {
-        let source = std::fs::File::open(file.clone())?;
+    pub async fn play(&mut self, path: String) -> Result<()> {
+        let source = std::fs::File::open(path.clone())?;
         let mss = MediaSourceStream::new(Box::new(source), Default::default());
         let hint = Hint::new();
         let meta_opts: MetadataOptions = Default::default();
@@ -139,7 +147,7 @@ impl Player {
             vec_buffer.clone(),
             BitsPerSample::from(bits_per_sample),
         ).await;
-
+        
         let streamparams = StreamParams {
             samplerate: samplerate.into(),
             channels,
@@ -148,8 +156,11 @@ impl Player {
             exclusive: true,
         };
 
-        let mut stream = self.device.build_stream(streamparams)?;
-        println!("Playing file path: {}", file);
+        let mut stream = self
+            .device
+            .build_stream(streamparams)
+            .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+        println!("Playing file path: {}", path);
         let callback = &mut |data: &mut [u8],
                              buffer_size: usize|
          -> Result<StreamFlow, Box<dyn std::error::Error>> {
@@ -164,10 +175,31 @@ impl Player {
             Ok(data_processing)
         };
 
-        stream.start(callback)
+        stream
+            .start(callback)
+            .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+        self._is_playing = false;
+        self._is_paused = false;
+        self._is_stoped = true;
+        Ok(())
     }
 
-    pub(crate) fn stop(&self) -> Result<(), String> {
+    pub(crate) fn is_playing(&self) -> bool {
+        self._is_playing
+    }
+
+    pub(crate) fn is_paused(&self) -> bool {
+        self._is_paused
+    }
+
+    pub(crate) fn is_stoped(&self) -> bool {
+        self._is_stoped
+    }
+
+    pub(crate) fn stop(&mut self) -> Result<(), String> {
+        self._is_stoped = true;
+        self._is_paused = false;
+        self._is_playing = false;
         Ok(())
     }
 }
