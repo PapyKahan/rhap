@@ -76,8 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .collect::<Vec<String>>();
         files.shuffle(&mut thread_rng());
         for f in files {
-            let player_clone = player.clone();
-            tokio::spawn(async move { player_clone.lock().await.play(f).await });
+            player.lock().await.play(f).await;
             println!("wait");
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
             println!("wait done");
@@ -87,7 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else if path.is_file() {
         let player_clone = player.clone();
         tokio::spawn(async move {
-            player_clone.lock().await.play(path.into_os_string().into_string().unwrap()).await
+            player.lock().await.play(path.into_os_string().into_string().unwrap()).await
         });
         println!("wait");
         tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
