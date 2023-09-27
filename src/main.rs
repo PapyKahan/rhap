@@ -76,21 +76,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .collect::<Vec<String>>();
         files.shuffle(&mut thread_rng());
         for f in files {
-            player.lock().await.play(f).await;
-            println!("wait");
-            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-            println!("wait done");
+            player.lock().await.play(f).await?;
         }
 
         println!("Directory: {}", path.to_str().unwrap());
     } else if path.is_file() {
-        let player_clone = player.clone();
-        tokio::spawn(async move {
-            player.lock().await.play(path.into_os_string().into_string().unwrap()).await
-        });
-        println!("wait");
-        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-        println!("wait done");
+        player.lock().await.play(path.into_os_string().into_string().unwrap()).await?;
     }
     return Ok(());
 }

@@ -80,7 +80,7 @@ pub trait HostTrait {
     fn get_devices(&self) -> Result<Vec<Box<dyn DeviceTrait>>, Box<dyn std::error::Error>>;
 }
 
-pub(crate) fn create_host(host_name : &str) -> Box<dyn HostTrait> {
+pub(crate) fn create_host(host_name : &str) -> Box<dyn HostTrait + Send + Sync> {
     match host_name {
         "wasapi" => Box::new(api::wasapi::host::Host::new()),
         _ => Box::new(api::wasapi::host::Host::new())

@@ -16,19 +16,18 @@ pub struct Player {
     _is_playing: bool,
     _is_paused: bool,
     _is_stoped: bool,
-    device: Box<dyn DeviceTrait + Send + Sync>,
+    host: Box<dyn HostTrait + Send + Sync>,
+    device_id: Option<u32>
 }
 
 impl Player {
-    pub fn new(host: Box<dyn HostTrait>, device_id: Option<u32>) -> Result<Self> {
-        let device: Box<dyn DeviceTrait + Send + Sync> = host
-            .create_device(device_id)
-            .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+    pub fn new(host: Box<dyn HostTrait + Send + Sync>, device_id: Option<u32>) -> Result<Self> {
         Ok(Player {
-            device,
             _is_playing: false,
             _is_stoped: true,
             _is_paused: false,
+            host,
+            device_id
         })
     }
 
@@ -155,9 +154,11 @@ impl Player {
             buffer_length: 0,
             exclusive: true,
         };
+        let device: Box<dyn DeviceTrait + Send + Sync> = self.host
+            .create_device(self.device_id)
+            .map_err(|err| anyhow::anyhow!(err.to_string()))?;
 
-        let mut stream = self
-            .device
+        let mut stream = device
             .build_stream(streamparams)
             .map_err(|err| anyhow::anyhow!(err.to_string()))?;
         println!("Playing file path: {}", path);
