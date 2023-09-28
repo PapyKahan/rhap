@@ -10,14 +10,15 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
-use crate::audio::{BitsPerSample, DeviceTrait, HostTrait, StreamFlow, StreamParams};
+use crate::audio::{BitsPerSample, DeviceTrait, HostTrait, StreamFlow, StreamParams, StreamTrait};
 
 pub struct Player {
     _is_playing: bool,
     _is_paused: bool,
     _is_stoped: bool,
     host: Box<dyn HostTrait + Send + Sync>,
-    device_id: Option<u32>
+    device_id: Option<u32>,
+    stream: Option<Arc<Box<dyn StreamTrait>>>
 }
 
 impl Player {
@@ -27,7 +28,8 @@ impl Player {
             _is_stoped: true,
             _is_paused: false,
             host,
-            device_id
+            device_id,
+            stream: None
         })
     }
 
@@ -176,9 +178,9 @@ impl Player {
             Ok(data_processing)
         };
 
-        stream
-            .start(callback)
-            .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+        //self.stream = Some(Arc::new(stream));
+
+        stream.start(callback).map_err(|err| anyhow::anyhow!(err.to_string()))?;
         self._is_playing = false;
         self._is_paused = false;
         self._is_stoped = true;

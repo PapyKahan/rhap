@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use wasapi::calculate_period_100ns;
 use wasapi::AudioClient;
 use wasapi::AudioRenderClient;
@@ -16,13 +17,17 @@ use super::com::com_initialize;
 use super::device::Device;
 use crate::audio::{StreamFlow, StreamParams, StreamTrait};
 
+#[derive(Clone)]
 pub struct Stream {
     params: StreamParams,
-    client: AudioClient,
-    renderer: AudioRenderClient,
-    eventhandle: Handle,
+    client: Arc<AudioClient>,
+    renderer: Arc<AudioRenderClient>,
+    eventhandle: Arc<Handle>,
     wave_format: WaveFormat,
 }
+
+unsafe impl Send for Stream {}
+unsafe impl Sync for Stream {}
 
 impl Stream {
     // WAVEFORMATEX documentation: https://learn.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatex
@@ -150,10 +155,10 @@ impl Stream {
         let renderer = client.get_audiorenderclient()?;
         Ok(Stream {
             params,
-            client,
-            renderer,
+            client: Arc::new(client),
+            renderer: Arc::new(renderer),
             wave_format,
-            eventhandle,
+            eventhandle: Arc::new(eventhandle),
         })
     }
 }

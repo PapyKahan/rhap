@@ -60,7 +60,7 @@ pub enum StreamFlow {
     Complete,
 }
 
-pub trait StreamTrait {
+pub trait StreamTrait : Send + Sync {
     fn start(&mut self, callback : &mut dyn FnMut(&mut [u8], usize) -> Result<StreamFlow, Box<dyn std::error::Error>>) -> Result<(), Box<dyn std::error::Error>>;
     fn stop(&self) -> Result<(), Box<dyn std::error::Error>>;
     fn pause(&self) -> Result<(), Box<dyn std::error::Error>>;
