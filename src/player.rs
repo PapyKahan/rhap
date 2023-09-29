@@ -13,23 +13,17 @@ use symphonia::core::sample::i24;
 use crate::audio::{BitsPerSample, DeviceTrait, HostTrait, StreamFlow, StreamParams, StreamTrait};
 
 pub struct Player {
-    _is_playing: bool,
-    _is_paused: bool,
-    _is_stoped: bool,
     host: Box<dyn HostTrait + Send + Sync>,
     device_id: Option<u32>,
-    stream: Option<Arc<Box<dyn StreamTrait>>>
+    current_stream: Option<Arc<Mutex<Box<dyn StreamTrait>>>>,
 }
 
 impl Player {
     pub fn new(host: Box<dyn HostTrait + Send + Sync>, device_id: Option<u32>) -> Result<Self> {
         Ok(Player {
-            _is_playing: false,
-            _is_stoped: true,
-            _is_paused: false,
             host,
             device_id,
-            stream: None
+            current_stream: None,
         })
     }
 
@@ -147,8 +141,9 @@ impl Player {
             format,
             vec_buffer.clone(),
             BitsPerSample::from(bits_per_sample),
-        ).await;
-        
+        )
+        .await;
+
         let streamparams = StreamParams {
             samplerate: samplerate.into(),
             channels,
@@ -156,13 +151,29 @@ impl Player {
             buffer_length: 0,
             exclusive: true,
         };
-        let device: Box<dyn DeviceTrait + Send + Sync> = self.host
+        let device: Box<dyn DeviceTrait + Send + Sync> = self
+            .host
             .create_device(self.device_id)
             .map_err(|err| anyhow::anyhow!(err.to_string()))?;
 
-        let mut stream = device
+        if self.current_stream.is_some() {
+            let stream = self.current_stream.take();
+            stream
+                .clone()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .stop()
+                .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+            drop(stream);
+        }
+
+        let stream = device
             .build_stream(streamparams)
             .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+        let stream = Arc::new(Mutex::new(stream));
+        self.current_stream = Some(stream.clone());
+
         println!("Playing file path: {}", path);
         let callback = &mut |data: &mut [u8],
                              buffer_size: usize|
@@ -177,32 +188,23 @@ impl Player {
             }
             Ok(data_processing)
         };
-
-        //self.stream = Some(Arc::new(stream));
-
-        stream.start(callback).map_err(|err| anyhow::anyhow!(err.to_string()))?;
-        self._is_playing = false;
-        self._is_paused = false;
-        self._is_stoped = true;
+        stream
+            .lock()
+            .unwrap()
+            .start(callback)
+            .map_err(|err| anyhow::anyhow!(err.to_string()))?;
         Ok(())
     }
 
-    pub(crate) fn is_playing(&self) -> bool {
-        self._is_playing
-    }
-
-    pub(crate) fn is_paused(&self) -> bool {
-        self._is_paused
-    }
-
-    pub(crate) fn is_stoped(&self) -> bool {
-        self._is_stoped
-    }
-
-    pub(crate) fn stop(&mut self) -> Result<(), String> {
-        self._is_stoped = true;
-        self._is_paused = false;
-        self._is_playing = false;
+    pub(crate) fn stop(&mut self) -> Result<()> {
+        if self.current_stream.is_some() {
+            let stream = self.current_stream.clone().unwrap();
+            stream
+                .lock()
+                .unwrap()
+                .stop()
+                .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+        }
         Ok(())
     }
 }

@@ -172,10 +172,13 @@ impl StreamTrait for Stream {
         ) -> Result<StreamFlow, Box<dyn std::error::Error>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         println!("Starting stream with parameters: {:?}", self.params);
+
         self.client.start_stream()?;
+
         let client_buffer_size = self.client.get_bufferframecount()? * self.wave_format.get_blockalign();
         let mut data = vec![0 as u8; client_buffer_size as usize];
         let data = data.as_mut_slice();
+
         loop {
             let available_frames = self.client.get_available_space_in_frames()?;
             let available_buffer_len = available_frames as usize * self.wave_format.get_blockalign() as usize;
