@@ -19,6 +19,7 @@ use crate::audio::{StreamFlow, StreamParams, StreamTrait};
 
 #[derive(Clone)]
 pub struct Stream {
+    command: StreamFlow,
     params: StreamParams,
     client: Arc<AudioClient>,
     renderer: Arc<AudioRenderClient>,
@@ -154,6 +155,7 @@ impl Stream {
         let eventhandle = client.set_get_eventhandle()?;
         let renderer = client.get_audiorenderclient()?;
         Ok(Stream {
+            command: StreamFlow::Continue,
             params,
             client: Arc::new(client),
             renderer: Arc::new(renderer),
@@ -186,6 +188,15 @@ impl StreamTrait for Stream {
                 StreamFlow::Complete => {
                     break;
                 }
+                StreamFlow::Stop => { break; }
+                StreamFlow::Pause => {
+                    self.renderer.write_to_device(
+                        available_frames as usize,
+                        self.wave_format.get_blockalign() as usize,
+                        data,
+                        None,
+                    )?;
+                }
                 StreamFlow::Continue => {
                     self.renderer.write_to_device(
                         available_frames as usize,
@@ -204,18 +215,21 @@ impl StreamTrait for Stream {
         self.client.stop_stream()
     }
 
-    fn stop(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("Stopping stream with parameters: {:?}", self.params);
-        self.client.stop_stream()
-    }
-
-    fn pause(&self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Pausing stream with parameters: {:?}", self.params);
+        self.command = StreamFlow::Stop;
         Ok(())
     }
 
-    fn resume(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn pause(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        println!("Pausing stream with parameters: {:?}", self.params);
+        self.command = StreamFlow::Pause;
+        Ok(())
+    }
+
+    fn resume(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("Resuming stream with parameters: {:?}", self.params);
+        self.command = StreamFlow::Continue;
         Ok(())
     }
 
@@ -223,7 +237,7 @@ impl StreamTrait for Stream {
         &self.params
     }
 
-    fn set_stream_params(&mut self, stream_paramters: StreamParams) {
-        self.params = stream_paramters;
+    fn set_stream_params(&mut self, parameters: StreamParams) {
+        self.params = parameters;
     }
 }

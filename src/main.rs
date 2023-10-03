@@ -2,9 +2,7 @@ use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use tokio::sync::Mutex;
 use std::path::PathBuf;
-use std::sync::Arc;
 use walkdir::WalkDir;
 
 mod audio;
@@ -48,14 +46,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .exit();
     }
 
-    let player = Arc::new(Mutex::new(Player::new(host, cli.device)?));
-    let player_clone = player.clone();
+    let mut player = Player::new(host, cli.device)?;
+    let mut player_clone = player.clone();
     tokio::spawn(async move {
         tokio::signal::ctrl_c()
             .await
             .expect("failed to listen for CTRL+C signal");
         println!("Stopping...");
-        player_clone.lock().await.stop().expect("Error stopping player");
+        player_clone.stop().expect("Error stopping player");
         std::process::exit(0);
     });
 
@@ -76,12 +74,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .collect::<Vec<String>>();
         files.shuffle(&mut thread_rng());
         for f in files {
-            player.lock().await.play(f).await?;
+            player.play(f).await?;
         }
 
         println!("Directory: {}", path.to_str().unwrap());
     } else if path.is_file() {
-        player.lock().await.play(path.into_os_string().into_string().unwrap()).await?;
+        player.play(path.into_os_string().into_string().unwrap()).await?;
     }
     return Ok(());
 }

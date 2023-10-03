@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use wasapi::{DeviceCollection, Direction, get_default_device};
 
 use crate::audio::{HostTrait, DeviceTrait};
@@ -21,9 +23,10 @@ impl HostTrait for Host {
             Some(index) => devices_collection.get_device_at_index(index)?,
             _ => get_default_device(&Direction::Render)?
         };
+        let device = Arc::new(device);
         let id = device.get_id()?;
         Ok(Box::new(Device {
-            inner_device: device,
+            inner_device: device.clone(),
             is_default: id == default_device.get_id()?,
         }))
     }
@@ -37,7 +40,7 @@ impl HostTrait for Host {
             let device = devices_collection.get_device_at_index(i)?;
             let device_id = device.get_id()?;
             enumerated_devices.push(Box::new(Device {
-                inner_device: device,
+                inner_device: Arc::new(device),
                 is_default: device_id == default_device.get_id()?
             }));
         }

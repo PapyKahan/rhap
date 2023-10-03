@@ -1,11 +1,12 @@
-use std::error::Error;
+use std::{error::Error, sync::Arc};
 
 use super::stream::Stream;
 use crate::audio::{StreamTrait, DeviceTrait, StreamParams};
 
+#[derive(Clone)]
 pub struct Device {
     pub is_default: bool,
-    pub(super) inner_device: wasapi::Device,
+    pub(super) inner_device: Arc<wasapi::Device>,
 }
 
 unsafe impl Send for Device {}

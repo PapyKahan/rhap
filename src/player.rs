@@ -12,16 +12,17 @@ use symphonia::core::sample::i24;
 
 use crate::audio::{BitsPerSample, DeviceTrait, HostTrait, StreamFlow, StreamParams, StreamTrait};
 
+#[derive(Clone)]
 pub struct Player {
-    host: Box<dyn HostTrait + Send + Sync>,
+    host: Arc<Box<dyn HostTrait>>,
     device_id: Option<u32>,
     current_stream: Option<Arc<Mutex<Box<dyn StreamTrait>>>>,
 }
 
 impl Player {
-    pub fn new(host: Box<dyn HostTrait + Send + Sync>, device_id: Option<u32>) -> Result<Self> {
+    pub fn new(host: Box<dyn HostTrait>, device_id: Option<u32>) -> Result<Self> {
         Ok(Player {
-            host,
+            host: Arc::new(host),
             device_id,
             current_stream: None,
         })

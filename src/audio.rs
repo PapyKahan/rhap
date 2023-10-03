@@ -55,16 +55,19 @@ pub struct StreamParams {
     pub exclusive: bool,
 }
 
+#[derive(Clone)]
 pub enum StreamFlow {
+    Stop,
+    Pause,
     Continue,
     Complete,
 }
 
 pub trait StreamTrait : Send + Sync {
     fn start(&mut self, callback : &mut dyn FnMut(&mut [u8], usize) -> Result<StreamFlow, Box<dyn std::error::Error>>) -> Result<(), Box<dyn std::error::Error>>;
-    fn stop(&self) -> Result<(), Box<dyn std::error::Error>>;
-    fn pause(&self) -> Result<(), Box<dyn std::error::Error>>;
-    fn resume(&self) -> Result<(), Box<dyn std::error::Error>>;
+    fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>>;
+    fn pause(&mut self) -> Result<(), Box<dyn std::error::Error>>;
+    fn resume(&mut self) -> Result<(), Box<dyn std::error::Error>>;
     fn get_stream_params(&self) -> &StreamParams;
     fn set_stream_params(&mut self, stream_paramters: StreamParams);
 }
@@ -75,12 +78,12 @@ pub trait DeviceTrait {
     fn build_stream(&self, params: StreamParams) -> Result<Box<dyn StreamTrait>, Box<dyn std::error::Error>>;
 }
 
-pub trait HostTrait {
+pub trait HostTrait: Send + Sync {
     fn create_device(&self, id: Option<u32>) -> Result<Box<dyn DeviceTrait + Send + Sync>, Box<dyn std::error::Error>>;
     fn get_devices(&self) -> Result<Vec<Box<dyn DeviceTrait>>, Box<dyn std::error::Error>>;
 }
 
-pub(crate) fn create_host(host_name : &str) -> Box<dyn HostTrait + Send + Sync> {
+pub(crate) fn create_host(host_name : &str) -> Box<dyn HostTrait> {
     match host_name {
         "wasapi" => Box::new(api::wasapi::host::Host::new()),
         _ => Box::new(api::wasapi::host::Host::new())
