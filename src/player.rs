@@ -16,13 +16,18 @@ use crate::audio::{BitsPerSample, DeviceTrait, HostTrait, StreamFlow, StreamPara
 pub struct Player {
     host: Arc<Box<dyn HostTrait>>,
     device_id: Option<u32>,
+    device: Arc<Box<dyn DeviceTrait + Sync + Send>>,
     current_stream: Option<Arc<Mutex<Box<dyn StreamTrait>>>>,
 }
 
 impl Player {
     pub fn new(host: Box<dyn HostTrait>, device_id: Option<u32>) -> Result<Self> {
+        let device = host
+            .create_device(device_id)
+            .map_err(|err| anyhow::anyhow!(err.to_string()))?;
         Ok(Player {
             host: Arc::new(host),
+            device: Arc::new(device),
             device_id,
             current_stream: None,
         })
@@ -152,13 +157,10 @@ impl Player {
             buffer_length: 0,
             exclusive: true,
         };
-        let device: Box<dyn DeviceTrait + Send + Sync> = self
-            .host
-            .create_device(self.device_id)
-            .map_err(|err| anyhow::anyhow!(err.to_string()))?;
 
         if self.current_stream.is_some() {
             let stream = self.current_stream.take();
+            println!("drop previous stream");
             stream
                 .clone()
                 .unwrap()
@@ -169,11 +171,10 @@ impl Player {
             drop(stream);
         }
 
-        let stream = device
+        let stream = self.device
             .build_stream(streamparams)
             .map_err(|err| anyhow::anyhow!(err.to_string()))?;
         let stream = Arc::new(Mutex::new(stream));
-        self.current_stream = Some(stream.clone());
 
         println!("Playing file path: {}", path);
         let callback = &mut |data: &mut [u8],
@@ -189,6 +190,7 @@ impl Player {
             }
             Ok(data_processing)
         };
+        let stream = self.current_stream.get_or_insert(stream);
         stream
             .lock()
             .unwrap()
@@ -200,11 +202,14 @@ impl Player {
     pub(crate) fn stop(&mut self) -> Result<()> {
         if self.current_stream.is_some() {
             let stream = self.current_stream.clone().unwrap();
+            println!("before lock");
             stream
                 .lock()
                 .unwrap()
                 .stop()
                 .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+        } else {
+            println!("there's no value");
         }
         Ok(())
     }
