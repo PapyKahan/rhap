@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use symphonia::core::audio::RawSampleBuffer;
@@ -16,7 +16,7 @@ use crate::audio::{BitsPerSample, DeviceTrait, HostTrait, StreamFlow, StreamPara
 pub struct Player {
     host: Arc<Box<dyn HostTrait>>,
     device_id: Option<u32>,
-    device: Arc<Box<dyn DeviceTrait + Sync + Send>>,
+    device: Arc<Box<dyn DeviceTrait>>,
     current_stream: Option<Arc<Mutex<Box<dyn StreamTrait>>>>,
 }
 
@@ -24,7 +24,7 @@ impl Player {
     pub fn new(host: Box<dyn HostTrait>, device_id: Option<u32>) -> Result<Self> {
         let device = host
             .create_device(device_id)
-            .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+            .map_err(|err| anyhow!(err.to_string()))?;
         Ok(Player {
             host: Arc::new(host),
             device: Arc::new(device),
@@ -167,13 +167,14 @@ impl Player {
                 .lock()
                 .unwrap()
                 .stop()
-                .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+                .map_err(|err| anyhow!(err.to_string()))?;
             drop(stream);
+            println!("drop previous stream");
         }
 
         let stream = self.device
             .build_stream(streamparams)
-            .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+            .map_err(|err| anyhow!(err.to_string()))?;
         let stream = Arc::new(Mutex::new(stream));
 
         println!("Playing file path: {}", path);
@@ -195,7 +196,7 @@ impl Player {
             .lock()
             .unwrap()
             .start(callback)
-            .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+            .map_err(|err| anyhow!(err.to_string()))?;
         Ok(())
     }
 
@@ -207,7 +208,7 @@ impl Player {
                 .lock()
                 .unwrap()
                 .stop()
-                .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+                .map_err(|err| anyhow!(err.to_string()))?;
         } else {
             println!("there's no value");
         }

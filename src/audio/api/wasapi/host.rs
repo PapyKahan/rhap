@@ -15,7 +15,7 @@ impl Host {
 }
 
 impl HostTrait for Host {
-    fn create_device(&self, id: Option<u32>) -> Result<Box<dyn DeviceTrait + Sync + Send>, Box<dyn std::error::Error>> {
+    fn create_device(&self, id: Option<u32>) -> Result<Box<dyn DeviceTrait>, Box<dyn std::error::Error>> {
         com_initialize();
         let devices_collection = DeviceCollection::new(&Direction::Render)?;
         let default_device = get_default_device(&Direction::Render)?;

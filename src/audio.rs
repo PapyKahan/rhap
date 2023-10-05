@@ -72,14 +72,14 @@ pub trait StreamTrait : Send + Sync {
     fn set_stream_params(&mut self, stream_paramters: StreamParams);
 }
 
-pub trait DeviceTrait {
+pub trait DeviceTrait : Send + Sync  {
     fn is_default(&self) -> bool;
     fn name(&self) -> String;
     fn build_stream(&self, params: StreamParams) -> Result<Box<dyn StreamTrait>, Box<dyn std::error::Error>>;
 }
 
 pub trait HostTrait: Send + Sync {
-    fn create_device(&self, id: Option<u32>) -> Result<Box<dyn DeviceTrait + Send + Sync>, Box<dyn std::error::Error>>;
+    fn create_device(&self, id: Option<u32>) -> Result<Box<dyn DeviceTrait>, Box<dyn std::error::Error>>;
     fn get_devices(&self) -> Result<Vec<Box<dyn DeviceTrait>>, Box<dyn std::error::Error>>;
 }
 
