@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use symphonia::core::audio::RawSampleBuffer;
@@ -10,26 +10,29 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
-use crate::audio::{BitsPerSample, HostTrait, StreamTrait, StreamFlow, StreamParams, Stream, Host, DeviceTrait, Device};
+use crate::audio::{
+    BitsPerSample, Device, DeviceTrait, Host, HostTrait, Stream, StreamFlow, StreamParams,
+    StreamTrait,
+};
 
 #[derive(Clone)]
 pub struct Player {
-    host: Host,
-    device_id: Option<u32>,
+    //host: Host,
+    //device_id: Option<u32>,
     device: Arc<Device>,
-    current_stream: Option<Arc<Mutex<Stream>>>,
+    current_stream: Stream,
 }
 
-impl Player{
+impl Player {
     pub fn new(host: Host, device_id: Option<u32>) -> Result<Self> {
         let device = host
             .create_device(device_id)
             .map_err(|err| anyhow!(err.to_string()))?;
         Ok(Player {
-            host,
+            //host,
             device: Arc::new(device),
-            device_id,
-            current_stream: None,
+            //device_id,
+            current_stream: Stream::None,
         })
     }
 
@@ -158,58 +161,30 @@ impl Player{
             exclusive: true,
         };
 
-        if self.current_stream.is_some() {
-            let stream = self.current_stream.take();
-            println!("drop previous stream");
-            stream
-                .unwrap()
-                .lock()
-                .unwrap()
-                .stop()
-                .map_err(|err| anyhow!(err.to_string()))?;
-            println!("drop previous stream");
-        }
-
-        let stream = self.device
+        self.current_stream.stop().map_err(|err| anyhow!(err.to_string()))?;
+        self.current_stream = self
+            .device
             .build_stream(streamparams)
             .map_err(|err| anyhow!(err.to_string()))?;
-        let stream = Arc::new(Mutex::new(stream));
-
-        println!("Playing file path: {}", path);
-        let callback = &mut |data: &mut [u8],
-                             buffer_size: usize|
-         -> Result<StreamFlow, Box<dyn std::error::Error>> {
-            let mut data_processing = StreamFlow::Continue;
-            for i in 0..buffer_size {
-                if vec_buffer.lock().unwrap().is_empty() {
-                    data_processing = StreamFlow::Complete;
-                    break;
+            println!("Playing file path: {}", path);
+            let callback = &mut |data: &mut [u8],
+                                 buffer_size: usize|
+             -> Result<StreamFlow, Box<dyn std::error::Error>> {
+                let mut data_processing = StreamFlow::Continue;
+                for i in 0..buffer_size {
+                    if vec_buffer.lock().unwrap().is_empty() {
+                        data_processing = StreamFlow::Complete;
+                        break;
+                    }
+                    data[i] = vec_buffer.lock().unwrap().pop_front().unwrap_or_default();
                 }
-                data[i] = vec_buffer.lock().unwrap().pop_front().unwrap_or_default();
-            }
-            Ok(data_processing)
-        };
-        let stream = self.current_stream.get_or_insert(stream);
-        stream
-            .lock()
-            .unwrap()
-            .start(callback)
-            .map_err(|err| anyhow!(err.to_string()))?;
+                Ok(data_processing)
+            };
+        self.current_stream.start(callback).map_err(|err| anyhow!(err.to_string()))?;
         Ok(())
     }
 
     pub(crate) fn stop(&mut self) -> Result<()> {
-        if self.current_stream.is_some() {
-            let stream = self.current_stream.clone().unwrap();
-            println!("before lock");
-            stream
-                .lock()
-                .unwrap()
-                .stop()
-                .map_err(|err| anyhow!(err.to_string()))?;
-        } else {
-            println!("there's no value");
-        }
-        Ok(())
+        self.current_stream.stop().map_err(|err| anyhow!(err.to_string()))
     }
 }

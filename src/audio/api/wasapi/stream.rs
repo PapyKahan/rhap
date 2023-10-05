@@ -182,13 +182,16 @@ impl StreamTrait for Stream {
         let data = data.as_mut_slice();
 
         loop {
+            match self.command {
+                StreamFlow::Stop => break,
+                StreamFlow::Pause => continue,
+                _ => ()
+            };
             let available_frames = self.client.get_available_space_in_frames()?;
             let available_buffer_len = available_frames as usize * self.wave_format.get_blockalign() as usize;
             match callback(data, available_buffer_len)? {
-                StreamFlow::Complete => {
-                    break;
-                }
-                StreamFlow::Stop => { break; }
+                StreamFlow::Complete => break,
+                StreamFlow::Stop => break,
                 StreamFlow::Pause => {
                     self.renderer.write_to_device(
                         available_frames as usize,
@@ -205,13 +208,12 @@ impl StreamTrait for Stream {
                         None,
                     )?;
 
-                    if self.eventhandle.wait_for_event(1000).is_err() {
-                        println!("error, stopping playback");
-                        break;
-                    }
+                    self.eventhandle.wait_for_event(1000)?;
                 }
             }
         }
+
+        println!("client.stop_stream");
         self.client.stop_stream()
     }
 
@@ -219,6 +221,7 @@ impl StreamTrait for Stream {
         println!("Stopping stream with parameters: {:?}", self.params);
         self.command = StreamFlow::Stop;
         Ok(())
+        //self.client.stop_stream()
     }
 
     fn pause(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -233,8 +236,8 @@ impl StreamTrait for Stream {
         Ok(())
     }
 
-    fn get_stream_params(&self) -> &StreamParams {
-        &self.params
+    fn get_stream_params(&self) -> StreamParams {
+        self.params
     }
 
     fn set_stream_params(&mut self, parameters: StreamParams) {
