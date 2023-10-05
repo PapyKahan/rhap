@@ -1,4 +1,4 @@
-mod device;
-mod stream;
-mod com;
+pub(crate) mod device;
 pub(crate) mod host;
+pub(crate) mod stream;
+mod com;

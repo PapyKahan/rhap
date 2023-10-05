@@ -10,14 +10,14 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
-use crate::audio::{BitsPerSample, DeviceTrait, HostTrait, StreamFlow, StreamParams, StreamTrait, Host};
+use crate::audio::{BitsPerSample, HostTrait, StreamTrait, StreamFlow, StreamParams, Stream, Host, DeviceTrait, Device};
 
 #[derive(Clone)]
 pub struct Player {
     host: Host,
     device_id: Option<u32>,
-    device: Arc<Box<dyn DeviceTrait>>,
-    current_stream: Option<Arc<Mutex<Box<dyn StreamTrait>>>>,
+    device: Arc<Device>,
+    current_stream: Option<Arc<Mutex<Stream>>>,
 }
 
 impl Player{
@@ -162,13 +162,11 @@ impl Player{
             let stream = self.current_stream.take();
             println!("drop previous stream");
             stream
-                .clone()
                 .unwrap()
                 .lock()
                 .unwrap()
                 .stop()
                 .map_err(|err| anyhow!(err.to_string()))?;
-            drop(stream);
             println!("drop previous stream");
         }
 

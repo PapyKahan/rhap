@@ -9,7 +9,7 @@ mod audio;
 mod player;
 
 use crate::player::Player;
-use crate::audio::HostTrait;
+use crate::audio::{ HostTrait, DeviceTrait };
 
 #[derive(Parser)]
 struct Cli {

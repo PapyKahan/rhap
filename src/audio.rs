@@ -72,15 +72,91 @@ pub trait StreamTrait : Send + Sync {
     fn set_stream_params(&mut self, stream_paramters: StreamParams);
 }
 
+pub enum Stream {
+    Wasapi(api::wasapi::stream::Stream)
+}
+
+impl StreamTrait for Stream {
+    fn start(&mut self, callback : &mut dyn FnMut(&mut [u8], usize) -> Result<StreamFlow, Box<dyn std::error::Error>>) -> Result<(), Box<dyn std::error::Error>> {
+        let stream = match self {
+            Self::Wasapi(stream) => stream
+        };
+        stream.start(callback)
+    }
+
+    fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let stream = match self {
+            Self::Wasapi(stream) => stream
+        };
+        stream.stop()
+    }
+
+    fn pause(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let stream = match self {
+            Self::Wasapi(stream) => stream
+        };
+        stream.pause()
+    }
+
+    fn resume(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let stream = match self {
+            Self::Wasapi(stream) => stream
+        };
+        stream.resume()
+    }
+
+    fn get_stream_params(&self) -> &StreamParams {
+        let stream = match self {
+            Self::Wasapi(stream) => stream
+        };
+        stream.get_stream_params()
+    }
+
+    fn set_stream_params(&mut self, stream_paramters: StreamParams) {
+        let stream = match self {
+            Self::Wasapi(stream) => stream
+        };
+        stream.set_stream_params(stream_paramters)
+    }
+}
+
 pub trait DeviceTrait : Send + Sync  {
     fn is_default(&self) -> bool;
     fn name(&self) -> String;
-    fn build_stream(&self, params: StreamParams) -> Result<Box<dyn StreamTrait>, Box<dyn std::error::Error>>;
+    fn build_stream(&self, params: StreamParams) -> Result<Stream, Box<dyn std::error::Error>>;
+}
+
+pub enum Device {
+    Wasapi(api::wasapi::device::Device)
+}
+
+impl DeviceTrait for Device {
+    fn is_default(&self) -> bool {
+        let device = match self {
+            Self::Wasapi(device) => device
+        };
+        device.is_default()
+    }
+
+    fn name(&self) -> String {
+        let device = match self {
+            Self::Wasapi(device) => device
+        };
+        device.name()
+    }
+
+    fn build_stream(&self, params: StreamParams) -> Result<Stream, Box<dyn std::error::Error>> {
+        let device = match self {
+            Self::Wasapi(device) => device
+        };
+
+        device.build_stream(params)
+    }
 }
 
 pub trait HostTrait: Send + Sync {
-    fn create_device(&self, id: Option<u32>) -> Result<Box<dyn DeviceTrait>, Box<dyn std::error::Error>>;
-    fn get_devices(&self) -> Result<Vec<Box<dyn DeviceTrait>>, Box<dyn std::error::Error>>;
+    fn create_device(&self, id: Option<u32>) -> Result<Device, Box<dyn std::error::Error>>;
+    fn get_devices(&self) -> Result<Vec<Device>, Box<dyn std::error::Error>>;
 }
 
 #[derive(Clone)]
@@ -89,7 +165,7 @@ pub enum Host {
 }
 
 impl HostTrait for Host {
-    fn get_devices(&self) -> Result<Vec<Box<dyn DeviceTrait>>, Box<dyn std::error::Error>> {
+    fn get_devices(&self) -> Result<Vec<Device>, Box<dyn std::error::Error>> {
         match self {
             Self::Wasapi(host) => {
                 host.get_devices()
@@ -97,7 +173,7 @@ impl HostTrait for Host {
         }
     }
 
-    fn create_device(&self, id: Option<u32>) -> Result<Box<dyn DeviceTrait>, Box<dyn std::error::Error>> {
+    fn create_device(&self, id: Option<u32>) -> Result<Device, Box<dyn std::error::Error>> {
         match self {
             Self::Wasapi(host) => {
                 host.create_device(id)

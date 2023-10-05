@@ -1,7 +1,7 @@
 use std::{error::Error, sync::Arc};
 
 use super::stream::Stream;
-use crate::audio::{StreamTrait, DeviceTrait, StreamParams};
+use crate::audio::{DeviceTrait, StreamParams};
 
 #[derive(Clone)]
 pub struct Device {
@@ -20,9 +20,9 @@ impl DeviceTrait for Device{
         self.inner_device.get_friendlyname().unwrap_or_default()
     }
 
-    fn build_stream(&self, params: StreamParams) -> Result<Box<dyn StreamTrait>, Box<dyn Error>>
+    fn build_stream(&self, params: StreamParams) -> Result<crate::audio::Stream, Box<dyn Error>>
     {
         let stream = Stream::build_from_device(&self, params)?;
-        Ok(Box::new(stream))
+        Ok(stream)
     }
 }

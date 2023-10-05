@@ -54,7 +54,7 @@ impl Stream {
     pub(super) fn build_from_device(
         device: &Device,
         params: StreamParams,
-    ) -> Result<Stream, Box<dyn std::error::Error>> {
+    ) -> Result<crate::audio::Stream, Box<dyn std::error::Error>> {
         com_initialize();
         let mut client = device.inner_device.get_iaudioclient()?;
         let wave_format = Stream::create_waveformat_from(params.clone());
@@ -154,14 +154,14 @@ impl Stream {
 
         let eventhandle = client.set_get_eventhandle()?;
         let renderer = client.get_audiorenderclient()?;
-        Ok(Stream {
+        Ok(crate::audio::Stream::Wasapi(Stream {
             command: StreamFlow::Continue,
             params,
             client: Arc::new(client),
             renderer: Arc::new(renderer),
             wave_format,
             eventhandle: Arc::new(eventhandle),
-        })
+        }))
     }
 }
 
