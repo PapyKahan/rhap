@@ -6,6 +6,7 @@ use crate::audio::{HostTrait, DeviceTrait};
 
 use super::{com::com_initialize, device::Device};
 
+#[derive(Clone)]
 pub struct Host {}
 
 impl Host {

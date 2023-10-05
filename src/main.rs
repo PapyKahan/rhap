@@ -9,6 +9,7 @@ mod audio;
 mod player;
 
 use crate::player::Player;
+use crate::audio::HostTrait;
 
 #[derive(Parser)]
 struct Cli {
@@ -23,8 +24,8 @@ struct Cli {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
-    let host = audio::create_host("wasapi");
     if cli.list {
+        let host = audio::create_host("wasapi");
         let devices = host.get_devices()?;
         let mut index = 0;
         for dev in devices {
@@ -46,6 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .exit();
     }
 
+    let host = audio::create_host("wasapi");
     let mut player = Player::new(host, cli.device)?;
     let mut player_clone = player.clone();
     tokio::spawn(async move {

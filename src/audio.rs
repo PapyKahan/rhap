@@ -83,9 +83,32 @@ pub trait HostTrait: Send + Sync {
     fn get_devices(&self) -> Result<Vec<Box<dyn DeviceTrait>>, Box<dyn std::error::Error>>;
 }
 
-pub(crate) fn create_host(host_name : &str) -> Box<dyn HostTrait> {
+#[derive(Clone)]
+pub enum Host {
+    Wasapi(api::wasapi::host::Host)
+}
+
+impl HostTrait for Host {
+    fn get_devices(&self) -> Result<Vec<Box<dyn DeviceTrait>>, Box<dyn std::error::Error>> {
+        match self {
+            Self::Wasapi(host) => {
+                host.get_devices()
+            }
+        }
+    }
+
+    fn create_device(&self, id: Option<u32>) -> Result<Box<dyn DeviceTrait>, Box<dyn std::error::Error>> {
+        match self {
+            Self::Wasapi(host) => {
+                host.create_device(id)
+            }
+        }
+    }
+}
+
+pub(crate) fn create_host(host_name : &str) -> Host {
     match host_name {
-        "wasapi" => Box::new(api::wasapi::host::Host::new()),
-        _ => Box::new(api::wasapi::host::Host::new())
+        "wasapi" => Host::Wasapi(api::wasapi::host::Host::new()),
+        _ => Host::Wasapi(api::wasapi::host::Host::new())
     }
 }

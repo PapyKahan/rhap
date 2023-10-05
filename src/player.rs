@@ -10,23 +10,23 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
-use crate::audio::{BitsPerSample, DeviceTrait, HostTrait, StreamFlow, StreamParams, StreamTrait};
+use crate::audio::{BitsPerSample, DeviceTrait, HostTrait, StreamFlow, StreamParams, StreamTrait, Host};
 
 #[derive(Clone)]
 pub struct Player {
-    host: Arc<Box<dyn HostTrait>>,
+    host: Host,
     device_id: Option<u32>,
     device: Arc<Box<dyn DeviceTrait>>,
     current_stream: Option<Arc<Mutex<Box<dyn StreamTrait>>>>,
 }
 
-impl Player {
-    pub fn new(host: Box<dyn HostTrait>, device_id: Option<u32>) -> Result<Self> {
+impl Player{
+    pub fn new(host: Host, device_id: Option<u32>) -> Result<Self> {
         let device = host
             .create_device(device_id)
             .map_err(|err| anyhow!(err.to_string()))?;
         Ok(Player {
-            host: Arc::new(host),
+            host,
             device: Arc::new(device),
             device_id,
             current_stream: None,
