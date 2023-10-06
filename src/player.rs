@@ -151,11 +151,8 @@ impl Player {
             exclusive: true,
         };
 
-        let mut stream = self.device
-            .build_stream(vec_buffer, streamparams)
-            .map_err(|err| anyhow!(err.to_string()))?;
         println!("Playing file path: {}", path);
-        stream.start().map_err(|err| anyhow!(err.to_string()))
+        self.device.stream(vec_buffer, streamparams).map_err(|err| anyhow!(err.to_string()))
     }
 
     pub(crate) fn stop(&mut self) -> Result<()> {

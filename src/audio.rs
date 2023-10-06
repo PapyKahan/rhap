@@ -141,6 +141,7 @@ pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> bool;
     fn name(&self) -> String;
     fn build_stream(&self, buffer : Arc<Mutex<VecDeque<u8>>>, params: StreamParams) -> Result<Stream, Box<dyn std::error::Error>>;
+    fn stream(&self, buffer : Arc<Mutex<VecDeque<u8>>>, params: StreamParams) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 #[derive(Clone)]
@@ -169,6 +170,14 @@ impl DeviceTrait for Device {
         };
 
         device.build_stream(buffer, params)
+    }
+
+    fn stream(&self, buffer : Arc<Mutex<VecDeque<u8>>>, params: StreamParams) -> Result<(), Box<dyn std::error::Error>> {
+        let device = match self {
+            Self::Wasapi(device) => device,
+        };
+
+        device.stream(buffer, params)
     }
 }
 
