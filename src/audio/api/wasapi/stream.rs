@@ -17,7 +17,7 @@ use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 
 use super::com::com_initialize;
 use super::device::Device;
-use crate::audio::{StreamParams, StreamTrait};
+use crate::audio::StreamParams;
 
 #[derive(Clone)]
 pub struct Stream {
@@ -53,11 +53,11 @@ impl Stream {
         );
     }
 
-    pub(super) fn build_from_device(
+    pub(super) fn new(
         device: &Device,
         buffer: Arc<Mutex<VecDeque<u8>>>,
         params: StreamParams,
-    ) -> Result<crate::audio::Stream, Box<dyn std::error::Error>> {
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         com_initialize();
         let mut client = device.inner_device.get_iaudioclient()?;
         let wave_format = Stream::create_waveformat_from(params.clone());
@@ -157,19 +157,17 @@ impl Stream {
 
         let eventhandle = client.set_get_eventhandle()?;
         let renderer = client.get_audiorenderclient()?;
-        Ok(crate::audio::Stream::Wasapi(Stream {
+        Ok(Stream {
             params,
             audio_file_buffer: buffer,
             client: Arc::new(client),
             renderer: Arc::new(renderer),
             wave_format,
             eventhandle: Arc::new(eventhandle),
-        }))
+        })
     }
-}
 
-impl StreamTrait for Stream {
-    fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("Starting stream with parameters: {:?}", self.params);
 
         self.client.start_stream()?;
@@ -196,28 +194,5 @@ impl StreamTrait for Stream {
         }
 
         self.client.stop_stream()
-    }
-
-    fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Stopping stream with parameters: {:?}", self.params);
-        Ok(())
-    }
-
-    fn pause(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Pausing stream with parameters: {:?}", self.params);
-        Ok(())
-    }
-
-    fn resume(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Resuming stream with parameters: {:?}", self.params);
-        Ok(())
-    }
-
-    fn get_stream_params(&self) -> StreamParams {
-        self.params
-    }
-
-    fn set_stream_params(&mut self, parameters: StreamParams) {
-        self.params = parameters;
     }
 }

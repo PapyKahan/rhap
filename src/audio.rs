@@ -57,17 +57,6 @@ pub struct StreamParams {
     pub buffer_length: i64,
     pub exclusive: bool,
 }
-impl StreamParams {
-    fn empty() -> StreamParams {
-        Self {
-            channels: 0,
-            samplerate: SampleRate::Rate44100Hz,
-            bits_per_sample: BitsPerSample::Bits8,
-            buffer_length: 0,
-            exclusive: false,
-        }
-    }
-}
 
 pub trait StreamTrait: Send + Sync {
     fn start(&mut self) -> Result<(), Box<dyn std::error::Error>>;
@@ -78,69 +67,9 @@ pub trait StreamTrait: Send + Sync {
     fn set_stream_params(&mut self, stream_paramters: StreamParams);
 }
 
-#[derive(Clone)]
-pub enum Stream {
-    None,
-    Wasapi(api::wasapi::stream::Stream),
-}
-
-impl StreamTrait for Stream {
-    fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let stream = match self {
-            Self::Wasapi(stream) => stream,
-            Self::None => return Ok(()),
-        };
-        stream.start()
-    }
-
-    fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let stream = match self {
-            Self::Wasapi(stream) => stream,
-            Self::None => {
-                println!("no stream");
-                return Ok(());
-            },
-        };
-        stream.stop()
-    }
-
-    fn pause(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let stream = match self {
-            Self::Wasapi(stream) => stream,
-            Self::None => return Ok(()),
-        };
-        stream.pause()
-    }
-
-    fn resume(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let stream = match self {
-            Self::Wasapi(stream) => stream,
-            Self::None => return Ok(()),
-        };
-        stream.resume()
-    }
-
-    fn get_stream_params(&self) -> StreamParams {
-        let stream = match self {
-            Self::Wasapi(stream) => stream,
-            Self::None => return StreamParams::empty(),
-        };
-        stream.get_stream_params()
-    }
-
-    fn set_stream_params(&mut self, stream_paramters: StreamParams) {
-        let stream = match self {
-            Self::Wasapi(stream) => stream,
-            Self::None => return,
-        };
-        stream.set_stream_params(stream_paramters)
-    }
-}
-
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> bool;
     fn name(&self) -> String;
-    fn build_stream(&self, buffer : Arc<Mutex<VecDeque<u8>>>, params: StreamParams) -> Result<Stream, Box<dyn std::error::Error>>;
     fn stream(&self, buffer : Arc<Mutex<VecDeque<u8>>>, params: StreamParams) -> Result<(), Box<dyn std::error::Error>>;
 }
 
@@ -162,14 +91,6 @@ impl DeviceTrait for Device {
             Self::Wasapi(device) => device,
         };
         device.name()
-    }
-
-    fn build_stream(&self, buffer : Arc<Mutex<VecDeque<u8>>>, params: StreamParams) -> Result<Stream, Box<dyn std::error::Error>> {
-        let device = match self {
-            Self::Wasapi(device) => device,
-        };
-
-        device.build_stream(buffer, params)
     }
 
     fn stream(&self, buffer : Arc<Mutex<VecDeque<u8>>>, params: StreamParams) -> Result<(), Box<dyn std::error::Error>> {

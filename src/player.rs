@@ -10,8 +10,7 @@ use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
 use crate::audio::{
-    BitsPerSample, Device, DeviceTrait, Host, HostTrait, Stream, StreamParams,
-    StreamTrait
+    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams 
 };
 
 #[derive(Clone)]
@@ -153,9 +152,5 @@ impl Player {
 
         println!("Playing file path: {}", path);
         self.device.stream(vec_buffer, streamparams).map_err(|err| anyhow!(err.to_string()))
-    }
-
-    pub(crate) fn stop(&mut self) -> Result<()> {
-        Ok(())
     }
 }
