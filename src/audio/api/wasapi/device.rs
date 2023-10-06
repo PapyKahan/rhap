@@ -1,6 +1,6 @@
 use std::{sync::{Arc, Mutex}, collections::VecDeque};
 
-use super::stream::Stream;
+use super::stream::Streamer;
 use crate::audio::{DeviceTrait, StreamParams};
 
 #[derive(Clone)]
@@ -21,8 +21,8 @@ impl DeviceTrait for Device{
         self.inner_device.get_friendlyname().unwrap_or_default()
     }
 
-    fn stream(&self, buffer : Arc<Mutex<VecDeque<u8>>>, params: StreamParams) -> Result<(), Box<dyn std::error::Error>> {
-        let mut stream = Stream::new(&self, buffer, params)?;
-        stream.start()
+    fn stream(&self, stream_source : Arc<Mutex<VecDeque<u8>>>, params: StreamParams) -> Result<(), Box<dyn std::error::Error>> {
+        let mut streamer = Streamer::new(&self, stream_source, params)?;
+        streamer.start()
     }
 }

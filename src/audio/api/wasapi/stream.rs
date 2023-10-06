@@ -19,20 +19,19 @@ use super::com::com_initialize;
 use super::device::Device;
 use crate::audio::StreamParams;
 
-#[derive(Clone)]
-pub struct Stream {
+pub struct Streamer {
     params: StreamParams,
-    audio_file_buffer: Arc<Mutex<VecDeque<u8>>>,
+    stream_source: Arc<Mutex<VecDeque<u8>>>,
     client: Arc<AudioClient>,
     renderer: Arc<AudioRenderClient>,
     eventhandle: Arc<Handle>,
     wave_format: WaveFormat,
 }
 
-unsafe impl Send for Stream {}
-unsafe impl Sync for Stream {}
+unsafe impl Send for Streamer {}
+unsafe impl Sync for Streamer {}
 
-impl Stream {
+impl Streamer {
     // WAVEFORMATEX documentation: https://learn.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatex
     // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
     #[inline(always)]
@@ -55,12 +54,12 @@ impl Stream {
 
     pub(super) fn new(
         device: &Device,
-        buffer: Arc<Mutex<VecDeque<u8>>>,
+        stream_source: Arc<Mutex<VecDeque<u8>>>,
         params: StreamParams,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         com_initialize();
         let mut client = device.inner_device.get_iaudioclient()?;
-        let wave_format = Stream::create_waveformat_from(params.clone());
+        let wave_format = Streamer::create_waveformat_from(params.clone());
         let sharemode = match params.exclusive {
             true => ShareMode::Exclusive,
             false => ShareMode::Shared,
@@ -157,9 +156,9 @@ impl Stream {
 
         let eventhandle = client.set_get_eventhandle()?;
         let renderer = client.get_audiorenderclient()?;
-        Ok(Stream {
+        Ok(Streamer {
             params,
-            audio_file_buffer: buffer,
+            stream_source,
             client: Arc::new(client),
             renderer: Arc::new(renderer),
             wave_format,
@@ -176,10 +175,10 @@ impl Stream {
             let available_buffer_len = available_frames as usize * self.wave_format.get_blockalign() as usize;
             let mut data = vec![0 as u8; available_buffer_len];
             for i in 0..available_buffer_len {
-                if self.audio_file_buffer.lock().unwrap().is_empty() {
+                if self.stream_source.lock().unwrap().is_empty() {
                     break;
                 }
-                data[i] = self.audio_file_buffer.lock().unwrap().pop_front().unwrap_or_default();
+                data[i] = self.stream_source.lock().unwrap().pop_front().unwrap_or_default();
             }
             self.renderer.write_to_device(
                 available_frames as usize,
@@ -188,7 +187,7 @@ impl Stream {
                 None,
             )?;
             self.eventhandle.wait_for_event(1000)?;
-            if self.audio_file_buffer.lock().unwrap().is_empty() {
+            if self.stream_source.lock().unwrap().is_empty() {
                 break;
             }
         }
