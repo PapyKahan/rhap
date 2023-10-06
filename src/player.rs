@@ -10,8 +10,8 @@ use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
 use crate::audio::{
-    BitsPerSample, Device, DeviceTrait, Host, HostTrait, Stream, StreamFlow, StreamParams,
-    StreamTrait,
+    BitsPerSample, Device, DeviceTrait, Host, HostTrait, Stream, StreamParams,
+    StreamTrait
 };
 
 #[derive(Clone)]
@@ -158,26 +158,13 @@ impl Player {
 
         self.current_stream = None;
         let stream = self.device
-            .build_stream(streamparams)
+            .build_stream(vec_buffer, streamparams)
             .map_err(|err| anyhow!(err.to_string()))?;
             println!("Playing file path: {}", path);
-            let callback = &mut |data: &mut [u8],
-                                 buffer_size: usize|
-             -> Result<StreamFlow, Box<dyn std::error::Error>> {
-                let mut data_processing = StreamFlow::Continue;
-                for i in 0..buffer_size {
-                    if vec_buffer.lock().unwrap().is_empty() {
-                        data_processing = StreamFlow::Complete;
-                        break;
-                    }
-                    data[i] = vec_buffer.lock().unwrap().pop_front().unwrap_or_default();
-                }
-                Ok(data_processing)
-            };
         self.current_stream = Some(stream);
 
         let mut stream = self.current_stream.as_ref().unwrap().clone();
-        stream.start(callback).map_err(|err| anyhow!(err.to_string()))?;
+        stream.start().map_err(|err| anyhow!(err.to_string()))?;
         Ok(())
     }
 

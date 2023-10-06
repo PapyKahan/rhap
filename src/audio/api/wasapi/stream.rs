@@ -1,4 +1,6 @@
+use std::collections::VecDeque;
 use std::sync::Arc;
+use std::sync::Mutex;
 use wasapi::calculate_period_100ns;
 use wasapi::AudioClient;
 use wasapi::AudioRenderClient;
@@ -15,11 +17,12 @@ use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 
 use super::com::com_initialize;
 use super::device::Device;
-use crate::audio::{StreamFlow, StreamParams, StreamTrait};
+use crate::audio::{StreamParams, StreamTrait};
 
 #[derive(Clone)]
 pub struct Stream {
     params: StreamParams,
+    audio_file_buffer: Arc<Mutex<VecDeque<u8>>>,
     client: Arc<AudioClient>,
     renderer: Arc<AudioRenderClient>,
     eventhandle: Arc<Handle>,
@@ -52,6 +55,7 @@ impl Stream {
 
     pub(super) fn build_from_device(
         device: &Device,
+        buffer: Arc<Mutex<VecDeque<u8>>>,
         params: StreamParams,
     ) -> Result<crate::audio::Stream, Box<dyn std::error::Error>> {
         com_initialize();
@@ -155,6 +159,7 @@ impl Stream {
         let renderer = client.get_audiorenderclient()?;
         Ok(crate::audio::Stream::Wasapi(Stream {
             params,
+            audio_file_buffer: buffer,
             client: Arc::new(client),
             renderer: Arc::new(renderer),
             wave_format,
@@ -164,36 +169,31 @@ impl Stream {
 }
 
 impl StreamTrait for Stream {
-    fn start(
-        &mut self,
-        callback: &mut dyn FnMut(
-            &mut [u8],
-            usize,
-        ) -> Result<StreamFlow, Box<dyn std::error::Error>>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("Starting stream with parameters: {:?}", self.params);
 
         self.client.start_stream()?;
 
-        let client_buffer_size = self.client.get_bufferframecount()? * self.wave_format.get_blockalign();
-        let mut data = vec![0 as u8; client_buffer_size as usize];
-        let data = data.as_mut_slice();
-
         loop {
             let available_frames = self.client.get_available_space_in_frames()?;
             let available_buffer_len = available_frames as usize * self.wave_format.get_blockalign() as usize;
-            match callback(data, available_buffer_len)? {
-                StreamFlow::Complete => break,
-                StreamFlow::Continue => {
-                    self.renderer.write_to_device(
-                        available_frames as usize,
-                        self.wave_format.get_blockalign() as usize,
-                        data,
-                        None,
-                    )?;
 
-                    self.eventhandle.wait_for_event(1000)?;
+            let mut data = vec![0 as u8; available_buffer_len];
+            for i in 0..available_buffer_len {
+                if self.audio_file_buffer.lock().unwrap().is_empty() {
+                    break;
                 }
+                data[i] = self.audio_file_buffer.lock().unwrap().pop_front().unwrap_or_default();
+            }
+            self.renderer.write_to_device(
+                available_frames as usize,
+                self.wave_format.get_blockalign() as usize,
+                data.as_mut_slice(),
+                None,
+            )?;
+            self.eventhandle.wait_for_event(1000)?;
+            if self.audio_file_buffer.lock().unwrap().is_empty() {
+                break;
             }
         }
 

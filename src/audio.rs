@@ -1,3 +1,6 @@
+use std::{sync::{Arc, Mutex}, collections::VecDeque};
+
+use anyhow::Result;
 pub mod api;
 
 #[repr(u32)]
@@ -66,20 +69,8 @@ impl StreamParams {
     }
 }
 
-#[derive(Clone)]
-pub enum StreamFlow {
-    Continue,
-    Complete,
-}
-
 pub trait StreamTrait: Send + Sync {
-    fn start(
-        &mut self,
-        callback: &mut dyn FnMut(
-            &mut [u8],
-            usize,
-        ) -> Result<StreamFlow, Box<dyn std::error::Error>>,
-    ) -> Result<(), Box<dyn std::error::Error>>;
+    fn start(&mut self) -> Result<(), Box<dyn std::error::Error>>;
     fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>>;
     fn pause(&mut self) -> Result<(), Box<dyn std::error::Error>>;
     fn resume(&mut self) -> Result<(), Box<dyn std::error::Error>>;
@@ -94,18 +85,12 @@ pub enum Stream {
 }
 
 impl StreamTrait for Stream {
-    fn start(
-        &mut self,
-        callback: &mut dyn FnMut(
-            &mut [u8],
-            usize,
-        ) -> Result<StreamFlow, Box<dyn std::error::Error>>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let stream = match self {
             Self::Wasapi(stream) => stream,
             Self::None => return Ok(()),
         };
-        stream.start(callback)
+        stream.start()
     }
 
     fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -155,7 +140,7 @@ impl StreamTrait for Stream {
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> bool;
     fn name(&self) -> String;
-    fn build_stream(&self, params: StreamParams) -> Result<Stream, Box<dyn std::error::Error>>;
+    fn build_stream(&self, buffer : Arc<Mutex<VecDeque<u8>>>, params: StreamParams) -> Result<Stream, Box<dyn std::error::Error>>;
 }
 
 #[derive(Clone)]
@@ -178,12 +163,12 @@ impl DeviceTrait for Device {
         device.name()
     }
 
-    fn build_stream(&self, params: StreamParams) -> Result<Stream, Box<dyn std::error::Error>> {
+    fn build_stream(&self, buffer : Arc<Mutex<VecDeque<u8>>>, params: StreamParams) -> Result<Stream, Box<dyn std::error::Error>> {
         let device = match self {
             Self::Wasapi(device) => device,
         };
 
-        device.build_stream(params)
+        device.build_stream(buffer, params)
     }
 }
 
