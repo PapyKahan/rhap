@@ -19,7 +19,6 @@ use crate::audio::{StreamFlow, StreamParams, StreamTrait};
 
 #[derive(Clone)]
 pub struct Stream {
-    command: StreamFlow,
     params: StreamParams,
     client: Arc<AudioClient>,
     renderer: Arc<AudioRenderClient>,
@@ -155,7 +154,6 @@ impl Stream {
         let eventhandle = client.set_get_eventhandle()?;
         let renderer = client.get_audiorenderclient()?;
         Ok(crate::audio::Stream::Wasapi(Stream {
-            command: StreamFlow::Continue,
             params,
             client: Arc::new(client),
             renderer: Arc::new(renderer),
@@ -182,24 +180,10 @@ impl StreamTrait for Stream {
         let data = data.as_mut_slice();
 
         loop {
-            match self.command {
-                StreamFlow::Stop => break,
-                StreamFlow::Pause => continue,
-                _ => ()
-            };
             let available_frames = self.client.get_available_space_in_frames()?;
             let available_buffer_len = available_frames as usize * self.wave_format.get_blockalign() as usize;
             match callback(data, available_buffer_len)? {
                 StreamFlow::Complete => break,
-                StreamFlow::Stop => break,
-                StreamFlow::Pause => {
-                    self.renderer.write_to_device(
-                        available_frames as usize,
-                        self.wave_format.get_blockalign() as usize,
-                        data,
-                        None,
-                    )?;
-                }
                 StreamFlow::Continue => {
                     self.renderer.write_to_device(
                         available_frames as usize,
@@ -213,26 +197,21 @@ impl StreamTrait for Stream {
             }
         }
 
-        println!("client.stop_stream");
-        self.client.stop_stream()?;
-        self.client.reset_stream()
+        self.client.stop_stream()
     }
 
     fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("Stopping stream with parameters: {:?}", self.params);
-        self.command = StreamFlow::Stop;
         Ok(())
     }
 
     fn pause(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("Pausing stream with parameters: {:?}", self.params);
-        self.command = StreamFlow::Pause;
         Ok(())
     }
 
     fn resume(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("Resuming stream with parameters: {:?}", self.params);
-        self.command = StreamFlow::Continue;
         Ok(())
     }
 

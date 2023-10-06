@@ -68,8 +68,6 @@ impl StreamParams {
 
 #[derive(Clone)]
 pub enum StreamFlow {
-    Stop,
-    Pause,
     Continue,
     Complete,
 }
