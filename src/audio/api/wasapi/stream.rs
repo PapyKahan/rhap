@@ -214,14 +214,14 @@ impl StreamTrait for Stream {
         }
 
         println!("client.stop_stream");
-        self.client.stop_stream()
+        self.client.stop_stream()?;
+        self.client.reset_stream()
     }
 
     fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("Stopping stream with parameters: {:?}", self.params);
         self.command = StreamFlow::Stop;
         Ok(())
-        //self.client.stop_stream()
     }
 
     fn pause(&mut self) -> Result<(), Box<dyn std::error::Error>> {

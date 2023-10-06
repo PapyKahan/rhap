@@ -160,6 +160,7 @@ pub trait DeviceTrait: Send + Sync {
     fn build_stream(&self, params: StreamParams) -> Result<Stream, Box<dyn std::error::Error>>;
 }
 
+#[derive(Clone)]
 pub enum Device {
     Wasapi(api::wasapi::device::Device),
 }
@@ -193,7 +194,7 @@ pub trait HostTrait: Send + Sync {
     fn get_devices(&self) -> Result<Vec<Device>, Box<dyn std::error::Error>>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum Host {
     Wasapi(api::wasapi::host::Host),
 }

@@ -17,10 +17,8 @@ use crate::audio::{
 
 #[derive(Clone)]
 pub struct Player {
-    //host: Host,
-    //device_id: Option<u32>,
-    device: Arc<Device>,
-    current_stream: Stream,
+    device: Device,
+    current_stream: Option<Stream>,
 }
 
 impl Player {
@@ -29,10 +27,8 @@ impl Player {
             .create_device(device_id)
             .map_err(|err| anyhow!(err.to_string()))?;
         Ok(Player {
-            //host,
-            device: Arc::new(device),
-            //device_id,
-            current_stream: Stream::None,
+            device,
+            current_stream: None
         })
     }
 
@@ -161,9 +157,8 @@ impl Player {
             exclusive: true,
         };
 
-        self.current_stream.stop().map_err(|err| anyhow!(err.to_string()))?;
-        self.current_stream = self
-            .device
+        self.current_stream = None;
+        let stream = self.device
             .build_stream(streamparams)
             .map_err(|err| anyhow!(err.to_string()))?;
             println!("Playing file path: {}", path);
@@ -180,11 +175,18 @@ impl Player {
                 }
                 Ok(data_processing)
             };
-        self.current_stream.start(callback).map_err(|err| anyhow!(err.to_string()))?;
+        self.current_stream = Some(stream);
+
+        let mut stream = self.current_stream.as_ref().unwrap().clone();
+        stream.start(callback).map_err(|err| anyhow!(err.to_string()))?;
         Ok(())
     }
 
     pub(crate) fn stop(&mut self) -> Result<()> {
-        self.current_stream.stop().map_err(|err| anyhow!(err.to_string()))
+        if self.current_stream.is_some() {
+            println!("stoping");
+            self.current_stream.as_mut().unwrap().stop().map_err(|err| anyhow!(err.to_string()))?;
+        }
+        Ok(())
     }
 }

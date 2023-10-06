@@ -4,7 +4,7 @@ use wasapi::{DeviceCollection, Direction, get_default_device};
 use crate::audio::HostTrait;
 use super::{com::com_initialize, device::Device};
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Host {}
 
 impl Host {

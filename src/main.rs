@@ -49,13 +49,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let host = audio::create_host("wasapi");
     let mut player = Player::new(host, cli.device)?;
-    let mut player_clone = player.clone();
     tokio::spawn(async move {
         tokio::signal::ctrl_c()
             .await
             .expect("failed to listen for CTRL+C signal");
-        println!("Stopping...");
-        player_clone.stop().expect("Error stopping player");
         std::process::exit(0);
     });
 
@@ -78,8 +75,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         for f in files {
             player.play(f).await?;
         }
-
-        println!("Directory: {}", path.to_str().unwrap());
     } else if path.is_file() {
         player.play(path.into_os_string().into_string().unwrap()).await?;
     }
