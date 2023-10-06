@@ -10,7 +10,7 @@ use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
 use crate::audio::{
-    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams 
+    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamContext 
 };
 
 #[derive(Clone)]
@@ -150,7 +150,12 @@ impl Player {
             exclusive: true,
         };
 
+        let context = StreamContext::new(vec_buffer, streamparams);
         println!("Playing file path: {}", path);
-        self.device.stream(vec_buffer, streamparams).map_err(|err| anyhow!(err.to_string()))
+        let device = self.device.clone();
+        tokio::spawn(async move {
+            device.stream(context).expect("ldkjsflsdkjf");
+        }).await?;
+        Ok(())
     }
 }

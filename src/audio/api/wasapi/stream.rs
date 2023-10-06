@@ -1,6 +1,4 @@
-use std::collections::VecDeque;
 use std::sync::Arc;
-use std::sync::Mutex;
 use wasapi::calculate_period_100ns;
 use wasapi::AudioClient;
 use wasapi::AudioRenderClient;
@@ -17,11 +15,11 @@ use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 
 use super::com::com_initialize;
 use super::device::Device;
+use crate::audio::StreamContext;
 use crate::audio::StreamParams;
 
 pub struct Streamer {
-    params: StreamParams,
-    stream_source: Arc<Mutex<VecDeque<u8>>>,
+    context: StreamContext,
     client: Arc<AudioClient>,
     renderer: Arc<AudioRenderClient>,
     eventhandle: Arc<Handle>,
@@ -54,20 +52,19 @@ impl Streamer {
 
     pub(super) fn new(
         device: &Device,
-        stream_source: Arc<Mutex<VecDeque<u8>>>,
-        params: StreamParams,
+        context: StreamContext
     ) -> Result<Self, Box<dyn std::error::Error>> {
         com_initialize();
         let mut client = device.inner_device.get_iaudioclient()?;
-        let wave_format = Streamer::create_waveformat_from(params.clone());
-        let sharemode = match params.exclusive {
+        let wave_format = Streamer::create_waveformat_from(context.parameters.clone());
+        let sharemode = match context.parameters.exclusive {
             true => ShareMode::Exclusive,
             false => ShareMode::Shared,
         };
 
         let (default_device_period, _) = client.get_periods()?;
-        let default_device_period = if params.buffer_length != 0 {
-            (params.buffer_length * 1000000) / 100 as i64
+        let default_device_period = if context.parameters.buffer_length != 0 {
+            (context.parameters.buffer_length * 1000000) / 100 as i64
         } else {
             default_device_period
         };
@@ -157,8 +154,7 @@ impl Streamer {
         let eventhandle = client.set_get_eventhandle()?;
         let renderer = client.get_audiorenderclient()?;
         Ok(Streamer {
-            params,
-            stream_source,
+            context,
             client: Arc::new(client),
             renderer: Arc::new(renderer),
             wave_format,
@@ -167,7 +163,7 @@ impl Streamer {
     }
 
     pub(crate) fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Starting stream with parameters: {:?}", self.params);
+        println!("Starting stream with parameters: {:?}", self.context.parameters);
 
         self.client.start_stream()?;
         loop {
@@ -175,10 +171,10 @@ impl Streamer {
             let available_buffer_len = available_frames as usize * self.wave_format.get_blockalign() as usize;
             let mut data = vec![0 as u8; available_buffer_len];
             for i in 0..available_buffer_len {
-                if self.stream_source.lock().unwrap().is_empty() {
+                if self.context.source.lock().unwrap().is_empty() {
                     break;
                 }
-                data[i] = self.stream_source.lock().unwrap().pop_front().unwrap_or_default();
+                data[i] = self.context.source.lock().unwrap().pop_front().unwrap_or_default();
             }
             self.renderer.write_to_device(
                 available_frames as usize,
@@ -187,7 +183,7 @@ impl Streamer {
                 None,
             )?;
             self.eventhandle.wait_for_event(1000)?;
-            if self.stream_source.lock().unwrap().is_empty() {
+            if self.context.source.lock().unwrap().is_empty() {
                 break;
             }
         }

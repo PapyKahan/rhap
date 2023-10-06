@@ -61,12 +61,33 @@ pub struct StreamParams {
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> bool;
     fn name(&self) -> String;
-    fn stream(&self, stream_source : Arc<Mutex<VecDeque<u8>>>, params: StreamParams) -> Result<(), Box<dyn std::error::Error>>;
+    fn stream(&self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 #[derive(Clone)]
 pub enum Device {
     Wasapi(api::wasapi::device::Device),
+}
+
+pub enum StreamStatus {
+    Playing,
+    Stoped,
+    Paused,
+}
+pub struct StreamContext {
+    source: Arc<Mutex<VecDeque<u8>>>,
+    parameters: StreamParams,
+    status: StreamStatus,
+}
+
+impl StreamContext {
+    pub fn new(source: Arc<Mutex<VecDeque<u8>>>, parameters: StreamParams) -> Self {
+        Self {
+            source,
+            parameters,
+            status: StreamStatus::Stoped
+        }
+    }
 }
 
 impl DeviceTrait for Device {
@@ -84,12 +105,12 @@ impl DeviceTrait for Device {
         device.name()
     }
 
-    fn stream(&self, stream_source : Arc<Mutex<VecDeque<u8>>>, params: StreamParams) -> Result<(), Box<dyn std::error::Error>> {
+    fn stream(&self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>> {
         let device = match self {
             Self::Wasapi(device) => device,
         };
 
-        device.stream(stream_source, params)
+        device.stream(context)
     }
 }
 
