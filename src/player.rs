@@ -122,8 +122,8 @@ impl Player {
         let source = std::fs::File::open(path.clone())?;
         let mss = MediaSourceStream::new(Box::new(source), Default::default());
         let hint = Hint::new();
-        let meta_opts: MetadataOptions = Default::default();
-        let fmt_opts: FormatOptions = Default::default();
+        let meta_opts = Default::default();
+        let fmt_opts = Default::default();
         let probed = symphonia::default::get_probe()
             .format(&hint, mss, &fmt_opts, &meta_opts)
             .expect("unsupported format");
@@ -135,7 +135,7 @@ impl Player {
         let bits_per_sample = track.codec_params.bits_per_sample.unwrap_or(16) as u8;
 
         // Use the default options for the decoder.
-        let dec_opts: DecoderOptions = DecoderOptions { verify: true };
+        let dec_opts = DecoderOptions { verify: true };
 
         // Create a decoder for the track.
         let decoder = symphonia::default::get_codecs().make(&track.codec_params, &dec_opts)?;
