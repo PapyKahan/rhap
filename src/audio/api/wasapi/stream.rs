@@ -173,11 +173,9 @@ impl StreamTrait for Stream {
         println!("Starting stream with parameters: {:?}", self.params);
 
         self.client.start_stream()?;
-
         loop {
             let available_frames = self.client.get_available_space_in_frames()?;
             let available_buffer_len = available_frames as usize * self.wave_format.get_blockalign() as usize;
-
             let mut data = vec![0 as u8; available_buffer_len];
             for i in 0..available_buffer_len {
                 if self.audio_file_buffer.lock().unwrap().is_empty() {

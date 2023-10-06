@@ -17,7 +17,6 @@ use crate::audio::{
 #[derive(Clone)]
 pub struct Player {
     device: Device,
-    current_stream: Option<Stream>,
 }
 
 impl Player {
@@ -26,8 +25,7 @@ impl Player {
             .create_device(device_id)
             .map_err(|err| anyhow!(err.to_string()))?;
         Ok(Player {
-            device,
-            current_stream: None
+            device
         })
     }
 
@@ -133,11 +131,8 @@ impl Player {
         let channels = track.codec_params.channels.unwrap().count() as u8;
         let bits_per_sample = track.codec_params.bits_per_sample.unwrap_or(16) as u8;
 
-        // Use the default options for the decoder.
-        let dec_opts = DecoderOptions { verify: true };
-
         // Create a decoder for the track.
-        let decoder = symphonia::default::get_codecs().make(&track.codec_params, &dec_opts)?;
+        let decoder = symphonia::default::get_codecs().make(&track.codec_params, &DecoderOptions { verify: true })?;
 
         let vec_buffer = Arc::new(Mutex::new(VecDeque::new()));
         self.fill_buffer(
@@ -156,23 +151,14 @@ impl Player {
             exclusive: true,
         };
 
-        self.current_stream = None;
-        let stream = self.device
+        let mut stream = self.device
             .build_stream(vec_buffer, streamparams)
             .map_err(|err| anyhow!(err.to_string()))?;
-            println!("Playing file path: {}", path);
-        self.current_stream = Some(stream);
-
-        let mut stream = self.current_stream.as_ref().unwrap().clone();
-        stream.start().map_err(|err| anyhow!(err.to_string()))?;
-        Ok(())
+        println!("Playing file path: {}", path);
+        stream.start().map_err(|err| anyhow!(err.to_string()))
     }
 
     pub(crate) fn stop(&mut self) -> Result<()> {
-        if self.current_stream.is_some() {
-            println!("stoping");
-            self.current_stream.as_mut().unwrap().stop().map_err(|err| anyhow!(err.to_string()))?;
-        }
         Ok(())
     }
 }
