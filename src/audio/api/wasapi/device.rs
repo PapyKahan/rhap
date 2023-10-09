@@ -10,6 +10,16 @@ pub struct Device {
     pub(super) inner_device: Arc<wasapi::Device>,
 }
 
+impl Device {
+    pub(super) fn new(inner_device: wasapi::Device, is_default: bool) -> Self {
+        Self {
+            inner_device: Arc::new(inner_device),
+            is_default,
+            status: Arc::new(Mutex::new(PlaybackStatus::Stoped))
+        }
+    }
+}
+
 unsafe impl Send for Device {}
 unsafe impl Sync for Device {}
 

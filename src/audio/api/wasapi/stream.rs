@@ -179,10 +179,10 @@ impl Streamer {
             let available_buffer_len = available_frames as usize * self.wave_format.get_blockalign() as usize;
             let mut data = vec![0 as u8; available_buffer_len];
             for i in 0..available_buffer_len {
-                if self.context.source.lock().unwrap().is_empty() {
+                if self.context.source.lock().expect("fail to lock source mutex").is_empty() {
                     break;
                 }
-                data[i] = self.context.source.lock().unwrap().pop_front().unwrap_or_default();
+                data[i] = self.context.source.lock().expect("fail to locak source mutex").pop_front().unwrap_or_default();
             }
             self.renderer.write_to_device(
                 available_frames as usize,

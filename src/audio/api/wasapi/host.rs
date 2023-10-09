@@ -1,7 +1,5 @@
-use std::sync::{Arc, Mutex};
-
 use wasapi::{DeviceCollection, Direction, get_default_device};
-use crate::audio::{HostTrait, PlaybackStatus};
+use crate::audio::HostTrait;
 use super::{com::com_initialize, device::Device};
 
 #[derive(Clone, Copy)]
@@ -22,13 +20,8 @@ impl HostTrait for Host {
             Some(index) => devices_collection.get_device_at_index(index)?,
             _ => get_default_device(&Direction::Render)?
         };
-        let device = Arc::new(device);
-        let id = device.get_id()?;
-        Ok(crate::audio::Device::Wasapi(Device {
-            inner_device: device.clone(),
-            status: Arc::new(Mutex::new(PlaybackStatus::Stoped)),
-            is_default: id == default_device.get_id()?,
-        }))
+        let device_id = device.get_id()?;
+        Ok(crate::audio::Device::Wasapi(Device::new(device, device_id == default_device.get_id()?)))
     }
 
     fn get_devices(&self) -> Result<Vec<crate::audio::Device>, Box<dyn std::error::Error>> {
@@ -39,11 +32,7 @@ impl HostTrait for Host {
         for i in 0..devices_collection.get_nbr_devices()? {
             let device = devices_collection.get_device_at_index(i)?;
             let device_id = device.get_id()?;
-            enumerated_devices.push(crate::audio::Device::Wasapi(Device {
-                inner_device: Arc::new(device),
-                status: Arc::new(Mutex::new(PlaybackStatus::Stoped)),
-                is_default: device_id == default_device.get_id()?
-            }));
+            enumerated_devices.push(crate::audio::Device::Wasapi(Device::new(device, device_id == default_device.get_id()?)));
         }
         Ok(enumerated_devices)
     }
