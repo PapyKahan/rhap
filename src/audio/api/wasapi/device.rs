@@ -1,11 +1,12 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use super::stream::Streamer;
-use crate::audio::{DeviceTrait, StreamContext};
+use crate::audio::{DeviceTrait, StreamContext, PlaybackStatus};
 
 #[derive(Clone)]
 pub struct Device {
     pub is_default: bool,
+    pub status: Arc<Mutex<PlaybackStatus>>,
     pub(super) inner_device: Arc<wasapi::Device>,
 }
 
@@ -21,8 +22,23 @@ impl DeviceTrait for Device{
         self.inner_device.get_friendlyname().unwrap_or_default()
     }
 
-    fn stream(&self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>> {
+    fn stream(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>> {
         let mut streamer = Streamer::new(&self, context)?;
-        streamer.start()
+        self.set_status(PlaybackStatus::Playing);
+        streamer.start()?;
+        self.set_status(PlaybackStatus::Stoped);
+        Ok(())
+    }
+
+    fn set_status(&mut self, status: PlaybackStatus) {
+        *self.status.lock().expect("fail to lock mutex") = status;
+    }
+
+    fn is_playing(&self) -> bool {
+        match *self.status.lock().expect("fail to lock mutex") {
+            PlaybackStatus::Stoped => false,
+            PlaybackStatus::Paused => true,
+            PlaybackStatus::Playing => true,
+        }
     }
 }

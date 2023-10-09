@@ -1,7 +1,7 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use wasapi::{DeviceCollection, Direction, get_default_device};
-use crate::audio::HostTrait;
+use crate::audio::{HostTrait, PlaybackStatus};
 use super::{com::com_initialize, device::Device};
 
 #[derive(Clone, Copy)]
@@ -26,6 +26,7 @@ impl HostTrait for Host {
         let id = device.get_id()?;
         Ok(crate::audio::Device::Wasapi(Device {
             inner_device: device.clone(),
+            status: Arc::new(Mutex::new(PlaybackStatus::Stoped)),
             is_default: id == default_device.get_id()?,
         }))
     }
@@ -40,6 +41,7 @@ impl HostTrait for Host {
             let device_id = device.get_id()?;
             enumerated_devices.push(crate::audio::Device::Wasapi(Device {
                 inner_device: Arc::new(device),
+                status: Arc::new(Mutex::new(PlaybackStatus::Stoped)),
                 is_default: device_id == default_device.get_id()?
             }));
         }

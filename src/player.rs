@@ -10,7 +10,7 @@ use symphonia::core::probe::Hint;
 use symphonia::core::sample::i24;
 
 use crate::audio::{
-    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamContext 
+    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamContext, StreamParams,
 };
 
 #[derive(Clone)]
@@ -23,9 +23,7 @@ impl Player {
         let device = host
             .create_device(device_id)
             .map_err(|err| anyhow!(err.to_string()))?;
-        Ok(Player {
-            device
-        })
+        Ok(Player { device })
     }
 
     #[inline(always)]
@@ -131,31 +129,38 @@ impl Player {
         let bits_per_sample = track.codec_params.bits_per_sample.unwrap_or(16) as u8;
 
         // Create a decoder for the track.
-        let decoder = symphonia::default::get_codecs().make(&track.codec_params, &DecoderOptions { verify: true })?;
+        let decoder = symphonia::default::get_codecs()
+            .make(&track.codec_params, &DecoderOptions { verify: true })?;
 
-        let vec_buffer = Arc::new(Mutex::new(VecDeque::new()));
+        let buffer = Arc::new(Mutex::new(VecDeque::new()));
         self.fill_buffer(
             decoder,
             format,
-            vec_buffer.clone(),
+            buffer.clone(),
             BitsPerSample::from(bits_per_sample),
         )
         .await;
 
-        let streamparams = StreamParams {
-            samplerate: samplerate.into(),
-            channels,
-            bits_per_sample: bits_per_sample.into(),
-            buffer_length: 0,
-            exclusive: true,
-        };
-
-        let context = StreamContext::new(vec_buffer, streamparams);
         println!("Playing file path: {}", path);
-        let device = self.device.clone();
+        let mut device = self.device.clone();
         tokio::spawn(async move {
-            device.stream(context).expect("ldkjsflsdkjf");
-        }).await?;
+            let streamparams = StreamParams {
+                samplerate: samplerate.into(),
+                channels,
+                bits_per_sample: bits_per_sample.into(),
+                buffer_length: 0,
+                exclusive: true,
+            };
+            device.stream(StreamContext::new(buffer, streamparams)).expect("fail to start streaming");
+        });
+
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            if !self.device.is_playing() {
+                println!("playing next song");
+                break;
+            }
+        }
         Ok(())
     }
 }

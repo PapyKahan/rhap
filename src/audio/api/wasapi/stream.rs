@@ -17,8 +17,10 @@ use super::com::com_initialize;
 use super::device::Device;
 use crate::audio::StreamContext;
 use crate::audio::StreamParams;
+use crate::audio::PlaybackStatus;
 
 pub struct Streamer {
+    device: Arc<Device>,
     context: StreamContext,
     client: Arc<AudioClient>,
     renderer: Arc<AudioRenderClient>,
@@ -155,6 +157,7 @@ impl Streamer {
         let renderer = client.get_audiorenderclient()?;
         Ok(Streamer {
             context,
+            device: Arc::new(device.clone()),
             client: Arc::new(client),
             renderer: Arc::new(renderer),
             wave_format,
@@ -164,9 +167,14 @@ impl Streamer {
 
     pub(crate) fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("Starting stream with parameters: {:?}", self.context.parameters);
-
         self.client.start_stream()?;
+        *self.device.status.lock().expect("fail to lock mutex") = PlaybackStatus::Playing;
         loop {
+            match *self.device.status.lock().expect("fail to lock mutex") {
+                PlaybackStatus::Paused => continue,
+                PlaybackStatus::Stoped => break,
+                PlaybackStatus::Playing => ()
+            };
             let available_frames = self.client.get_available_space_in_frames()?;
             let available_buffer_len = available_frames as usize * self.wave_format.get_blockalign() as usize;
             let mut data = vec![0 as u8; available_buffer_len];

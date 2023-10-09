@@ -60,8 +60,10 @@ pub struct StreamParams {
 
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> bool;
+    fn is_playing(&self) -> bool;
+    fn set_status(&mut self, status: PlaybackStatus);
     fn name(&self) -> String;
-    fn stream(&self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>>;
+    fn stream(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 #[derive(Clone)]
@@ -69,15 +71,17 @@ pub enum Device {
     Wasapi(api::wasapi::device::Device),
 }
 
-pub enum StreamStatus {
+#[derive(Debug)]
+pub enum PlaybackStatus {
     Playing,
     Stoped,
     Paused,
 }
+
+#[derive(Clone)]
 pub struct StreamContext {
     source: Arc<Mutex<VecDeque<u8>>>,
     parameters: StreamParams,
-    status: StreamStatus,
 }
 
 impl StreamContext {
@@ -85,7 +89,6 @@ impl StreamContext {
         Self {
             source,
             parameters,
-            status: StreamStatus::Stoped
         }
     }
 }
@@ -105,12 +108,25 @@ impl DeviceTrait for Device {
         device.name()
     }
 
-    fn stream(&self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>> {
+    fn stream(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>> {
         let device = match self {
             Self::Wasapi(device) => device,
         };
-
         device.stream(context)
+    }
+
+    fn is_playing(&self) -> bool {
+        let device = match self {
+            Self::Wasapi(device) => device,
+        };
+        device.is_playing()
+    }
+
+    fn set_status(&mut self, status: PlaybackStatus) {
+        let device = match self {
+            Self::Wasapi(device) => device,
+        };
+        device.set_status(status)
     }
 }
 
