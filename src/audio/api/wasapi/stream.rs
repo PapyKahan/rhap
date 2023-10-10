@@ -15,7 +15,7 @@ use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 
 use super::com::com_initialize;
 use super::device::Device;
-use crate::audio::{PlaybackStatus, StreamContext, StreamParams, DeviceTrait};
+use crate::audio::{DeviceTrait, PlaybackCommand, StreamContext, StreamParams};
 
 pub struct Streamer {
     device: Arc<Device>,
@@ -52,7 +52,7 @@ impl Streamer {
 
     pub(super) fn new(
         device: &Device,
-        context: StreamContext
+        context: StreamContext,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         com_initialize();
         let mut client = device.inner_device.get_iaudioclient()?;
@@ -164,27 +164,47 @@ impl Streamer {
     }
 
     pub(crate) fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Starting stream with parameters: {:?}", self.context.parameters);
+        println!(
+            "Starting stream with parameters: {:?}",
+            self.context.parameters
+        );
         self.client.start_stream()?;
-        self.device.set_status(PlaybackStatus::Playing);
+        self.device.set_status(PlaybackCommand::Play);
 
         loop {
+            match self.device.get_status() {
+                PlaybackCommand::Play => (),
+                PlaybackCommand::Pause => {
+                    self.client.stop_stream()?;
+                    self.device.wait_readiness();
+                    self.client.start_stream()?;
+                },
+                PlaybackCommand::Stop => break,
+            };
+
             let available_frames = self.client.get_available_space_in_frames()?;
-            let available_buffer_len = available_frames as usize * self.wave_format.get_blockalign() as usize;
+            let available_buffer_len =
+                available_frames as usize * self.wave_format.get_blockalign() as usize;
             let mut data = vec![0 as u8; available_buffer_len];
 
-            match self.device.get_status() {
-                PlaybackStatus::Stoped => break,
-                PlaybackStatus::Paused => (),
-                PlaybackStatus::Playing => {
-                    for i in 0..available_buffer_len {
-                        if self.context.source.lock().expect("fail to lock source mutex").is_empty() {
-                            break;
-                        }
-                        data[i] = self.context.source.lock().expect("fail to locak source mutex").pop_front().unwrap_or_default();
-                    }
+            for i in 0..available_buffer_len {
+                if self
+                    .context
+                    .source
+                    .lock()
+                    .expect("fail to lock source mutex")
+                    .is_empty()
+                {
+                    break;
                 }
-            };
+                data[i] = self
+                    .context
+                    .source
+                    .lock()
+                    .expect("fail to lock source mutex")
+                    .pop_front()
+                    .unwrap_or_default();
+            }
 
             self.renderer.write_to_device(
                 available_frames as usize,
@@ -192,13 +212,14 @@ impl Streamer {
                 data.as_mut_slice(),
                 None,
             )?;
+
             self.eventhandle.wait_for_event(1000)?;
             if self.context.source.lock().unwrap().is_empty() {
                 break;
             }
         }
 
-        self.device.set_status(PlaybackStatus::Stoped);
+        self.device.set_status(PlaybackCommand::Stop);
         self.client.stop_stream()
     }
 }
