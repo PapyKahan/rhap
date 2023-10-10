@@ -160,10 +160,6 @@ impl Player {
                 println!("playing next song");
                 break;
             }
-            tokio::time::sleep(tokio::time::Duration::from_millis(10000)).await;
-            self.device.set_status(crate::audio::PlaybackCommand::Pause);
-            tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
-            self.device.set_status(crate::audio::PlaybackCommand::Play);
         }
         Ok(())
     }
