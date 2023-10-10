@@ -61,7 +61,8 @@ pub struct StreamParams {
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> bool;
     fn is_playing(&self) -> bool;
-    fn set_status(&mut self, status: PlaybackStatus);
+    fn set_status(&self, status: PlaybackStatus);
+    fn get_status(&self) -> PlaybackStatus;
     fn name(&self) -> String;
     fn stream(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>>;
 }
@@ -71,7 +72,7 @@ pub enum Device {
     Wasapi(api::wasapi::device::Device),
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone)]
 pub enum PlaybackStatus {
     Playing,
     Stoped,
@@ -122,11 +123,18 @@ impl DeviceTrait for Device {
         device.is_playing()
     }
 
-    fn set_status(&mut self, status: PlaybackStatus) {
+    fn set_status(&self, status: PlaybackStatus) {
         let device = match self {
             Self::Wasapi(device) => device,
         };
         device.set_status(status)
+    }
+
+    fn get_status(&self) -> PlaybackStatus {
+        let device = match self {
+            Self::Wasapi(device) => device,
+        };
+        device.get_status()
     }
 }
 

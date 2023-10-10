@@ -6,7 +6,7 @@ use crate::audio::{DeviceTrait, StreamContext, PlaybackStatus};
 #[derive(Clone)]
 pub struct Device {
     pub is_default: bool,
-    pub status: Arc<Mutex<PlaybackStatus>>,
+    status: Arc<Mutex<PlaybackStatus>>,
     pub(super) inner_device: Arc<wasapi::Device>,
 }
 
@@ -40,7 +40,7 @@ impl DeviceTrait for Device{
         Ok(())
     }
 
-    fn set_status(&mut self, status: PlaybackStatus) {
+    fn set_status(&self, status: PlaybackStatus) {
         *self.status.lock().expect("fail to lock mutex") = status;
     }
 
@@ -50,5 +50,9 @@ impl DeviceTrait for Device{
             PlaybackStatus::Paused => true,
             PlaybackStatus::Playing => true,
         }
+    }
+
+    fn get_status(&self) -> PlaybackStatus {
+        *self.status.lock().expect("fail to lock mutex")
     }
 }

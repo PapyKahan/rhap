@@ -15,9 +15,7 @@ use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 
 use super::com::com_initialize;
 use super::device::Device;
-use crate::audio::StreamContext;
-use crate::audio::StreamParams;
-use crate::audio::PlaybackStatus;
+use crate::audio::{PlaybackStatus, StreamContext, StreamParams, DeviceTrait};
 
 pub struct Streamer {
     device: Arc<Device>,
@@ -168,22 +166,26 @@ impl Streamer {
     pub(crate) fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("Starting stream with parameters: {:?}", self.context.parameters);
         self.client.start_stream()?;
-        *self.device.status.lock().expect("fail to lock mutex") = PlaybackStatus::Playing;
+        self.device.set_status(PlaybackStatus::Playing);
+
         loop {
-            match *self.device.status.lock().expect("fail to lock mutex") {
-                PlaybackStatus::Paused => continue,
-                PlaybackStatus::Stoped => break,
-                PlaybackStatus::Playing => ()
-            };
             let available_frames = self.client.get_available_space_in_frames()?;
             let available_buffer_len = available_frames as usize * self.wave_format.get_blockalign() as usize;
             let mut data = vec![0 as u8; available_buffer_len];
-            for i in 0..available_buffer_len {
-                if self.context.source.lock().expect("fail to lock source mutex").is_empty() {
-                    break;
+
+            match self.device.get_status() {
+                PlaybackStatus::Stoped => break,
+                PlaybackStatus::Paused => (),
+                PlaybackStatus::Playing => {
+                    for i in 0..available_buffer_len {
+                        if self.context.source.lock().expect("fail to lock source mutex").is_empty() {
+                            break;
+                        }
+                        data[i] = self.context.source.lock().expect("fail to locak source mutex").pop_front().unwrap_or_default();
+                    }
                 }
-                data[i] = self.context.source.lock().expect("fail to locak source mutex").pop_front().unwrap_or_default();
-            }
+            };
+
             self.renderer.write_to_device(
                 available_frames as usize,
                 self.wave_format.get_blockalign() as usize,
@@ -196,6 +198,7 @@ impl Streamer {
             }
         }
 
+        self.device.set_status(PlaybackStatus::Stoped);
         self.client.stop_stream()
     }
 }
