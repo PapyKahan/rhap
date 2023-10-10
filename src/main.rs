@@ -49,10 +49,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let host = audio::create_host("wasapi");
     let mut player = Player::new(host, cli.device)?;
+    let cl = player.clone();
     tokio::spawn(async move {
         tokio::signal::ctrl_c()
             .await
             .expect("failed to listen for CTRL+C signal");
+        cl.stop();
         std::process::exit(0);
     });
 

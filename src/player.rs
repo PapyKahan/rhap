@@ -162,4 +162,8 @@ impl Player {
         }
         Ok(())
     }
+
+    pub fn stop(&self) {
+        self.device.stop();
+    }
 }

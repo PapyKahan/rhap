@@ -71,4 +71,8 @@ impl DeviceTrait for Device{
     fn get_status(&self) -> PlaybackCommand {
         *self.status.lock().expect("fail to lock mutex")
     }
+
+    fn stop(&self) {
+        self.set_status(PlaybackCommand::Stop)
+    }
 }

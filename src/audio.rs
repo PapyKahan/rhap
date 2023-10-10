@@ -65,6 +65,7 @@ pub trait DeviceTrait: Send + Sync {
     fn get_status(&self) -> PlaybackCommand;
     fn name(&self) -> String;
     fn stream(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>>;
+    fn stop(&self);
 }
 
 #[derive(Clone)]
@@ -135,6 +136,13 @@ impl DeviceTrait for Device {
             Self::Wasapi(device) => device,
         };
         device.get_status()
+    }
+
+    fn stop(&self) {
+        let device = match self {
+            Self::Wasapi(device) => device,
+        };
+        device.stop()
     }
 }
 
