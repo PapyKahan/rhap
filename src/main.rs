@@ -1,13 +1,17 @@
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
-use crossterm::event::{EnableMouseCapture, DisableMouseCapture, self, Event, KeyCode};
-use crossterm::terminal::{enable_raw_mode, EnterAlternateScreen, disable_raw_mode, LeaveAlternateScreen, SetTitle};
+use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetTitle,
+};
 use crossterm::{execute, ExecutableCommand};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use ratatui::widgets::{Paragraph, Block, Borders};
-use ratatui::{Terminal, Frame};
-use std::io::{stdout, self};
+use ratatui::prelude::{Backend, Constraint};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::widgets::{Block, Borders, Cell, List, ListItem, Paragraph, Row, Table, TableState};
+use ratatui::{Frame, Terminal};
+use std::io::{self, stdout};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
@@ -27,42 +31,118 @@ struct Cli {
     device: Option<u32>,
 }
 
-fn ui(frame: &mut Frame<ratatui::backend::CrosstermBackend<std::io::Stdout>>) {
-    frame.render_widget(
-        Paragraph::new("Hello World!")
-            .block(Block::default().title("Greeting").borders(Borders::ALL)),
-        frame.size(),
-    );
+struct DeviceList<'devicelist> {
+    state: TableState,
+    devices: Vec<Row<'devicelist>>,
 }
 
-fn handle_events() -> io::Result<bool> {
-    if event::poll(std::time::Duration::from_millis(50))? {
-        if let Event::Key(key) = event::read()? {
-            if key.kind == event::KeyEventKind::Press && key.code == KeyCode::Char('q') {
-                return Ok(true);
+impl<'devicelist> DeviceList<'devicelist> {
+    fn new() -> DeviceList<'devicelist> {
+        let host = audio::create_host("wasapi");
+        let devices = match host.get_devices() {
+            Ok(devices) => devices,
+            Err(err) => {
+                let mut cmd = Cli::command();
+                cmd.error(ErrorKind::InvalidValue, err).exit();
             }
-       }
+        };
+        let mut index = 0;
+        let mut items = Vec::new();
+
+        for dev in devices {
+            let row = Row::new(vec![
+                Cell::from(if dev.is_default() { "*" } else { "  " }),
+                Cell::from(index.to_string()),
+                Cell::from(dev.name()),
+            ])
+            .height(1)
+            .style(Style::default().fg(Color::White));
+            items.push(row);
+            index = index + 1;
+        }
+        DeviceList {
+            state: TableState::default(),
+            devices: items,
+        }
     }
-    Ok(false)
+
+    fn next(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i >= self.devices.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+    }
+
+    fn previous(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.devices.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+    }
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut DeviceList) {
     let cli = Cli::parse();
     if cli.list {
         let host = audio::create_host("wasapi");
-        let devices = host.get_devices()?;
+        let devices = match host.get_devices() {
+            Ok(devices) => devices,
+            Err(err) => {
+                let mut cmd = Cli::command();
+                cmd.error(ErrorKind::InvalidValue, err).exit();
+            }
+        };
         let mut index = 0;
+        let mut items = Vec::new();
+
         for dev in devices {
-            println!(
-                "{} [{}]: {}",
-                if dev.is_default() { "->" } else { "  " },
-                index,
-                dev.name()
-            );
+            let row = Row::new(vec![
+                Cell::from(if dev.is_default() { "*" } else { "  " }),
+                Cell::from(index.to_string()),
+                Cell::from(dev.name()),
+            ])
+            .height(1)
+            .style(Style::default().fg(Color::White));
+            items.push(row);
             index = index + 1;
         }
-        return Ok(());
+        let table = Table::new(items)
+            .style(Style::default().fg(Color::White))
+            .header(
+                Row::new(vec![" ", "Id", "Device"])
+                    .style(Style::default().fg(Color::White))
+                    .height(1),
+            )
+            .highlight_symbol("=>")
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+            .widths(&[
+                Constraint::Length(1),
+                Constraint::Length(2),
+                Constraint::Percentage(100),
+            ])
+            .column_spacing(1)
+            .block(
+                Block::default()
+                    .title("Devices")
+                    .borders(Borders::default()),
+            );
+        frame.render_stateful_widget(table, frame.size(), &mut app.state);
+
+        return;
     } else if cli.path.is_none() {
         let mut cmd = Cli::command();
         cmd.error(
@@ -71,6 +151,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .exit();
     }
+}
+
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: DeviceList) -> io::Result<()> {
+    loop {
+        terminal.draw(|f| ui(f, &mut app))?;
+        if event::poll(std::time::Duration::from_millis(50))? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == event::KeyEventKind::Press {
+                    match key.code {
+                        KeyCode::Char('q') => return Ok(()),
+                        KeyCode::Down => app.next(),
+                        KeyCode::Up => app.previous(),
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    //let cli = Cli::parse();
+    //if cli.list {
+    //    let host = audio::create_host("wasapi");
+    //    let devices = host.get_devices()?;
+    //    let mut index = 0;
+    //    for dev in devices {
+    //        println!(
+    //            "{} [{}]: {}",
+    //            if dev.is_default() { "->" } else { "  " },
+    //            index,
+    //            dev.name()
+    //        );
+    //        index = index + 1;
+    //    }
+    //    return Ok(());
+    //} else if cli.path.is_none() {
+    //    let mut cmd = Cli::command();
+    //    cmd.error(
+    //        ErrorKind::MissingRequiredArgument,
+    //        "File or directory must be specified",
+    //    )
+    //    .exit();
+    //}
 
     //let host = audio::create_host("wasapi");
     //let mut player = Player::new(host, cli.device)?;
@@ -91,15 +216,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     backend.execute(SetTitle("rhap - Rust Handcrafted Audio Player"))?;
 
     let mut terminal = Terminal::new(backend)?;
-    let mut should_quit = false;
-    while !should_quit {
-        terminal.draw(ui)?;
-        should_quit = handle_events()?;
-    }
-    
+    let d = DeviceList::new();
+    run_app(&mut terminal, d)?;
+
     disable_raw_mode()?;
-    //let mut out = stdout();
-    //execute!(out, LeaveAlternateScreen, DisableMouseCapture)?;
+    let mut out = stdout();
+    execute!(out, LeaveAlternateScreen, DisableMouseCapture)?;
 
     //let path = cli.path.expect("Error: A file or a path is expected");
     //if path.is_dir() {
