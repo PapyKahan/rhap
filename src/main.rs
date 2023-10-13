@@ -7,7 +7,7 @@ use crossterm::terminal::{
 use crossterm::{execute, ExecutableCommand};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use ratatui::prelude::{Backend, Constraint};
+use ratatui::prelude::{Backend, Constraint, Rect, Layout, Direction};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, Cell, List, ListItem, Paragraph, Row, Table, TableState};
 use ratatui::{Frame, Terminal};
@@ -93,11 +93,8 @@ impl<'devicelist> DeviceList<'devicelist> {
         };
         self.state.select(Some(i));
     }
-}
 
-fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut DeviceList) {
-    let cli = Cli::parse();
-    if cli.list {
+    fn ui(&self) -> Table {
         let host = audio::create_host("wasapi");
         let devices = match host.get_devices() {
             Ok(devices) => devices,
@@ -120,7 +117,7 @@ fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut DeviceList) {
             items.push(row);
             index = index + 1;
         }
-        let table = Table::new(items)
+        Table::new(items)
             .style(Style::default().fg(Color::White))
             .header(
                 Row::new(vec![" ", "Id", "Device"])
@@ -139,23 +136,36 @@ fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut DeviceList) {
                 Block::default()
                     .title("Devices")
                     .borders(Borders::default()),
-            );
-        frame.render_stateful_widget(table, frame.size(), &mut app.state);
-
-        return;
-    } else if cli.path.is_none() {
-        let mut cmd = Cli::command();
-        cmd.error(
-            ErrorKind::MissingRequiredArgument,
-            "File or directory must be specified",
-        )
-        .exit();
+            )
     }
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: DeviceList) -> io::Result<()> {
+/// helper function to create a centered rect using up certain percentage of the available rect `r`
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(r);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(popup_layout[1])[1]
+}
+
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut DeviceList) -> io::Result<()> {
     loop {
-        terminal.draw(|f| ui(f, &mut app))?;
+        terminal.draw(|f| {
+            f.render_stateful_widget(app.ui(), f.size(), &mut app.state.clone());
+        })?;
         if event::poll(std::time::Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == event::KeyEventKind::Press {
@@ -173,40 +183,40 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: DeviceList) -> io::R
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    //let cli = Cli::parse();
-    //if cli.list {
-    //    let host = audio::create_host("wasapi");
-    //    let devices = host.get_devices()?;
-    //    let mut index = 0;
-    //    for dev in devices {
-    //        println!(
-    //            "{} [{}]: {}",
-    //            if dev.is_default() { "->" } else { "  " },
-    //            index,
-    //            dev.name()
-    //        );
-    //        index = index + 1;
-    //    }
-    //    return Ok(());
-    //} else if cli.path.is_none() {
-    //    let mut cmd = Cli::command();
-    //    cmd.error(
-    //        ErrorKind::MissingRequiredArgument,
-    //        "File or directory must be specified",
-    //    )
-    //    .exit();
-    //}
+    let cli = Cli::parse();
+    if cli.list {
+        let host = audio::create_host("wasapi");
+        let devices = host.get_devices()?;
+        let mut index = 0;
+        for dev in devices {
+            println!(
+                "{} [{}]: {}",
+                if dev.is_default() { "->" } else { "  " },
+                index,
+                dev.name()
+            );
+            index = index + 1;
+        }
+        return Ok(());
+    } else if cli.path.is_none() {
+        let mut cmd = Cli::command();
+        cmd.error(
+            ErrorKind::MissingRequiredArgument,
+            "File or directory must be specified",
+        )
+        .exit();
+    }
 
     //let host = audio::create_host("wasapi");
     //let mut player = Player::new(host, cli.device)?;
     //let cl = player.clone();
-    //tokio::spawn(async move {
-    //    tokio::signal::ctrl_c()
-    //        .await
-    //        .expect("failed to listen for CTRL+C signal");
-    //    cl.stop();
-    //    std::process::exit(0);
-    //});
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to listen for CTRL+C signal");
+        //cl.stop();
+        std::process::exit(0);
+    });
 
     let mut out = stdout();
     execute!(out, EnterAlternateScreen, EnableMouseCapture)?;
@@ -216,8 +226,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     backend.execute(SetTitle("rhap - Rust Handcrafted Audio Player"))?;
 
     let mut terminal = Terminal::new(backend)?;
-    let d = DeviceList::new();
-    run_app(&mut terminal, d)?;
+    let mut d = DeviceList::new();
+    run_app(&mut terminal, &mut d)?;
 
     disable_raw_mode()?;
     let mut out = stdout();
