@@ -1,3 +1,5 @@
+use anyhow::{anyhow, Result};
+use audio::Device;
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
@@ -7,9 +9,11 @@ use crossterm::terminal::{
 use crossterm::{execute, ExecutableCommand};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use ratatui::prelude::{Backend, Constraint, Rect, Layout, Direction};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::widgets::{Block, Borders, Cell, List, ListItem, Paragraph, Row, Table, TableState};
+use ratatui::prelude::{Alignment, Backend, Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::widgets::{
+    Block, Borders, Cell, Clear, List, ListItem, Paragraph, Row, Table, TableState, Wrap,
+};
 use ratatui::{Frame, Terminal};
 use std::io::{self, stdout};
 use std::path::PathBuf;
@@ -32,6 +36,8 @@ struct Cli {
 }
 
 struct DeviceList<'devicelist> {
+    show_popup: bool,
+    selected: Device,
     state: TableState,
     devices: Vec<Row<'devicelist>>,
 }
@@ -48,8 +54,12 @@ impl<'devicelist> DeviceList<'devicelist> {
         };
         let mut index = 0;
         let mut items = Vec::new();
-
+        let mut state = TableState::default();
+        state.select(Some(0));
         for dev in devices {
+            if dev.is_default() {
+                state.select(Some(index));
+            }
             let row = Row::new(vec![
                 Cell::from(if dev.is_default() { "*" } else { "  " }),
                 Cell::from(index.to_string()),
@@ -61,82 +71,98 @@ impl<'devicelist> DeviceList<'devicelist> {
             index = index + 1;
         }
         DeviceList {
-            state: TableState::default(),
+            show_popup: false,
+            state,
+            selected: Device::None,
             devices: items,
         }
     }
 
+    fn set_selected_device(&mut self) -> Result<()> {
+        if self.show_popup {
+            let host = audio::create_host("wasapi");
+            let devices = host.get_devices().map_err(|err| anyhow!(err.to_string()))?;
+            self.selected = match self.state.selected() {
+                Some(i) => devices[i].clone(),
+                None => Device::None,
+            };
+        }
+        Ok(())
+    }
+
     fn next(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i >= self.devices.len() - 1 {
-                    0
-                } else {
-                    i + 1
+        if self.show_popup {
+            let i = match self.state.selected() {
+                Some(i) => {
+                    if i >= self.devices.len() - 1 {
+                        0
+                    } else {
+                        i + 1
+                    }
                 }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
+                None => 0,
+            };
+            self.state.select(Some(i));
+        }
     }
 
     fn previous(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.devices.len() - 1
-                } else {
-                    i - 1
+        if self.show_popup {
+            let i = match self.state.selected() {
+                Some(i) => {
+                    if i == 0 {
+                        self.devices.len() - 1
+                    } else {
+                        i - 1
+                    }
                 }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
+                None => 0,
+            };
+            self.state.select(Some(i));
+        }
     }
 
-    fn ui(&self) -> Table {
+    fn ui(&self) -> Result<Table> {
+        let color = Color::Rgb(255, 191, 0);
+
         let host = audio::create_host("wasapi");
-        let devices = match host.get_devices() {
-            Ok(devices) => devices,
-            Err(err) => {
-                let mut cmd = Cli::command();
-                cmd.error(ErrorKind::InvalidValue, err).exit();
-            }
-        };
+        let devices = host.get_devices().map_err(|err| anyhow!(err.to_string()))?;
         let mut index = 0;
         let mut items = Vec::new();
 
+        let selected_device = match self.selected {
+            Device::None => host.get_default_device().map_err(|err| anyhow!(err.to_string()))?,
+            _ => self.selected.clone()
+        };
+
         for dev in devices {
+            let is_selected = dev.name() == selected_device.name();
             let row = Row::new(vec![
-                Cell::from(if dev.is_default() { "*" } else { "  " }),
-                Cell::from(index.to_string()),
+                Cell::from(if is_selected { "󰓃" } else { "  " }),
                 Cell::from(dev.name()),
             ])
             .height(1)
-            .style(Style::default().fg(Color::White));
+            .style(Style::default().bg(if index % 2 == 0 { Color::Rgb(80, 80, 80) } else { Color::Rgb(50, 50, 50) }));
             items.push(row);
             index = index + 1;
         }
-        Table::new(items)
-            .style(Style::default().fg(Color::White))
-            .header(
-                Row::new(vec![" ", "Id", "Device"])
-                    .style(Style::default().fg(Color::White))
-                    .height(1),
-            )
+
+        let table = Table::new(items)
             .highlight_symbol("=>")
-            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+            .highlight_style(Style::default().fg(color))
             .widths(&[
                 Constraint::Length(1),
-                Constraint::Length(2),
                 Constraint::Percentage(100),
             ])
-            .column_spacing(1)
             .block(
                 Block::default()
-                    .title("Devices")
-                    .borders(Borders::default()),
-            )
+                    .title("Select Output Device")
+                    .title_alignment(Alignment::Center)
+                    .borders(Borders::ALL)
+                    .border_type(ratatui::widgets::BorderType::Rounded)
+                    .border_style(Style::default().fg(color)),
+            );
+        Ok(table)
     }
 }
 
@@ -161,16 +187,36 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
         .split(popup_layout[1])[1]
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut DeviceList) -> io::Result<()> {
+fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut DeviceList) -> Result<()> {
+    let size = frame.size();
+
+    let block = Block::default().title("Content").borders(Borders::ALL);
+    frame.render_widget(block, size);
+
+    if app.show_popup {
+        let area = centered_rect(20, 10, size);
+        frame.render_widget(Clear, area); //this clears out the background
+        frame.render_stateful_widget(app.ui()?, area, &mut app.state.clone());
+    }
+    Ok(())
+}
+
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut DeviceList) -> Result<()> {
     loop {
-        terminal.draw(|f| {
-            f.render_stateful_widget(app.ui(), f.size(), &mut app.state.clone());
+        terminal.draw(|f| match ui(f, app) {
+            Ok(ok) => ok,
+            Err(err) => {
+                println!("error while drawing {}", err.to_string());
+                ()
+            }
         })?;
         if event::poll(std::time::Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == event::KeyEventKind::Press {
                     match key.code {
                         KeyCode::Char('q') => return Ok(()),
+                        KeyCode::Enter => app.set_selected_device()?,
+                        KeyCode::Char('p') => app.show_popup = !app.show_popup,
                         KeyCode::Down => app.next(),
                         KeyCode::Up => app.previous(),
                         _ => {}

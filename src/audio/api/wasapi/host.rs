@@ -36,4 +36,9 @@ impl HostTrait for Host {
         }
         Ok(enumerated_devices)
     }
+
+    fn get_default_device(&self)  -> Result<crate::audio::Device, Box<dyn std::error::Error>> {
+        let device = get_default_device(&Direction::Render)?;
+        Ok(crate::audio::Device::Wasapi(Device::new(device, true)))
+    }
 }

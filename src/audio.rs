@@ -70,6 +70,7 @@ pub trait DeviceTrait: Send + Sync {
 
 #[derive(Clone)]
 pub enum Device {
+    None,
     Wasapi(api::wasapi::device::Device),
 }
 
@@ -99,6 +100,7 @@ impl DeviceTrait for Device {
     fn is_default(&self) -> bool {
         let device = match self {
             Self::Wasapi(device) => device,
+            Self::None => return false,
         };
         device.is_default()
     }
@@ -106,6 +108,7 @@ impl DeviceTrait for Device {
     fn name(&self) -> String {
         let device = match self {
             Self::Wasapi(device) => device,
+            Self::None => return String::from("none"),
         };
         device.name()
     }
@@ -113,6 +116,7 @@ impl DeviceTrait for Device {
     fn stream(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>> {
         let device = match self {
             Self::Wasapi(device) => device,
+            Self::None => return Ok(()),
         };
         device.stream(context)
     }
@@ -120,6 +124,7 @@ impl DeviceTrait for Device {
     fn is_playing(&self) -> bool {
         let device = match self {
             Self::Wasapi(device) => device,
+            Self::None => return false,
         };
         device.is_playing()
     }
@@ -127,6 +132,7 @@ impl DeviceTrait for Device {
     fn set_status(&self, status: PlaybackCommand) {
         let device = match self {
             Self::Wasapi(device) => device,
+            Self::None => return,
         };
         device.set_status(status)
     }
@@ -134,6 +140,7 @@ impl DeviceTrait for Device {
     fn get_status(&self) -> PlaybackCommand {
         let device = match self {
             Self::Wasapi(device) => device,
+            Self::None => return PlaybackCommand::Stop,
         };
         device.get_status()
     }
@@ -141,6 +148,7 @@ impl DeviceTrait for Device {
     fn stop(&self) {
         let device = match self {
             Self::Wasapi(device) => device,
+            Self::None => return,
         };
         device.stop()
     }
@@ -149,6 +157,7 @@ impl DeviceTrait for Device {
 pub trait HostTrait: Send + Sync {
     fn create_device(&self, id: Option<u32>) -> Result<Device, Box<dyn std::error::Error>>;
     fn get_devices(&self) -> Result<Vec<Device>, Box<dyn std::error::Error>>;
+    fn get_default_device(&self) -> Result<Device, Box<dyn std::error::Error>>;
 }
 
 #[derive(Clone, Copy)]
@@ -166,6 +175,12 @@ impl HostTrait for Host {
     fn create_device(&self, id: Option<u32>) -> Result<Device, Box<dyn std::error::Error>> {
         match self {
             Self::Wasapi(host) => host.create_device(id),
+        }
+    }
+
+    fn get_default_device(&self) -> Result<Device, Box<dyn std::error::Error>> {
+        match self {
+            Self::Wasapi(host) => host.get_default_device(),
         }
     }
 }
