@@ -1,1 +1,3 @@
-pub mod device_selector;
+mod device_selector;
+
+pub(crate) use device_selector::DeviceSelector;

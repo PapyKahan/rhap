@@ -1,4 +1,4 @@
-pub mod api;
+pub(crate) mod api;
 
 use std::{sync::{Arc, Mutex}, collections::VecDeque};
 use anyhow::Result;

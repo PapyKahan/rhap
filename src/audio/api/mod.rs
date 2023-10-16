@@ -1,1 +1,1 @@
-pub mod wasapi;
+pub(crate) mod wasapi;

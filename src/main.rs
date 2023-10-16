@@ -14,7 +14,7 @@ use ratatui::widgets::{
     Block, Borders, Clear
 };
 use ratatui::{Frame, Terminal};
-use ui::widgets::device_selector::DeviceSelector;
+use ui::widgets::DeviceSelector;
 use std::io::{self, stdout};
 use std::path::PathBuf;
 use walkdir::WalkDir;
