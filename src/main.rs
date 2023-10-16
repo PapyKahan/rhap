@@ -2,7 +2,7 @@ use anyhow::Result;
 use audio::{Device, Host};
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
-use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
+use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetTitle,
 };
@@ -10,13 +10,11 @@ use crossterm::{execute, ExecutableCommand};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use ratatui::prelude::{Backend, Constraint, Direction, Layout, Rect};
-use ratatui::widgets::{
-    Block, Borders, Clear
-};
+use ratatui::widgets::{Block, Borders, Clear};
 use ratatui::{Frame, Terminal};
-use ui::widgets::DeviceSelector;
 use std::io::{self, stdout};
 use std::path::PathBuf;
+use ui::widgets::DeviceSelector;
 use walkdir::WalkDir;
 
 mod audio;
@@ -35,7 +33,6 @@ struct Cli {
     #[clap(short, long)]
     device: Option<u32>,
 }
-
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
@@ -58,23 +55,9 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
         .split(popup_layout[1])[1]
 }
 
-fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut DeviceSelector) -> Result<()> {
-    let size = frame.size();
-
-    let block = Block::default().title("Content").borders(Borders::ALL);
-    frame.render_widget(block, size);
-
-    if app.show_popup {
-        let area = centered_rect(20, 10, size);
-        frame.render_widget(Clear, area); //this clears out the background
-        frame.render_stateful_widget(app.ui()?, area, &mut app.state.clone());
-    }
-    Ok(())
-}
-
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut DeviceSelector) -> Result<()> {
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
     loop {
-        terminal.draw(|f| match ui(f, app) {
+        terminal.draw(|f| match app.ui(f) {
             Ok(ok) => ok,
             Err(err) => {
                 println!("error while drawing {}", err.to_string());
@@ -83,13 +66,23 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut DeviceSelector) -> 
         })?;
         if event::poll(std::time::Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
+                let last = app.screens.last();
+                if last.is_some() {
+                    let last = last.unwrap();
+                    match last {
+                        Screens::OutputSelector(selector) => {
+                            selector.event_hanlder(key);
+                            continue;
+                        }
+                        Screens::None => (),
+                    }
+                }
                 if key.kind == event::KeyEventKind::Press {
                     match key.code {
                         KeyCode::Char('q') => return Ok(()),
-                        KeyCode::Enter => app.set_selected_device()?,
-                        KeyCode::Char('p') => app.show_popup = !app.show_popup,
-                        KeyCode::Down => app.next(),
-                        KeyCode::Up => app.previous(),
+                        KeyCode::Char('p') => app
+                            .screens
+                            .push(Screens::OutputSelector(DeviceSelector::new(app.host)?)),
                         _ => {}
                     }
                 }
@@ -98,15 +91,44 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut DeviceSelector) -> 
     }
 }
 
-pub struct App<'app> {
-    screens: Vec<Block<'app>>
+enum Screens {
+    None,
+    OutputSelector(DeviceSelector),
 }
 
-impl<'app> App<'app>{
-    fn new() -> Self {
-        Self{
-            screens: vec!()
-        }
+struct App {
+    pub host: Host,
+    screens: Vec<Screens>,
+}
+
+impl App {
+    fn new(host: Host) -> Result<Self> {
+        Ok(Self {
+            host,
+            screens: vec![],
+        })
+    }
+
+    fn ui<B: Backend>(&mut self, frame: &mut Frame<B>) -> Result<()> {
+        let size = frame.size();
+
+        let block = Block::default().title("Content").borders(Borders::ALL);
+        frame.render_widget(block, size);
+
+        let last = self.screens.last();
+        if last.is_some() {
+            let last = last.unwrap();
+            let area = centered_rect(20, 10, size);
+            match last {
+                Screens::OutputSelector(selector) => {
+                    frame.render_widget(Clear, area); //this clears out the background
+                    frame.render_stateful_widget(selector.ui()?, area, &mut selector.state.clone());
+                }
+                Screens::None => (),
+            }
+        };
+
+        Ok(())
     }
 }
 
@@ -155,11 +177,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     backend.execute(SetTitle("rhap - Rust Handcrafted Audio Player"))?;
 
     let mut terminal = Terminal::new(backend)?;
-    let app = App::new();
     let host = Host::new("wasapi");
-    //app.screens.push()
-    let mut d = DeviceSelector::new(host)?;
-    run_app(&mut terminal, &mut d)?;
+    let mut app = App::new(host)?;
+    run_app(&mut terminal, &mut app)?;
 
     disable_raw_mode()?;
     let mut out = stdout();

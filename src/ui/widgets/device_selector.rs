@@ -1,5 +1,6 @@
 use crate::audio::{Device, DeviceTrait, Host, HostTrait};
 use anyhow::{anyhow, Result};
+use crossterm::event::{Event, KeyEvent, KeyEventKind, KeyCode};
 use ratatui::{
     prelude::{Alignment, Constraint},
     style::{Color, Style},
@@ -116,5 +117,17 @@ impl<'deviceselector> DeviceSelector {
                     .border_style(Style::default().fg(color)),
             );
         Ok(table)
+    }
+
+    pub fn event_hanlder(&mut self, key: KeyEvent) -> Result<()> {
+        if key.kind == KeyEventKind::Press {
+            match key.code {
+                KeyCode::Up => self.previous(),
+                KeyCode::Down => self.next(),
+                KeyCode::Enter => self.set_selected_device()?,
+                _ => ()
+            }
+        }
+        Ok(())
     }
 }
