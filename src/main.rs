@@ -1,5 +1,5 @@
 use anyhow::Result;
-use audio::Device;
+use audio::{Device, Host};
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
@@ -98,11 +98,23 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut DeviceSelector) -> 
     }
 }
 
+pub struct App<'app> {
+    screens: Vec<Block<'app>>
+}
+
+impl<'app> App<'app>{
+    fn new() -> Self {
+        Self{
+            screens: vec!()
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     if cli.list {
-        let host = audio::create_host("wasapi");
+        let host = Host::new("wasapi");
         let devices = host.get_devices()?;
         let mut index = 0;
         for dev in devices {
@@ -143,7 +155,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     backend.execute(SetTitle("rhap - Rust Handcrafted Audio Player"))?;
 
     let mut terminal = Terminal::new(backend)?;
-    let mut d = DeviceSelector::new()?;
+    let app = App::new();
+    let host = Host::new("wasapi");
+    //app.screens.push()
+    let mut d = DeviceSelector::new(host)?;
     run_app(&mut terminal, &mut d)?;
 
     disable_raw_mode()?;

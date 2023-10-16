@@ -185,9 +185,11 @@ impl HostTrait for Host {
     }
 }
 
-pub(crate) fn create_host(host_name: &str) -> Host {
-    match host_name {
-        "wasapi" => Host::Wasapi(api::wasapi::host::Host::new()),
-        _ => Host::Wasapi(api::wasapi::host::Host::new()),
+impl Host {
+    pub(crate) fn new(name: &str) -> Self {
+        match name {
+            "wasapi" => Host::Wasapi(api::wasapi::host::Host::new()),
+            _ => Host::Wasapi(api::wasapi::host::Host::new()),
+        }
     }
 }
