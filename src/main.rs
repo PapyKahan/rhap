@@ -2,7 +2,9 @@ use anyhow::Result;
 use audio::{Device, Host};
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
-use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind};
+use crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind,
+};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetTitle,
 };
@@ -57,34 +59,39 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
     loop {
-        terminal.draw(|f| match app.ui(f) {
+        terminal.draw(|frame| match app.ui(frame) {
             Ok(ok) => ok,
             Err(err) => {
                 println!("error while drawing {}", err.to_string());
                 ()
             }
         })?;
-        if event::poll(std::time::Duration::from_millis(50))? {
+
+        if event::poll(std::time::Duration::from_millis(200))? {
             if let Event::Key(key) = event::read()? {
-                let last = app.screens.last();
-                if last.is_some() {
-                    let last = last.unwrap();
-                    match last {
-                        Screens::OutputSelector(selector) => {
-                            selector.event_hanlder(key);
-                            continue;
+                let screen = app.screens.pop().unwrap_or(Screens::None);
+                match screen {
+                    Screens::OutputSelector(mut selector) => {
+                        selector.event_hanlder(key)?;
+                        if key.kind == event::KeyEventKind::Press {
+                            match key.code {
+                                KeyCode::Char('q') => continue,
+                                _ => {}
+                            }
                         }
-                        Screens::None => (),
-                    }
-                }
-                if key.kind == event::KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') => return Ok(()),
-                        KeyCode::Char('p') => app
-                            .screens
-                            .push(Screens::OutputSelector(DeviceSelector::new(app.host)?)),
-                        _ => {}
-                    }
+                        app.screens.push(Screens::OutputSelector(selector));
+                    },
+                    Screens::None => {
+                        if key.kind == event::KeyEventKind::Press {
+                            match key.code {
+                                KeyCode::Char('q') => return Ok(()),
+                                KeyCode::Char('p') => {
+                                    app.screens.push(Screens::OutputSelector(DeviceSelector::new(app.host)?));
+                                }
+                                _ => {}
+                            }
+                        }
+                    },
                 }
             }
         }
@@ -115,19 +122,15 @@ impl App {
         let block = Block::default().title("Content").borders(Borders::ALL);
         frame.render_widget(block, size);
 
-        let last = self.screens.last();
-        if last.is_some() {
-            let last = last.unwrap();
-            let area = centered_rect(20, 10, size);
-            match last {
-                Screens::OutputSelector(selector) => {
-                    frame.render_widget(Clear, area); //this clears out the background
-                    frame.render_stateful_widget(selector.ui()?, area, &mut selector.state.clone());
-                }
-                Screens::None => (),
+        let screen = self.screens.pop().unwrap_or(Screens::None);
+        match screen {
+            Screens::OutputSelector(mut selector) => {
+                let area = centered_rect(20, 10, size);
+                selector.render(frame, area)?;
+                self.screens.push(Screens::OutputSelector(selector));
             }
-        };
-
+            Screens::None => (),
+        }
         Ok(())
     }
 }

@@ -1,21 +1,21 @@
 use crate::audio::{Device, DeviceTrait, Host, HostTrait};
 use anyhow::{anyhow, Result};
-use crossterm::event::{Event, KeyEvent, KeyEventKind, KeyCode};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
-    prelude::{Alignment, Constraint},
+    prelude::{Alignment, Backend, Constraint, Rect},
     style::{Color, Style},
-    widgets::{Block, Borders, Cell, Row, Table, TableState},
+    widgets::{Block, Borders, Cell, Row, Table, TableState, Clear},
+    Frame,
 };
 
 pub struct DeviceSelector {
-    pub show_popup: bool,
     pub state: TableState,
     selected: Device,
     default: Device,
     devices: Vec<Device>,
 }
 
-impl<'deviceselector> DeviceSelector {
+impl DeviceSelector {
     pub fn new(host: Host) -> Result<DeviceSelector> {
         let devices = host.get_devices().map_err(|err| anyhow!(err.to_string()))?;
         let default = host
@@ -25,7 +25,6 @@ impl<'deviceselector> DeviceSelector {
         state.select(Some(0));
 
         Ok(DeviceSelector {
-            show_popup: false,
             state,
             selected: Device::None,
             default,
@@ -34,54 +33,60 @@ impl<'deviceselector> DeviceSelector {
     }
 
     pub fn set_selected_device(&mut self) -> Result<()> {
-        if self.show_popup {
-            self.selected = match self.state.selected() {
-                Some(i) => {
-                    if i < self.devices.len() - 1 {
-                        self.devices[i].clone()
-                    } else {
-                        self.default.clone()
-                    }
+        self.selected = match self.state.selected() {
+            Some(i) => {
+                if i < self.devices.len() - 1 {
+                    self.devices[i].clone()
+                } else {
+                    self.default.clone()
                 }
-                None => Device::None,
-            };
-        }
+            }
+            None => Device::None,
+        };
         Ok(())
     }
 
     pub fn next(&mut self) {
-        if self.show_popup {
-            let i = match self.state.selected() {
-                Some(i) => {
-                    if i >= self.devices.len() - 1 {
-                        0
-                    } else {
-                        i + 1
-                    }
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i >= self.devices.len() - 1 {
+                    0
+                } else {
+                    i + 1
                 }
-                None => 0,
-            };
-            self.state.select(Some(i));
-        }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
     }
 
     pub fn previous(&mut self) {
-        if self.show_popup {
-            let i = match self.state.selected() {
-                Some(i) => {
-                    if i == 0 {
-                        self.devices.len() - 1
-                    } else {
-                        i - 1
-                    }
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.devices.len() - 1
+                } else {
+                    i - 1
                 }
-                None => 0,
-            };
-            self.state.select(Some(i));
-        }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
     }
 
-    pub fn ui(&self) -> Result<Table> {
+    pub fn event_hanlder(&mut self, key: KeyEvent) -> Result<()> {
+        if key.kind == KeyEventKind::Press {
+            match key.code {
+                KeyCode::Up => self.previous(),
+                KeyCode::Down => self.next(),
+                KeyCode::Enter => self.set_selected_device()?,
+                _ => (),
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn render<B: Backend>(&mut self, frame: &mut Frame<B>, area: Rect) -> Result<()> {
         let color = Color::Rgb(255, 191, 0);
         let selected_device = match self.selected {
             Device::None => &self.default,
@@ -116,18 +121,9 @@ impl<'deviceselector> DeviceSelector {
                     .border_type(ratatui::widgets::BorderType::Rounded)
                     .border_style(Style::default().fg(color)),
             );
-        Ok(table)
-    }
 
-    pub fn event_hanlder(&mut self, key: KeyEvent) -> Result<()> {
-        if key.kind == KeyEventKind::Press {
-            match key.code {
-                KeyCode::Up => self.previous(),
-                KeyCode::Down => self.next(),
-                KeyCode::Enter => self.set_selected_device()?,
-                _ => ()
-            }
-        }
+        frame.render_widget(Clear, area);
+        frame.render_stateful_widget(table, area, &mut self.state);
         Ok(())
     }
 }
