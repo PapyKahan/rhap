@@ -14,6 +14,7 @@ use rand::thread_rng;
 use ratatui::prelude::{Backend, Constraint, Direction, Layout, Rect};
 use ratatui::widgets::{Block, Borders, Clear};
 use ratatui::{Frame, Terminal};
+use ui::{App, Screens};
 use std::io::{self, stdout};
 use std::path::PathBuf;
 use ui::widgets::DeviceSelector;
@@ -36,26 +37,6 @@ struct Cli {
     device: Option<u32>,
 }
 
-/// helper function to create a centered rect using up certain percentage of the available rect `r`
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
-        ])
-        .split(r);
-
-    Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
-        ])
-        .split(popup_layout[1])[1]
-}
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
     loop {
@@ -95,43 +76,6 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> 
                 }
             }
         }
-    }
-}
-
-enum Screens {
-    None,
-    OutputSelector(DeviceSelector),
-}
-
-struct App {
-    pub host: Host,
-    screens: Vec<Screens>,
-}
-
-impl App {
-    fn new(host: Host) -> Result<Self> {
-        Ok(Self {
-            host,
-            screens: vec![],
-        })
-    }
-
-    fn ui<B: Backend>(&mut self, frame: &mut Frame<B>) -> Result<()> {
-        let size = frame.size();
-
-        let block = Block::default().title("Content").borders(Borders::ALL);
-        frame.render_widget(block, size);
-
-        let screen = self.screens.pop().unwrap_or(Screens::None);
-        match screen {
-            Screens::OutputSelector(mut selector) => {
-                let area = centered_rect(20, 10, size);
-                selector.render(frame, area)?;
-                self.screens.push(Screens::OutputSelector(selector));
-            }
-            Screens::None => (),
-        }
-        Ok(())
     }
 }
 
