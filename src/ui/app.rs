@@ -1,4 +1,5 @@
-use std::{collections::HashSet, cell::RefCell};
+use std::{cell::RefCell, rc::Rc};
+
 use super::widgets::DeviceSelector;
 use crate::audio::Host;
 use anyhow::Result;
@@ -11,21 +12,19 @@ use ratatui::{
 
 pub enum Screens {
     None,
-    OutputSelector(DeviceSelector),
+    OutputSelector(Rc<RefCell<DeviceSelector>>),
 }
 
 pub struct App {
-    host: Host,
     layers: Vec<Screens>,
-    screens: RefCell<HashSet<Screens>>,
+    output_selector: Rc<RefCell<DeviceSelector>>,
 }
 
 impl App {
     pub fn new(host: Host) -> Result<Self> {
         Ok(Self {
-            host,
             layers: vec![],
-            screens: RefCell::new(HashSet::new())
+            output_selector: Rc::new(RefCell::new(DeviceSelector::new(host)?)),
         })
     }
 
@@ -35,12 +34,11 @@ impl App {
         let block = Block::default().title("Content").borders(Borders::ALL);
         frame.render_widget(block, size);
 
-        let layer = self.layers.pop().unwrap_or(Screens::None);
+        let layer = self.layers.last().unwrap_or(&Screens::None);
         match layer {
-            Screens::OutputSelector(mut selector) => {
+            Screens::OutputSelector(selector) => {
                 let area = Self::centered_rect(20, 10, size);
-                selector.render(frame, area)?;
-                self.layers.push(Screens::OutputSelector(selector));
+                (*selector).borrow_mut().render(frame, area)?;
             }
             Screens::None => (),
         }
@@ -78,29 +76,29 @@ impl App {
                 }
             })?;
 
-            if event::poll(std::time::Duration::from_millis(200))? {
+            if event::poll(std::time::Duration::from_millis(50))? {
                 if let Event::Key(key) = event::read()? {
-                    let screen = self.layers.pop().unwrap_or(Screens::None);
+                    let screen = self.layers.last().unwrap_or(&Screens::None);
                     match screen {
-                        Screens::OutputSelector(mut selector) => {
-                            selector.event_hanlder(key)?;
+                        Screens::OutputSelector(selector) => {
+                            selector.borrow_mut().event_hanlder(key)?;
                             if key.kind == event::KeyEventKind::Press {
                                 match key.code {
-                                    KeyCode::Char('q') => continue,
+                                    KeyCode::Char('q') => {
+                                        self.layers.pop();
+                                    }
                                     _ => {}
                                 }
                             }
-                            self.layers.push(Screens::OutputSelector(selector));
                         }
                         Screens::None => {
                             if key.kind == event::KeyEventKind::Press {
                                 match key.code {
                                     KeyCode::Char('q') => return Ok(()),
                                     KeyCode::Char('p') => {
-                                        let output_selector = Screens::OutputSelector(
-                                            DeviceSelector::new(self.host)?,
-                                        );
-                                        self.layers.push(output_selector);
+                                        self.layers.push(Screens::OutputSelector(
+                                            self.output_selector.clone(),
+                                        ));
                                     }
                                     _ => {}
                                 }
