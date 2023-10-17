@@ -119,6 +119,7 @@ impl App {
                                 match key.code {
                                     KeyCode::Char('q') => return Ok(()),
                                     KeyCode::Char('p') => {
+                                        self.output_selector.borrow_mut().refresh_device_list()?;
                                         self.layers.push(Screens::OutputSelector(
                                             self.output_selector.clone(),
                                         ));

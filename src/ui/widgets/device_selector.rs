@@ -3,13 +3,16 @@ use anyhow::{anyhow, Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     prelude::{Alignment, Backend, Constraint, Rect},
-    style::{Color, Style},
-    widgets::{Block, Borders, Cell, Row, Table, TableState, Clear},
+    style::Style,
+    widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
     Frame,
 };
 
+use super::{HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_COLOR};
+
 pub struct DeviceSelector {
-    pub state: TableState,
+    state: TableState,
+    host: Host,
     selected: Device,
     default: Device,
     devices: Vec<Device>,
@@ -17,19 +20,34 @@ pub struct DeviceSelector {
 
 impl DeviceSelector {
     pub fn new(host: Host) -> Result<DeviceSelector> {
-        let devices = host.get_devices().map_err(|err| anyhow!(err.to_string()))?;
-        let default = host
-            .get_default_device()
-            .map_err(|err| anyhow!(err.to_string()))?;
         let mut state = TableState::default();
         state.select(Some(0));
 
         Ok(DeviceSelector {
             state,
+            host,
             selected: Device::None,
-            default,
-            devices,
+            default: Device::None,
+            devices: Vec::new(),
         })
+    }
+
+    pub fn refresh_device_list(&mut self) -> Result<()> {
+        self.devices = self
+            .host
+            .get_devices()
+            .map_err(|err| anyhow!(err.to_string()))?;
+        self.default = self
+            .host
+            .get_default_device()
+            .map_err(|err| anyhow!(err.to_string()))?;
+        self.state.select(Some(0));
+
+        if !self.devices.iter().any(|item| item.name() == self.selected.name()) {
+            self.selected = Device::None; 
+        }
+
+        Ok(())
     }
 
     pub fn set_selected_device(&mut self) -> Result<()> {
@@ -40,7 +58,7 @@ impl DeviceSelector {
                 } else {
                     self.default.clone()
                 }
-            }
+            },
             None => Device::None,
         };
         Ok(())
@@ -54,7 +72,7 @@ impl DeviceSelector {
                 } else {
                     i + 1
                 }
-            }
+            },
             None => 0,
         };
         self.state.select(Some(i));
@@ -68,7 +86,7 @@ impl DeviceSelector {
                 } else {
                     i - 1
                 }
-            }
+            },
             None => 0,
         };
         self.state.select(Some(i));
@@ -87,7 +105,6 @@ impl DeviceSelector {
     }
 
     pub(crate) fn render<B: Backend>(&mut self, frame: &mut Frame<B>, area: Rect) -> Result<()> {
-        let color = Color::Rgb(255, 191, 0);
         let selected_device = match self.selected {
             Device::None => &self.default,
             _ => &self.selected,
@@ -102,16 +119,16 @@ impl DeviceSelector {
             ])
             .height(1)
             .style(Style::default().bg(if items.len() % 2 == 0 {
-                Color::Rgb(80, 80, 80)
+                ROW_COLOR
             } else {
-                Color::Rgb(50, 50, 50)
+                ROW_ALTERNATE_COLOR
             }));
             items.push(row);
         }
 
         let table = Table::new(items)
             .highlight_symbol("=>")
-            .highlight_style(Style::default().fg(color))
+            .highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
             .widths(&[Constraint::Length(1), Constraint::Percentage(100)])
             .block(
                 Block::default()
@@ -119,7 +136,7 @@ impl DeviceSelector {
                     .title_alignment(Alignment::Center)
                     .borders(Borders::ALL)
                     .border_type(ratatui::widgets::BorderType::Rounded)
-                    .border_style(Style::default().fg(color)),
+                    .border_style(Style::default().fg(HIGHLIGHT_COLOR)),
             );
 
         frame.render_widget(Clear, area);
