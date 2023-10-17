@@ -37,7 +37,7 @@ impl App {
         let layer = self.layers.last().unwrap_or(&Screens::None);
         match layer {
             Screens::OutputSelector(selector) => {
-                let area = Self::centered_rect(20, 10, size);
+                let area = Self::centered_fixed_size_rect(40, 6, size);
                 (*selector).borrow_mut().render(frame, area)?;
             }
             Screens::None => (),
@@ -62,6 +62,29 @@ impl App {
                 Constraint::Percentage((100 - percent_x) / 2),
                 Constraint::Percentage(percent_x),
                 Constraint::Percentage((100 - percent_x) / 2),
+            ])
+            .split(popup_layout[1])[1]
+    }
+
+    /// helper function to create a centered rect using up certain percentage of the available rect `r`
+    fn centered_fixed_size_rect(width: u16, height: u16, r: Rect) -> Rect {
+        let col = (r.width - width) / 2;
+        let row = (r.height - height) / 2;
+        let popup_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(row),
+                Constraint::Length(height),
+                Constraint::Length(row),
+            ])
+            .split(r);
+
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(col),
+                Constraint::Length(width),
+                Constraint::Length(col),
             ])
             .split(popup_layout[1])[1]
     }
