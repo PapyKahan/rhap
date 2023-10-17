@@ -1,31 +1,24 @@
 use anyhow::Result;
-use audio::{Device, Host};
+use audio::Host;
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
 use crossterm::event::{
-    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind,
+    DisableMouseCapture, EnableMouseCapture
 };
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetTitle,
 };
 use crossterm::{execute, ExecutableCommand};
-use rand::seq::SliceRandom;
-use rand::thread_rng;
-use ratatui::prelude::{Backend, Constraint, Direction, Layout, Rect};
-use ratatui::widgets::{Block, Borders, Clear};
-use ratatui::{Frame, Terminal};
-use ui::{App, Screens};
-use std::io::{self, stdout};
+use ratatui::Terminal;
+use ui::App;
+use std::io::stdout;
 use std::path::PathBuf;
-use ui::widgets::DeviceSelector;
-use walkdir::WalkDir;
 
 mod audio;
 mod player;
 mod ui;
 
 use crate::audio::{DeviceTrait, HostTrait};
-use crate::player::Player;
 
 #[derive(Parser)]
 struct Cli {
@@ -35,48 +28,6 @@ struct Cli {
     path: Option<PathBuf>,
     #[clap(short, long)]
     device: Option<u32>,
-}
-
-
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
-    loop {
-        terminal.draw(|frame| match app.ui(frame) {
-            Ok(ok) => ok,
-            Err(err) => {
-                println!("error while drawing {}", err.to_string());
-                ()
-            }
-        })?;
-
-        if event::poll(std::time::Duration::from_millis(200))? {
-            if let Event::Key(key) = event::read()? {
-                let screen = app.screens.pop().unwrap_or(Screens::None);
-                match screen {
-                    Screens::OutputSelector(mut selector) => {
-                        selector.event_hanlder(key)?;
-                        if key.kind == event::KeyEventKind::Press {
-                            match key.code {
-                                KeyCode::Char('q') => continue,
-                                _ => {}
-                            }
-                        }
-                        app.screens.push(Screens::OutputSelector(selector));
-                    },
-                    Screens::None => {
-                        if key.kind == event::KeyEventKind::Press {
-                            match key.code {
-                                KeyCode::Char('q') => return Ok(()),
-                                KeyCode::Char('p') => {
-                                    app.screens.push(Screens::OutputSelector(DeviceSelector::new(app.host)?));
-                                }
-                                _ => {}
-                            }
-                        }
-                    },
-                }
-            }
-        }
-    }
 }
 
 #[tokio::main]
@@ -126,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
     let host = Host::new("wasapi");
     let mut app = App::new(host)?;
-    run_app(&mut terminal, &mut app)?;
+    app.run(&mut terminal)?;
 
     disable_raw_mode()?;
     let mut out = stdout();

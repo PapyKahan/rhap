@@ -74,7 +74,7 @@ pub enum Device {
     Wasapi(api::wasapi::device::Device),
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum PlaybackCommand {
     Play,
     Stop,
