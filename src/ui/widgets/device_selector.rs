@@ -53,7 +53,7 @@ impl DeviceSelector {
     pub fn set_selected_device(&mut self) -> Result<()> {
         self.selected = match self.state.selected() {
             Some(i) => {
-                if i < self.devices.len() - 1 {
+                if i < self.devices.len() {
                     self.devices[i].clone()
                 } else {
                     self.default.clone()
