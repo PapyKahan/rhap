@@ -9,6 +9,7 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetTitle,
 };
 use crossterm::{execute, ExecutableCommand};
+use player::Player;
 use ratatui::Terminal;
 use ui::App;
 use std::io::stdout;
@@ -56,14 +57,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .exit();
     }
 
-    //let host = audio::create_host("wasapi");
-    //let mut player = Player::new(host, cli.device)?;
-    //let cl = player.clone();
+    let host = Host::new("wasapi");
+    let player = Player::new(host, cli.device)?;
+    let cl = player.clone();
     tokio::spawn(async move {
         tokio::signal::ctrl_c()
             .await
             .expect("failed to listen for CTRL+C signal");
-        //cl.stop();
+        cl.stop();
         std::process::exit(0);
     });
 
@@ -75,37 +76,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     backend.execute(SetTitle("rhap - Rust Handcrafted Audio Player"))?;
 
     let mut terminal = Terminal::new(backend)?;
-    let host = Host::new("wasapi");
-    let mut app = App::new(host)?;
+    let path = cli.path.expect("Error: A file or a path is expected");
+    let mut app = App::new(host, player, path)?;
     app.run(&mut terminal)?;
 
     disable_raw_mode()?;
     let mut out = stdout();
     execute!(out, LeaveAlternateScreen, DisableMouseCapture)?;
 
-    //let path = cli.path.expect("Error: A file or a path is expected");
-    //if path.is_dir() {
-    //    let mut files = WalkDir::new(path.clone())
-    //        .follow_links(true)
-    //        .into_iter()
-    //        .filter_map(|e| e.ok())
-    //        .filter(|e| {
-    //            e.file_type().is_file()
-    //                && e.file_name()
-    //                    .to_str()
-    //                    .map(|s| s.ends_with(".flac"))
-    //                    .unwrap_or(false)
-    //        })
-    //        .map(|e| e.path().to_str().unwrap().to_string())
-    //        .collect::<Vec<String>>();
-    //    files.shuffle(&mut thread_rng());
-    //    for f in files {
-    //        player.play(f).await?;
-    //    }
-    //} else if path.is_file() {
-    //    player
-    //        .play(path.into_os_string().into_string().unwrap())
-    //        .await?;
-    //}
     Ok(())
 }

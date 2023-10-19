@@ -1,7 +1,5 @@
-use std::{cell::RefCell, rc::Rc};
-
-use super::widgets::DeviceSelector;
-use crate::audio::Host;
+use super::{screens::Playlist, widgets::DeviceSelector};
+use crate::{audio::Host, player::Player};
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
@@ -9,36 +7,41 @@ use ratatui::{
     widgets::{Block, Borders},
     Frame, Terminal,
 };
+use std::{cell::RefCell, rc::Rc, path::PathBuf};
 
 pub enum Screens {
-    None,
     OutputSelector(Rc<RefCell<DeviceSelector>>),
+    Default(Rc<RefCell<Playlist>>),
 }
 
 pub struct App {
     layers: Vec<Screens>,
+    player: Player,
     output_selector: Rc<RefCell<DeviceSelector>>,
+    playlist: Rc<RefCell<Playlist>>,
 }
 
 impl App {
-    pub fn new(host: Host) -> Result<Self> {
+    pub fn new(host: Host, player: Player, path: PathBuf) -> Result<Self> {
         Ok(Self {
             layers: vec![],
+            player,
             output_selector: Rc::new(RefCell::new(DeviceSelector::new(host)?)),
+            playlist: Rc::new(RefCell::new(Playlist::new(path))),
         })
     }
 
     fn render<B: Backend>(&mut self, frame: &mut Frame<B>) -> Result<()> {
-        let block = Block::default().title("Content").borders(Borders::ALL);
-        frame.render_widget(block, frame.size());
-
-        let layer = self.layers.last().unwrap_or(&Screens::None);
+        self.playlist.borrow_mut().render(frame, frame.size())?;
+        let default = Screens::Default(self.playlist.clone());
+        let layer = self.layers.last().unwrap_or(&default);
         match layer {
             Screens::OutputSelector(selector) => {
                 let area = Self::bottom_right_fixed_size(40, 6, frame.size());
                 (*selector).borrow_mut().render(frame, area)?;
-            }
-            Screens::None => (),
+            },
+            _ => ()
+
         }
         Ok(())
     }
@@ -69,20 +72,13 @@ impl App {
         let row = area.height - height;
         let popup_layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(row),
-                Constraint::Length(height),
-            ])
+            .constraints([Constraint::Length(row), Constraint::Length(height)])
             .split(area);
 
         Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Length(col),
-                Constraint::Length(width),
-            ])
+            .constraints([Constraint::Length(col), Constraint::Length(width)])
             .split(popup_layout[1])[1]
-
     }
 
     /// helper function to create a centered rect using up certain percentage of the available rect `r`
@@ -120,7 +116,11 @@ impl App {
 
             if event::poll(std::time::Duration::from_millis(50))? {
                 if let Event::Key(key) = event::read()? {
-                    let screen = self.layers.last().unwrap_or(&Screens::None);
+                    let default = Screens::Default(self.playlist.clone());
+                    let screen = self
+                        .layers
+                        .last()
+                        .unwrap_or(&default);
                     match screen {
                         Screens::OutputSelector(selector) => {
                             selector.borrow_mut().event_hanlder(key)?;
@@ -133,7 +133,8 @@ impl App {
                                 }
                             }
                         }
-                        Screens::None => {
+                        Screens::Default(playlist) => {
+                            playlist.borrow_mut().event_hanlder(key)?;
                             if key.kind == event::KeyEventKind::Press {
                                 match key.code {
                                     KeyCode::Char('q') => return Ok(()),

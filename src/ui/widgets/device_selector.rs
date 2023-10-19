@@ -1,4 +1,4 @@
-use crate::audio::{Device, DeviceTrait, Host, HostTrait};
+use crate::{audio::{Device, DeviceTrait, Host, HostTrait}, ui::{ROW_COLOR, ROW_ALTERNATE_COLOR, HIGHLIGHT_COLOR}};
 use anyhow::{anyhow, Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
@@ -7,8 +7,6 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
     Frame,
 };
-
-use super::{HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_COLOR};
 
 pub struct DeviceSelector {
     state: TableState,
