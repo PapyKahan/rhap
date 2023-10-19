@@ -4,7 +4,6 @@ use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
     prelude::{Backend, Constraint, Direction, Layout, Rect},
-    widgets::{Block, Borders},
     Frame, Terminal,
 };
 use std::{cell::RefCell, rc::Rc, path::PathBuf};
@@ -27,7 +26,7 @@ impl App {
             layers: vec![],
             player,
             output_selector: Rc::new(RefCell::new(DeviceSelector::new(host)?)),
-            playlist: Rc::new(RefCell::new(Playlist::new(path))),
+            playlist: Rc::new(RefCell::new(Playlist::new(path)?)),
         })
     }
 

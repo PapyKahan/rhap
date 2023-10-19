@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
-use rand::{thread_rng, seq::SliceRandom};
+use rand::{seq::SliceRandom, thread_rng};
 use ratatui::{
     prelude::{Alignment, Backend, Constraint, Rect},
     style::Style,
@@ -11,15 +11,18 @@ use ratatui::{
 };
 use walkdir::WalkDir;
 
-use crate::ui::{HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_COLOR};
+use crate::{
+    song::Song,
+    ui::{HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_COLOR, ROW_COLOR_COL, ROW_ALTERNATE_COLOR_COL},
+};
 
 pub struct Playlist {
     state: TableState,
-    songs: Vec<String>,
+    songs: Vec<Song>,
 }
 
 impl Playlist {
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(path: PathBuf) -> Result<Self> {
         let mut songs = vec![];
         if path.is_dir() {
             let mut files = WalkDir::new(path.clone())
@@ -36,20 +39,16 @@ impl Playlist {
                 .map(|e| e.path().to_str().unwrap().to_string())
                 .collect::<Vec<String>>();
             files.shuffle(&mut thread_rng());
-            songs = files;
-            //for f in files {
-            //    player.play(f).await?;
-            //}
+            for f in files {
+                songs.push(Song::new(f)?);
+            }
         } else if path.is_file() {
-            songs.push(path.into_os_string().into_string().unwrap());
-        //    player
-        //        .play(path.into_os_string().into_string().unwrap())
-        //        .await?;
+            songs.push(Song::new(path.into_os_string().into_string().unwrap())?);
         }
-        Self {
+        Ok(Self {
             state: TableState::default(),
-            songs
-        }
+            songs,
+        })
     }
 
     pub fn next(&mut self) {
@@ -97,7 +96,14 @@ impl Playlist {
             let row = Row::new(vec![
                 //Cell::from(if is_selected { "󰓃" } else { "  " }),
                 Cell::from(" "),
-                Cell::from(song.to_string()),
+                Cell::from(song.title.clone()).style(Style::default().bg(
+                    if items.len() % 2 == 0 {
+                        ROW_COLOR_COL
+                    } else {
+                        ROW_ALTERNATE_COLOR_COL
+                    },
+                )),
+                Cell::from(song.artist.clone()),
             ])
             .height(1)
             .style(Style::default().bg(if items.len() % 2 == 0 {
@@ -109,7 +115,11 @@ impl Playlist {
         }
         let table = Table::new(items)
             .highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
-            .widths(&[Constraint::Length(1), Constraint::Percentage(100)])
+            .widths(&[
+                Constraint::Length(1),
+                Constraint::Percentage(20),
+                Constraint::Percentage(80),
+            ])
             .block(
                 Block::default()
                     .title(format!("Playlist - {}", self.songs.len()))

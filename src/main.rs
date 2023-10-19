@@ -17,6 +17,7 @@ use std::path::PathBuf;
 
 mod audio;
 mod player;
+mod song;
 mod ui;
 
 use crate::audio::{DeviceTrait, HostTrait};
