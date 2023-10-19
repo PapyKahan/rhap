@@ -28,7 +28,7 @@ impl App {
         })
     }
 
-    fn ui<B: Backend>(&mut self, frame: &mut Frame<B>) -> Result<()> {
+    fn render<B: Backend>(&mut self, frame: &mut Frame<B>) -> Result<()> {
         let block = Block::default().title("Content").borders(Borders::ALL);
         frame.render_widget(block, frame.size());
 
@@ -110,7 +110,7 @@ impl App {
 
     pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
         loop {
-            terminal.draw(|frame| match self.ui(frame) {
+            terminal.draw(|frame| match self.render(frame) {
                 Ok(ok) => ok,
                 Err(err) => {
                     println!("error while drawing {}", err.to_string());
