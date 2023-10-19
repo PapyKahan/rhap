@@ -29,15 +29,13 @@ impl App {
     }
 
     fn ui<B: Backend>(&mut self, frame: &mut Frame<B>) -> Result<()> {
-        let size = frame.size();
-
         let block = Block::default().title("Content").borders(Borders::ALL);
-        frame.render_widget(block, size);
+        frame.render_widget(block, frame.size());
 
         let layer = self.layers.last().unwrap_or(&Screens::None);
         match layer {
             Screens::OutputSelector(selector) => {
-                let area = Self::centered_fixed_size_rect(40, 6, size);
+                let area = Self::bottom_right_fixed_size(40, 6, frame.size());
                 (*selector).borrow_mut().render(frame, area)?;
             }
             Screens::None => (),
@@ -66,10 +64,31 @@ impl App {
             .split(popup_layout[1])[1]
     }
 
+    fn bottom_right_fixed_size(width: u16, height: u16, area: Rect) -> Rect {
+        let col = area.width - width;
+        let row = area.height - height;
+        let popup_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(row),
+                Constraint::Length(height),
+            ])
+            .split(area);
+
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(col),
+                Constraint::Length(width),
+            ])
+            .split(popup_layout[1])[1]
+
+    }
+
     /// helper function to create a centered rect using up certain percentage of the available rect `r`
-    fn centered_fixed_size_rect(width: u16, height: u16, r: Rect) -> Rect {
-        let col = (r.width - width) / 2;
-        let row = (r.height - height) / 2;
+    fn centered_fixed_size_rect(width: u16, height: u16, area: Rect) -> Rect {
+        let col = (area.width - width) / 2;
+        let row = (area.height - height) / 2;
         let popup_layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -77,7 +96,7 @@ impl App {
                 Constraint::Length(height),
                 Constraint::Length(row),
             ])
-            .split(r);
+            .split(area);
 
         Layout::default()
             .direction(Direction::Horizontal)
