@@ -151,7 +151,10 @@ impl Player {
                 buffer_length: 0,
                 exclusive: true,
             };
-            device.stream(StreamContext::new(buffer, streamparams)).expect("fail to start streaming");
+            device
+                .stream(StreamContext::new(buffer, streamparams))
+                .map_err(|err| anyhow!(err.to_string()))?;
+            Ok::<(), anyhow::Error>(())
         });
 
         loop {
