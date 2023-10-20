@@ -1,6 +1,7 @@
 use ratatui::style::Color;
 
 mod app;
+mod utils;
 pub(crate) mod screens;
 pub(crate) mod widgets;
 
