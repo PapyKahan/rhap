@@ -38,20 +38,6 @@ impl Player {
         tokio::spawn(async move {
             let mut format = format.lock().unwrap();
             let mut decoder = decoder.lock().unwrap();
-            match format.seek(
-                SeekMode::Accurate,
-                SeekTo::Time {
-                    time: Time::default(),
-                    track_id: None,
-                },
-            ) {
-                Ok(_) => (),
-                Err(err) => {
-                    error!("Error while seeking from the begining: {}", err);
-                    return;
-                }
-            }
-            decoder.reset();
             loop {
                 let packet = match format.next_packet() {
                     Ok(packet) => packet,
@@ -131,11 +117,16 @@ impl Player {
     /// - params:
     ///    - song: song struct
     pub async fn play_song(&mut self, song: &Song) -> Result<()> {
-        let decoder = song.decoder.clone();
-        let format = song.format.clone();
-
+        song.format.lock().unwrap().seek(
+            SeekMode::Accurate,
+            SeekTo::Time {
+                time: Time::default(),
+                track_id: None,
+            },
+        )?;
+        song.decoder.lock().unwrap().reset();
         let buffer = Arc::new(Mutex::new(VecDeque::new()));
-        self.fill_buffer(decoder, format, buffer.clone(), song.bits_per_sample)
+        self.fill_buffer(song.decoder.clone(), song.format.clone(), buffer.clone(), song.bits_per_sample)
             .await;
 
         let mut device = self.device.clone();
