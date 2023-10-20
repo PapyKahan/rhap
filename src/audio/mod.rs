@@ -59,11 +59,11 @@ pub struct StreamParams {
 
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> bool;
-    fn is_playing(&self) -> bool;
-    fn set_status(&self, status: PlaybackCommand);
-    fn get_status(&self) -> PlaybackCommand;
+    fn is_streaming(&self) -> bool;
+    fn set_status(&self, status: StreamingCommand);
+    fn get_status(&self) -> StreamingCommand;
     fn name(&self) -> String;
-    fn stream(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>>;
+    fn start(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>>;
     fn stop(&self);
     fn send(&self, i: u8) -> Result<(), std::sync::mpsc::SendError<u8>>;
 }
@@ -78,8 +78,8 @@ impl Device {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub enum PlaybackCommand {
-    Play,
+pub enum StreamingCommand {
+    Start,
     Stop,
     Pause,
 }
@@ -114,23 +114,23 @@ impl DeviceTrait for Device {
         device.name()
     }
 
-    fn stream(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>> {
+    fn start(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>> {
         let device = match self {
             Self::Wasapi(device) => device,
             Self::None => return Ok(()),
         };
-        device.stream(context)
+        device.start(context)
     }
 
-    fn is_playing(&self) -> bool {
+    fn is_streaming(&self) -> bool {
         let device = match self {
             Self::Wasapi(device) => device,
             Self::None => return false,
         };
-        device.is_playing()
+        device.is_streaming()
     }
 
-    fn set_status(&self, status: PlaybackCommand) {
+    fn set_status(&self, status: StreamingCommand) {
         let device = match self {
             Self::Wasapi(device) => device,
             Self::None => return,
@@ -138,10 +138,10 @@ impl DeviceTrait for Device {
         device.set_status(status)
     }
 
-    fn get_status(&self) -> PlaybackCommand {
+    fn get_status(&self) -> StreamingCommand {
         let device = match self {
             Self::Wasapi(device) => device,
-            Self::None => return PlaybackCommand::Stop,
+            Self::None => return StreamingCommand::Stop,
         };
         device.get_status()
     }

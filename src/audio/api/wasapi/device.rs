@@ -1,12 +1,12 @@
 use std::sync::{Arc, Mutex, Condvar, mpsc::{channel, Receiver, Sender, sync_channel, SyncSender}};
 
 use super::stream::Streamer;
-use crate::audio::{DeviceTrait, StreamContext, PlaybackCommand};
+use crate::audio::{DeviceTrait, StreamContext, StreamingCommand};
 
 #[derive(Clone)]
 pub struct Device {
     pub is_default: bool,
-    status: Arc<Mutex<PlaybackCommand>>,
+    status: Arc<Mutex<StreamingCommand>>,
     pub(super) pause_condition: Arc<Condvar>,
     pub(super) inner_device: Arc<wasapi::Device>,
     pub(super) receiver: Arc<Receiver<u8>>,
@@ -21,7 +21,7 @@ impl Device {
             receiver: Arc::new(rx),
             sender: Arc::new(tx),
             is_default,
-            status: Arc::new(Mutex::new(PlaybackCommand::Stop)),
+            status: Arc::new(Mutex::new(StreamingCommand::Stop)),
             pause_condition: Arc::new(Condvar::new())
         }
     }
@@ -44,20 +44,20 @@ impl DeviceTrait for Device{
         self.inner_device.get_friendlyname().unwrap_or_default()
     }
 
-    fn stream(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>> {
+    fn start(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>> {
         let mut streamer = Streamer::new(&self, context)?;
-        self.set_status(PlaybackCommand::Play);
+        self.set_status(StreamingCommand::Start);
         streamer.start()?;
-        self.set_status(PlaybackCommand::Stop);
+        self.set_status(StreamingCommand::Stop);
         Ok(())
     }
 
-    fn set_status(&self, status: PlaybackCommand) {
+    fn set_status(&self, status: StreamingCommand) {
         let mut current_status = self.status.lock().expect("fail to lock mutex");
         match *current_status {
-            PlaybackCommand::Pause => {
+            StreamingCommand::Pause => {
                 match status {
-                    PlaybackCommand::Play => self.pause_condition.notify_all(),
+                    StreamingCommand::Start => self.pause_condition.notify_all(),
                     _ => ()
                 };
                 *current_status = status
@@ -66,19 +66,19 @@ impl DeviceTrait for Device{
         };
     }
 
-    fn is_playing(&self) -> bool {
+    fn is_streaming(&self) -> bool {
         match *self.status.lock().expect("fail to lock mutex") {
-            PlaybackCommand::Stop => false,
+            StreamingCommand::Stop => false,
             _ => true
         }
     }
 
-    fn get_status(&self) -> PlaybackCommand {
+    fn get_status(&self) -> StreamingCommand {
         *self.status.lock().expect("fail to lock mutex")
     }
 
     fn stop(&self) {
-        self.set_status(PlaybackCommand::Stop)
+        self.set_status(StreamingCommand::Stop)
     }
 
     fn send(&self, i: u8) -> Result<(), std::sync::mpsc::SendError<u8>> {

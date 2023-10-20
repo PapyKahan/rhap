@@ -21,8 +21,7 @@ pub struct Player {
     device: Device,
     host: Host,
     is_playing: Arc<AtomicBool>,
-    streaming_thread: Option<Arc<JoinHandle<Result<(), anyhow::Error>>>>,
-    file_thread: Option<Arc<JoinHandle<Result<(), anyhow::Error>>>>,
+    streaming_finished: Arc<AtomicBool>,
 }
 
 impl Player {
@@ -35,8 +34,7 @@ impl Player {
             device,
             host,
             is_playing: Arc::new(AtomicBool::new(false)),
-            streaming_thread: None,
-            file_thread: None,
+            streaming_finished: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -45,14 +43,12 @@ impl Player {
     ///    - song: song struct
     pub async fn play_song(&mut self, song: &Song) -> Result<()> {
         let song = Arc::new(song);
-
-        if self.streaming_thread.is_some() {
-            let handle = self.streaming_thread.take().unwrap();
-            handle.abort();
-        }
-        if self.file_thread.is_some() {
-            let handle = self.file_thread.take().unwrap();
-            handle.abort();
+        if self.device.is_streaming() {
+            self.is_playing.store(false, std::sync::atomic::Ordering::Relaxed);
+            while !self.streaming_finished.load(std::sync::atomic::Ordering::Relaxed) {
+                tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+            }
+            self.device.stop();
         }
 
         song.format.lock().unwrap().seek(
@@ -76,18 +72,19 @@ impl Player {
         };
 
         let mut device = self.device.clone();
-        let streaming_thread = tokio::spawn(async move {
+        tokio::spawn(async move {
             device
-                .stream(StreamContext::new(streamparams))
+                .start(StreamContext::new(streamparams))
                 .map_err(|err| anyhow!(err.to_string()))?;
             Ok::<(), anyhow::Error>(())
         });
-        self.streaming_thread.insert(Arc::new(streaming_thread));
 
         let device = self.device.clone();
         self.is_playing.store(true, std::sync::atomic::Ordering::Relaxed);
         let is_playing = self.is_playing.clone();
-        let file_thread = tokio::spawn(async move {
+        let streaming_finished = self.streaming_finished.clone();
+        tokio::spawn(async move {
+            println!("Playing song");
             while is_playing.load(std::sync::atomic::Ordering::Relaxed) {
                 let packet = match format.lock().unwrap().next_packet() {
                     Ok(packet) => packet,
@@ -155,9 +152,11 @@ impl Player {
                     Err(_) => break,
                 }
             }
+            is_playing.store(false, std::sync::atomic::Ordering::Relaxed);
+            streaming_finished.store(true, std::sync::atomic::Ordering::Relaxed);
+            println!("Song finished");
             Ok::<(), anyhow::Error>(())
         });
-        self.file_thread.insert(Arc::new(file_thread));
 
         Ok(())
     }

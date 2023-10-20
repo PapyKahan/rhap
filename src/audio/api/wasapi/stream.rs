@@ -18,7 +18,7 @@ use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 
 use super::com::com_initialize;
 use super::device::Device;
-use crate::audio::{DeviceTrait, PlaybackCommand, StreamContext, StreamParams};
+use crate::audio::{DeviceTrait, StreamingCommand, StreamContext, StreamParams};
 
 pub struct Streamer {
     device: Arc<Device>,
@@ -167,22 +167,22 @@ impl Streamer {
     }
 
     pub(crate) fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        debug!(
+        println!(
             "Starting stream with parameters: {:?}",
             self.context.parameters
         );
         self.client.start_stream()?;
-        self.device.set_status(PlaybackCommand::Play);
+        self.device.set_status(StreamingCommand::Start);
         let mut buffer = vec![];
         loop {
             match self.device.get_status() {
-                PlaybackCommand::Play => (),
-                PlaybackCommand::Pause => {
+                StreamingCommand::Start => (),
+                StreamingCommand::Pause => {
                     self.client.stop_stream()?;
                     self.device.wait_readiness();
                     self.client.start_stream()?;
                 },
-                PlaybackCommand::Stop => break,
+                StreamingCommand::Stop => break,
             };
 
             let available_frames = self.client.get_available_space_in_frames()?;
@@ -213,7 +213,7 @@ impl Streamer {
             self.eventhandle.wait_for_event(1000)?;
         }
 
-        self.device.set_status(PlaybackCommand::Stop);
+        self.device.set_status(StreamingCommand::Stop);
         self.client.stop_stream()
     }
 }
