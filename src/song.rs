@@ -1,7 +1,7 @@
-use std::{sync::{Arc, Mutex}, time::Duration};
+use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use symphonia::core::{codecs::{DecoderOptions, Decoder}, io::MediaSourceStream, probe::Hint, formats::FormatReader, meta::{MetadataRevision, Tag, StandardTagKey}};
+use symphonia::core::{codecs::{DecoderOptions, Decoder}, io::MediaSourceStream, probe::Hint, formats::FormatReader, meta::{MetadataRevision, StandardTagKey}};
 
 use crate::audio::{SampleRate, BitsPerSample};
 

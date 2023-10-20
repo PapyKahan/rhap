@@ -1,17 +1,18 @@
 use anyhow::{anyhow, Result};
+use log::error;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use symphonia::core::audio::RawSampleBuffer;
-use symphonia::core::codecs::{Decoder, DecoderOptions};
+use symphonia::core::codecs::Decoder;
 use symphonia::core::errors::Error;
-use symphonia::core::formats::FormatReader;
-use symphonia::core::io::MediaSourceStream;
-use symphonia::core::probe::Hint;
+use symphonia::core::formats::{FormatReader, SeekMode, SeekTo};
 use symphonia::core::sample::i24;
+use symphonia::core::units::Time;
 
 use crate::audio::{
     BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamContext, StreamParams,
 };
+use crate::song::Song;
 
 #[derive(Clone)]
 pub struct Player {
@@ -29,12 +30,28 @@ impl Player {
     #[inline(always)]
     async fn fill_buffer(
         &self,
-        mut decoder: Box<dyn Decoder>,
-        mut format: Box<dyn FormatReader>,
+        decoder: Arc<Mutex<Box<dyn Decoder>>>,
+        format: Arc<Mutex<Box<dyn FormatReader>>>,
         vec_buffer: Arc<Mutex<VecDeque<u8>>>,
         bits_per_sample: BitsPerSample,
     ) {
         tokio::spawn(async move {
+            let mut format = format.lock().unwrap();
+            let mut decoder = decoder.lock().unwrap();
+            match format.seek(
+                SeekMode::Accurate,
+                SeekTo::Time {
+                    time: Time::default(),
+                    track_id: None,
+                },
+            ) {
+                Ok(_) => (),
+                Err(err) => {
+                    error!("Error while seeking from the begining: {}", err);
+                    return;
+                }
+            }
+            decoder.reset();
             loop {
                 let packet = match format.next_packet() {
                     Ok(packet) => packet,
@@ -48,12 +65,13 @@ impl Player {
                                 break;
                             }
                             _ => {
-                                panic!("Error reading packet: {:?}", err);
+                                error!("Error reading packet: {:?}", err);
+                                break;
                             }
                         }
                     }
                     Err(err) => {
-                        println!("Error reading packet: {:?}", err);
+                        error!("Error reading packet: {:?}", err);
                         break;
                     }
                 };
@@ -111,62 +129,38 @@ impl Player {
 
     /// Plays a FLAC file
     /// - params:
-    ///    - file: path to the FLAC file
-    pub async fn play(&mut self, path: String) -> Result<()> {
-        let source = std::fs::File::open(path.clone())?;
-        let mss = MediaSourceStream::new(Box::new(source), Default::default());
-        let hint = Hint::new();
-        let meta_opts = Default::default();
-        let fmt_opts = Default::default();
-        let probed = symphonia::default::get_probe()
-            .format(&hint, mss, &fmt_opts, &meta_opts)
-            .expect("unsupported format");
-
-        let format = probed.format;
-        let track = format.tracks().get(0).unwrap();
-        let samplerate = track.codec_params.sample_rate.unwrap();
-        let channels = track.codec_params.channels.unwrap().count() as u8;
-        let bits_per_sample = track.codec_params.bits_per_sample.unwrap_or(16) as u8;
-
-        // Create a decoder for the track.
-        let decoder = symphonia::default::get_codecs()
-            .make(&track.codec_params, &DecoderOptions { verify: true })?;
+    ///    - song: song struct
+    pub async fn play_song(&mut self, song: &Song) -> Result<()> {
+        let decoder = song.decoder.clone();
+        let format = song.format.clone();
 
         let buffer = Arc::new(Mutex::new(VecDeque::new()));
-        self.fill_buffer(
-            decoder,
-            format,
-            buffer.clone(),
-            BitsPerSample::from(bits_per_sample),
-        )
-        .await;
+        self.fill_buffer(decoder, format, buffer.clone(), song.bits_per_sample)
+            .await;
 
-        println!("Playing file path: {}", path);
         let mut device = self.device.clone();
+        let streamparams = StreamParams {
+            samplerate: song.sample,
+            channels: song.channels as u8,
+            bits_per_sample: song.bits_per_sample,
+            buffer_length: 0,
+            exclusive: true,
+        };
         tokio::spawn(async move {
-            let streamparams = StreamParams {
-                samplerate: samplerate.into(),
-                channels,
-                bits_per_sample: bits_per_sample.into(),
-                buffer_length: 0,
-                exclusive: true,
-            };
             device
                 .stream(StreamContext::new(buffer, streamparams))
                 .map_err(|err| anyhow!(err.to_string()))?;
             Ok::<(), anyhow::Error>(())
         });
 
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
-            if !self.device.is_playing() {
-                break;
-            }
-        }
         Ok(())
     }
 
     pub fn stop(&self) {
         self.device.stop();
+    }
+
+    pub(crate) fn is_playing(&self) -> bool {
+        self.device.is_playing()
     }
 }

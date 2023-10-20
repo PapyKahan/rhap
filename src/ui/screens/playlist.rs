@@ -13,16 +13,17 @@ use walkdir::WalkDir;
 
 use crate::{
     song::Song,
-    ui::{HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_COLOR, ROW_COLOR_COL, ROW_ALTERNATE_COLOR_COL},
+    ui::{HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_COLOR, ROW_COLOR_COL, ROW_ALTERNATE_COLOR_COL}, player::Player,
 };
 
 pub struct Playlist {
     state: TableState,
     songs: Vec<Song>,
+    player: Player
 }
 
 impl Playlist {
-    pub fn new(path: PathBuf) -> Result<Self> {
+    pub fn new(path: PathBuf, player: Player) -> Result<Self> {
         let mut songs = vec![];
         if path.is_dir() {
             let mut files = WalkDir::new(path.clone())
@@ -48,6 +49,7 @@ impl Playlist {
         Ok(Self {
             state: TableState::default(),
             songs,
+            player
         })
     }
 
@@ -79,11 +81,24 @@ impl Playlist {
         self.state.select(Some(i));
     }
 
-    pub fn event_hanlder(&mut self, key: KeyEvent) -> Result<()> {
+    async fn play(&mut self) -> Result<()> {
+        if self.player.is_playing() {
+            self.player.stop();
+        }
+        let index = self.state.selected().unwrap_or_default();
+        let song = self.songs.get(index);
+        if song.is_some() {
+            self.player.play_song(song.unwrap()).await?
+        }
+        Ok(())
+    }
+
+    pub async fn event_hanlder(&mut self, key: KeyEvent) -> Result<()> {
         if key.kind == KeyEventKind::Press {
             match key.code {
                 KeyCode::Up => self.previous(),
                 KeyCode::Down => self.next(),
+                KeyCode::Enter => self.play().await?,
                 _ => (),
             }
         }

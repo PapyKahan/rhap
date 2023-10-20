@@ -79,7 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
     let path = cli.path.expect("Error: A file or a path is expected");
     let mut app = App::new(host, player, path)?;
-    app.run(&mut terminal)?;
+    app.run(&mut terminal).await?;
 
     disable_raw_mode()?;
     let mut out = stdout();

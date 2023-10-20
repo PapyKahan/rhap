@@ -1,4 +1,6 @@
 use std::sync::Arc;
+use log::debug;
+use log::error;
 use wasapi::calculate_period_100ns;
 use wasapi::AudioClient;
 use wasapi::AudioRenderClient;
@@ -85,21 +87,21 @@ impl Streamer {
         );
 
         match result {
-            Ok(()) => println!("IAudioClient::Initialize ok"),
+            Ok(()) => debug!("IAudioClient::Initialize ok"),
             Err(e) => {
                 if let Some(werr) = e.downcast_ref::<windows::core::Error>() {
                     // Some of the possible errors. See the documentation for the full list and descriptions.
                     // https://docs.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize
                     match werr.code() {
-                        E_INVALIDARG => println!("IAudioClient::Initialize: Invalid argument"),
+                        E_INVALIDARG => error!("IAudioClient::Initialize: Invalid argument"),
                         AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED => {
-                            println!("IAudioClient::Initialize: Unaligned buffer, trying to adjust the period.");
+                            debug!("IAudioClient::Initialize: Unaligned buffer, trying to adjust the period.");
                             // Try to recover following the example in the docs.
                             // https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize#examples
                             // Just panic on errors to keep it short and simple.
                             // 1. Call IAudioClient::GetBufferSize and receive the next-highest-aligned buffer size (in frames).
                             let buffersize = client.get_bufferframecount()?;
-                            println!(
+                            debug!(
                                 "Client next-highest-aligned buffer size: {} frames",
                                 buffersize
                             );
@@ -109,7 +111,7 @@ impl Streamer {
                                 buffersize as i64,
                                 wave_format.get_samplespersec() as i64,
                             );
-                            println!("Aligned period in 100ns units: {}", aligned_period);
+                            debug!("Aligned period in 100ns units: {}", aligned_period);
                             // 4. Get a new IAudioClient
                             client = device.inner_device.get_iaudioclient()?;
                             // 5. Call Initialize again on the created audio client.
@@ -122,26 +124,26 @@ impl Streamer {
                                     false,
                                 )
                                 .unwrap();
-                            println!("IAudioClient::Initialize ok");
+                            debug!("IAudioClient::Initialize ok");
                         }
                         AUDCLNT_E_DEVICE_IN_USE => {
-                            println!("IAudioClient::Initialize: The device is already in use");
+                            error!("IAudioClient::Initialize: The device is already in use");
                             panic!("IAudioClient::Initialize failed");
                         }
                         AUDCLNT_E_UNSUPPORTED_FORMAT => {
-                            println!("IAudioClient::Initialize The device does not support the audio format");
+                            error!("IAudioClient::Initialize The device does not support the audio format");
                             panic!("IAudioClient::Initialize failed");
                         }
                         AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED => {
-                            println!("IAudioClient::Initialize: Exclusive mode is not allowed");
+                            error!("IAudioClient::Initialize: Exclusive mode is not allowed");
                             panic!("IAudioClient::Initialize failed");
                         }
                         AUDCLNT_E_ENDPOINT_CREATE_FAILED => {
-                            println!("IAudioClient::Initialize: Failed to create endpoint");
+                            error!("IAudioClient::Initialize: Failed to create endpoint");
                             panic!("IAudioClient::Initialize failed");
                         }
                         _ => {
-                            println!("IAudioClient::Initialize: Other error, HRESULT: {:#010x}, info: {:?}", werr.code().0, werr.message());
+                            error!("IAudioClient::Initialize: Other error, HRESULT: {:#010x}, info: {:?}", werr.code().0, werr.message());
                             panic!("IAudioClient::Initialize failed");
                         }
                     };
@@ -164,7 +166,7 @@ impl Streamer {
     }
 
     pub(crate) fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!(
+        debug!(
             "Starting stream with parameters: {:?}",
             self.context.parameters
         );

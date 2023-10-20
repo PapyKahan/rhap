@@ -2,6 +2,7 @@ use super::{screens::Playlist, utils::bottom_right_fixed_size, widgets::DeviceSe
 use crate::{audio::Host, player::Player};
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode};
+use log::error;
 use ratatui::{prelude::Backend, Frame, Terminal};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
@@ -12,7 +13,6 @@ pub enum Screens {
 
 pub struct App {
     layers: Vec<Screens>,
-    player: Player,
     output_selector: Rc<RefCell<DeviceSelector>>,
     playlist: Rc<RefCell<Playlist>>,
 }
@@ -21,9 +21,8 @@ impl App {
     pub fn new(host: Host, player: Player, path: PathBuf) -> Result<Self> {
         Ok(Self {
             layers: vec![],
-            player,
             output_selector: Rc::new(RefCell::new(DeviceSelector::new(host)?)),
-            playlist: Rc::new(RefCell::new(Playlist::new(path)?)),
+            playlist: Rc::new(RefCell::new(Playlist::new(path, player)?)),
         })
     }
 
@@ -44,12 +43,12 @@ impl App {
         Ok(())
     }
 
-    pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
+    pub async fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
         loop {
             terminal.draw(|frame| match self.render(frame) {
                 Ok(ok) => ok,
                 Err(err) => {
-                    println!("error while drawing {}", err.to_string());
+                    error!("error while drawing {}", err.to_string());
                     ()
                 }
             })?;
@@ -71,7 +70,7 @@ impl App {
                             }
                         }
                         Screens::Default(playlist) => {
-                            playlist.borrow_mut().event_hanlder(key)?;
+                            playlist.borrow_mut().event_hanlder(key).await?;
                             if key.kind == event::KeyEventKind::Press {
                                 match key.code {
                                     KeyCode::Char('q') => return Ok(()),
