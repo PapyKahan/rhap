@@ -7,7 +7,7 @@ use crate::audio::{DeviceTrait, StreamContext, PlaybackCommand};
 pub struct Device {
     pub is_default: bool,
     status: Arc<Mutex<PlaybackCommand>>,
-    pub(super) wait_condition: Arc<Condvar>,
+    pub(super) pause_condition: Arc<Condvar>,
     pub(super) inner_device: Arc<wasapi::Device>,
     pub(super) receiver: Arc<Receiver<u8>>,
     sender: Arc<SyncSender<u8>>,
@@ -22,13 +22,13 @@ impl Device {
             sender: Arc::new(tx),
             is_default,
             status: Arc::new(Mutex::new(PlaybackCommand::Stop)),
-            wait_condition: Arc::new(Condvar::new())
+            pause_condition: Arc::new(Condvar::new())
         }
     }
 
     pub(super) fn wait_readiness(&self) {
         let status = self.status.lock().expect("fail to lock status mutex");
-        let _ = self.wait_condition.wait(status);
+        let _ = self.pause_condition.wait(status);
     }
 }
 
@@ -57,7 +57,7 @@ impl DeviceTrait for Device{
         match *current_status {
             PlaybackCommand::Pause => {
                 match status {
-                    PlaybackCommand::Play => self.wait_condition.notify_all(),
+                    PlaybackCommand::Play => self.pause_condition.notify_all(),
                     _ => ()
                 };
                 *current_status = status
