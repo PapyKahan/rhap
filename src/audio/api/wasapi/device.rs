@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, Condvar};
+use std::sync::{Arc, Mutex, Condvar, mpsc::{channel, Receiver, Sender, sync_channel, SyncSender}};
 
 use super::stream::Streamer;
 use crate::audio::{DeviceTrait, StreamContext, PlaybackCommand};
@@ -9,12 +9,17 @@ pub struct Device {
     status: Arc<Mutex<PlaybackCommand>>,
     pub(super) wait_condition: Arc<Condvar>,
     pub(super) inner_device: Arc<wasapi::Device>,
+    pub(super) receiver: Arc<Receiver<u8>>,
+    sender: Arc<SyncSender<u8>>,
 }
 
 impl Device {
     pub(super) fn new(inner_device: wasapi::Device, is_default: bool) -> Self {
+        let (tx, rx) = sync_channel::<u8>(4096);
         Self {
             inner_device: Arc::new(inner_device),
+            receiver: Arc::new(rx),
+            sender: Arc::new(tx),
             is_default,
             status: Arc::new(Mutex::new(PlaybackCommand::Stop)),
             wait_condition: Arc::new(Condvar::new())
@@ -74,5 +79,9 @@ impl DeviceTrait for Device{
 
     fn stop(&self) {
         self.set_status(PlaybackCommand::Stop)
+    }
+
+    fn send(&self, i: u8) -> Result<(), std::sync::mpsc::SendError<u8>> {
+        self.sender.send(i)
     }
 }

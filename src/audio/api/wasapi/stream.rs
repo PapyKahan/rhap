@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 use log::debug;
 use log::error;
 use wasapi::calculate_period_100ns;
@@ -172,8 +173,21 @@ impl Streamer {
         );
         self.client.start_stream()?;
         self.device.set_status(PlaybackCommand::Play);
+        let mut buffer = vec![];
 
         loop {
+
+            let available_frames = self.client.get_available_space_in_frames()?;
+            let available_buffer_len =
+                available_frames as usize * self.wave_format.get_blockalign() as usize;
+
+            while let Ok(data) = self.device.receiver.recv_timeout(Duration::from_millis(100)) {
+                buffer.push(data);
+                if buffer.len() == available_buffer_len {
+                    break;
+                }
+            }
+
             match self.device.get_status() {
                 PlaybackCommand::Play => (),
                 PlaybackCommand::Pause => {
@@ -184,41 +198,20 @@ impl Streamer {
                 PlaybackCommand::Stop => break,
             };
 
-            let available_frames = self.client.get_available_space_in_frames()?;
-            let available_buffer_len =
-                available_frames as usize * self.wave_format.get_blockalign() as usize;
-            let mut data = vec![0 as u8; available_buffer_len];
-
-            for i in 0..available_buffer_len {
-                if self
-                    .context
-                    .source
-                    .lock()
-                    .expect("fail to lock source mutex")
-                    .is_empty()
-                {
-                    break;
-                }
-                data[i] = self
-                    .context
-                    .source
-                    .lock()
-                    .expect("fail to lock source mutex")
-                    .pop_front()
-                    .unwrap_or_default();
+            if buffer.len() != available_buffer_len {
+                continue;
             }
 
             self.renderer.write_to_device(
                 available_frames as usize,
                 self.wave_format.get_blockalign() as usize,
-                data.as_mut_slice(),
+                buffer.as_mut_slice(),
                 None,
             )?;
 
+            buffer.clear();
+
             self.eventhandle.wait_for_event(1000)?;
-            if self.context.source.lock().unwrap().is_empty() {
-                break;
-            }
         }
 
         self.device.set_status(PlaybackCommand::Stop);

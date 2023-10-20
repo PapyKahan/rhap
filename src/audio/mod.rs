@@ -1,6 +1,5 @@
 pub(crate) mod api;
 
-use std::{sync::{Arc, Mutex}, collections::VecDeque};
 use anyhow::Result;
 
 #[repr(u32)]
@@ -66,12 +65,16 @@ pub trait DeviceTrait: Send + Sync {
     fn name(&self) -> String;
     fn stream(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>>;
     fn stop(&self);
+    fn send(&self, i: u8) -> Result<(), std::sync::mpsc::SendError<u8>>;
 }
 
 #[derive(Clone)]
 pub enum Device {
     None,
     Wasapi(api::wasapi::device::Device),
+}
+
+impl Device {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -83,14 +86,12 @@ pub enum PlaybackCommand {
 
 #[derive(Clone)]
 pub struct StreamContext {
-    source: Arc<Mutex<VecDeque<u8>>>,
     parameters: StreamParams,
 }
 
 impl StreamContext {
-    pub fn new(source: Arc<Mutex<VecDeque<u8>>>, parameters: StreamParams) -> Self {
+    pub fn new(parameters: StreamParams) -> Self {
         Self {
-            source,
             parameters,
         }
     }
@@ -151,6 +152,14 @@ impl DeviceTrait for Device {
             Self::None => return,
         };
         device.stop()
+    }
+
+    fn send(&self, i: u8) -> Result<(), std::sync::mpsc::SendError<u8>> {
+        let device = match self {
+            Self::Wasapi(device) => device,
+            Self::None => return Ok(()),
+        };
+        device.send(i)
     }
 }
 
