@@ -82,9 +82,6 @@ impl Playlist {
     }
 
     async fn play(&mut self) -> Result<()> {
-        if self.player.is_playing() {
-            self.player.stop();
-        }
         let index = self.state.selected().unwrap_or_default();
         let song = self.songs.get(index);
         if song.is_some() {

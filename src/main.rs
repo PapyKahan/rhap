@@ -60,12 +60,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let host = Host::new("wasapi");
     let player = Player::new(host, cli.device)?;
-    let cl = player.clone();
+    //let cl = player.clone();
     tokio::spawn(async move {
         tokio::signal::ctrl_c()
             .await
             .expect("failed to listen for CTRL+C signal");
-        cl.stop();
+        //cl.stop();
         std::process::exit(0);
     });
 

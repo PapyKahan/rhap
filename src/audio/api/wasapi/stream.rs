@@ -174,20 +174,7 @@ impl Streamer {
         self.client.start_stream()?;
         self.device.set_status(PlaybackCommand::Play);
         let mut buffer = vec![];
-
         loop {
-
-            let available_frames = self.client.get_available_space_in_frames()?;
-            let available_buffer_len =
-                available_frames as usize * self.wave_format.get_blockalign() as usize;
-
-            while let Ok(data) = self.device.receiver.recv_timeout(Duration::from_millis(100)) {
-                buffer.push(data);
-                if buffer.len() == available_buffer_len {
-                    break;
-                }
-            }
-
             match self.device.get_status() {
                 PlaybackCommand::Play => (),
                 PlaybackCommand::Pause => {
@@ -197,6 +184,18 @@ impl Streamer {
                 },
                 PlaybackCommand::Stop => break,
             };
+
+            let available_frames = self.client.get_available_space_in_frames()?;
+            let available_buffer_len =
+                available_frames as usize * self.wave_format.get_blockalign() as usize;
+
+            //while let Ok(data) = self.device.receiver.try_recv() {
+            while let Ok(data) = self.device.receiver.recv_timeout(Duration::from_millis(100)) {
+                buffer.push(data);
+                if buffer.len() == available_buffer_len {
+                    break;
+                }
+            }
 
             if buffer.len() != available_buffer_len {
                 continue;
