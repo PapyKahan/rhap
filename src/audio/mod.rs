@@ -59,7 +59,6 @@ pub struct StreamParams {
 
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> bool;
-    fn is_streaming(&self) -> bool;
     fn set_status(&self, status: StreamingCommand);
     fn get_status(&self) -> StreamingCommand;
     fn name(&self) -> String;
@@ -120,14 +119,6 @@ impl DeviceTrait for Device {
             Self::None => return Ok(()),
         };
         device.start(context)
-    }
-
-    fn is_streaming(&self) -> bool {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return false,
-        };
-        device.is_streaming()
     }
 
     fn set_status(&self, status: StreamingCommand) {

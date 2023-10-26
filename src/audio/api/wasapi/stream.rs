@@ -22,7 +22,6 @@ use crate::audio::{DeviceTrait, StreamingCommand, StreamContext, StreamParams};
 
 pub struct Streamer {
     device: Arc<Device>,
-    context: StreamContext,
     client: Arc<AudioClient>,
     renderer: Arc<AudioRenderClient>,
     eventhandle: Arc<Handle>,
@@ -157,7 +156,6 @@ impl Streamer {
         let eventhandle = client.set_get_eventhandle()?;
         let renderer = client.get_audiorenderclient()?;
         Ok(Streamer {
-            context,
             device: Arc::new(device.clone()),
             client: Arc::new(client),
             renderer: Arc::new(renderer),
@@ -167,10 +165,6 @@ impl Streamer {
     }
 
     pub(crate) fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!(
-            "Starting stream with parameters: {:?}",
-            self.context.parameters
-        );
         self.client.start_stream()?;
         self.device.set_status(StreamingCommand::Start);
         let mut buffer = vec![];
@@ -190,7 +184,7 @@ impl Streamer {
                 available_frames as usize * self.wave_format.get_blockalign() as usize;
 
             //while let Ok(data) = self.device.receiver.try_recv() {
-            while let Ok(data) = self.device.receiver.recv_timeout(Duration::from_millis(100)) {
+            while let Ok(data) = self.device.receiver.recv_timeout(Duration::from_millis(10)) {
                 buffer.push(data);
                 if buffer.len() == available_buffer_len {
                     break;

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
@@ -18,7 +18,7 @@ use crate::{
 
 pub struct Playlist {
     state: TableState,
-    songs: Vec<Song>,
+    songs: Vec<Arc<Song>>,
     player: Player
 }
 
@@ -41,10 +41,10 @@ impl Playlist {
                 .collect::<Vec<String>>();
             files.shuffle(&mut thread_rng());
             for f in files {
-                songs.push(Song::new(f)?);
+                songs.push(Arc::new(Song::new(f)?));
             }
         } else if path.is_file() {
-            songs.push(Song::new(path.into_os_string().into_string().unwrap())?);
+            songs.push(Arc::new(Song::new(path.into_os_string().into_string().unwrap())?));
         }
         Ok(Self {
             state: TableState::default(),
@@ -83,9 +83,8 @@ impl Playlist {
 
     async fn play(&mut self) -> Result<()> {
         let index = self.state.selected().unwrap_or_default();
-        let song = self.songs.get(index);
-        if song.is_some() {
-            self.player.play_song(song.unwrap()).await?
+        if let Some(song) = self.songs.get(index) {
+            self.player.play_song(song.clone()).await?
         }
         Ok(())
     }

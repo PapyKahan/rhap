@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, Condvar, mpsc::{channel, Receiver, Sender, sync_channel, SyncSender}};
+use std::sync::{Arc, Mutex, Condvar, mpsc::{Receiver, sync_channel, SyncSender}};
 
 use super::stream::Streamer;
 use crate::audio::{DeviceTrait, StreamContext, StreamingCommand};
@@ -45,10 +45,15 @@ impl DeviceTrait for Device{
     }
 
     fn start(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>> {
-        let mut streamer = Streamer::new(&self, context)?;
-        self.set_status(StreamingCommand::Start);
-        streamer.start()?;
-        self.set_status(StreamingCommand::Stop);
+        let device = self.clone();
+        std::thread::spawn(move || {
+            if let Ok(mut streamer) = Streamer::new(&device, context) {
+                match streamer.start() {
+                    Ok(_) => (),
+                    Err(e) => println!("Error while starting stream: {}", e)
+                };
+            }
+        });
         Ok(())
     }
 
@@ -64,13 +69,6 @@ impl DeviceTrait for Device{
             },
             _ => *current_status = status
         };
-    }
-
-    fn is_streaming(&self) -> bool {
-        match *self.status.lock().expect("fail to lock mutex") {
-            StreamingCommand::Stop => false,
-            _ => true
-        }
     }
 
     fn get_status(&self) -> StreamingCommand {

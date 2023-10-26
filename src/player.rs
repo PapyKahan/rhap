@@ -1,5 +1,5 @@
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use anyhow::{anyhow, Result};
 use log::error;
@@ -8,20 +8,17 @@ use symphonia::core::errors::Error;
 use symphonia::core::formats::{SeekMode, SeekTo};
 use symphonia::core::sample::i24;
 use symphonia::core::units::Time;
-use tokio::task::JoinHandle;
 
 use crate::audio::{
-    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamContext, StreamParams,
+    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamContext, StreamParams, StreamingCommand,
 };
 use crate::song::Song;
 
-#[derive(Clone)]
 pub struct Player {
     device_id: Option<u32>,
     device: Device,
     host: Host,
     is_playing: Arc<AtomicBool>,
-    streaming_finished: Arc<AtomicBool>,
 }
 
 impl Player {
@@ -34,23 +31,18 @@ impl Player {
             device,
             host,
             is_playing: Arc::new(AtomicBool::new(false)),
-            streaming_finished: Arc::new(AtomicBool::new(false)),
         })
     }
 
     /// Plays a FLAC file
     /// - params:
     ///    - song: song struct
-    pub async fn play_song(&mut self, song: &Song) -> Result<()> {
-        let song = Arc::new(song);
-        if self.device.is_streaming() {
+    pub async fn play_song(&mut self, song: Arc<Song>) -> Result<()> {
+        self.device.stop();
+        if self.is_playing.load(std::sync::atomic::Ordering::Relaxed) {
             self.is_playing.store(false, std::sync::atomic::Ordering::Relaxed);
-            while !self.streaming_finished.load(std::sync::atomic::Ordering::Relaxed) {
-                tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-            }
-            self.device.stop();
+            tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
         }
-
         song.format.lock().unwrap().seek(
             SeekMode::Accurate,
             SeekTo::Time {
@@ -59,8 +51,6 @@ impl Player {
             },
         )?;
         song.decoder.lock().unwrap().reset();
-        let decoder = song.decoder.clone();
-        let format = song.format.clone();
         let bits_per_sample = song.bits_per_sample;
 
         let streamparams = StreamParams {
@@ -71,22 +61,12 @@ impl Player {
             exclusive: true,
         };
 
-        let mut device = self.device.clone();
-        tokio::spawn(async move {
-            device
-                .start(StreamContext::new(streamparams))
-                .map_err(|err| anyhow!(err.to_string()))?;
-            Ok::<(), anyhow::Error>(())
-        });
-
         let device = self.device.clone();
-        self.is_playing.store(true, std::sync::atomic::Ordering::Relaxed);
         let is_playing = self.is_playing.clone();
-        let streaming_finished = self.streaming_finished.clone();
-        tokio::spawn(async move {
-            println!("Playing song");
+        std::thread::spawn(move || {
+            is_playing.store(true, std::sync::atomic::Ordering::Relaxed);
             while is_playing.load(std::sync::atomic::Ordering::Relaxed) {
-                let packet = match format.lock().unwrap().next_packet() {
+                let packet = match song.format.lock().unwrap().next_packet() {
                     Ok(packet) => packet,
                     Err(Error::ResetRequired) => {
                         unimplemented!();
@@ -110,53 +90,51 @@ impl Player {
                     }
                 };
 
-                match decoder.lock().unwrap().decode(&packet) {
-                    Ok(_decoded) => {
-                        let spec = *_decoded.spec();
-                        let duration = _decoded.capacity() as u64;
+                let mut decoder = song.decoder.lock().unwrap();
+                let decoded = decoder.decode(&packet)?;
+                let spec = decoded.spec();
+                let duration = decoded.capacity() as u64;
 
-                        // Not very efficient, but i can't create a RawSampleBuffer dynamically
-                        // so i have to create one for each possible bits_per_sample and at eatch iteration
-                        match bits_per_sample {
-                            BitsPerSample::Bits8 => {
-                                let mut sample_buffer = RawSampleBuffer::<u8>::new(duration, spec);
-                                sample_buffer.copy_interleaved_ref(_decoded);
-                                for i in sample_buffer.as_bytes().iter() {
-                                    device.send(*i)?;
-                                }
-                            }
-                            BitsPerSample::Bits16 => {
-                                let mut sample_buffer = RawSampleBuffer::<i16>::new(duration, spec);
-                                sample_buffer.copy_interleaved_ref(_decoded);
-                                for i in sample_buffer.as_bytes().iter() {
-                                    device.send(*i)?;
-                                }
-                            }
-                            BitsPerSample::Bits24 => {
-                                let mut sample_buffer = RawSampleBuffer::<i24>::new(duration, spec);
-                                sample_buffer.copy_interleaved_ref(_decoded);
-                                for i in sample_buffer.as_bytes().iter() {
-                                    device.send(*i)?;
-                                }
-                            }
-                            BitsPerSample::Bits32 => {
-                                let mut sample_buffer = RawSampleBuffer::<f32>::new(duration, spec);
-                                sample_buffer.copy_interleaved_ref(_decoded);
-                                for i in sample_buffer.as_bytes().iter() {
-                                    device.send(*i)?;
-                                }
-                            }
-                        };
+                // Not very efficient, but i can't create a RawSampleBuffer dynamically
+                // so i have to create one for each possible bits_per_sample and at eatch iteration
+                match bits_per_sample {
+                    BitsPerSample::Bits8 => {
+                        let mut sample_buffer = RawSampleBuffer::<u8>::new(duration, *spec);
+                        sample_buffer.copy_interleaved_ref(decoded);
+                        for i in sample_buffer.as_bytes().iter() {
+                            device.send(*i)?;
+                        }
                     }
-                    Err(Error::DecodeError(_)) => (),
-                    Err(_) => break,
-                }
+                    BitsPerSample::Bits16 => {
+                        let mut sample_buffer = RawSampleBuffer::<i16>::new(duration, *spec);
+                        sample_buffer.copy_interleaved_ref(decoded);
+                        for i in sample_buffer.as_bytes().iter() {
+                            device.send(*i)?;
+                        }
+                    }
+                    BitsPerSample::Bits24 => {
+                        let mut sample_buffer = RawSampleBuffer::<i24>::new(duration, *spec);
+                        sample_buffer.copy_interleaved_ref(decoded);
+                        for i in sample_buffer.as_bytes().iter() {
+                            device.send(*i)?;
+                        }
+                    }
+                    BitsPerSample::Bits32 => {
+                        let mut sample_buffer = RawSampleBuffer::<f32>::new(duration, *spec);
+                        sample_buffer.copy_interleaved_ref(decoded);
+                        for i in sample_buffer.as_bytes().iter() {
+                            device.send(*i)?;
+                        }
+                    }
+                };
             }
-            is_playing.store(false, std::sync::atomic::Ordering::Relaxed);
-            streaming_finished.store(true, std::sync::atomic::Ordering::Relaxed);
-            println!("Song finished");
             Ok::<(), anyhow::Error>(())
         });
+
+        let mut device = self.device.clone();
+        device
+            .start(StreamContext::new(streamparams))
+            .map_err(|err| anyhow!(err.to_string()))?;
 
         Ok(())
     }
