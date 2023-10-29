@@ -1,24 +1,17 @@
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
-
 use anyhow::{anyhow, Result};
 use log::error;
+use std::sync::Arc;
 use symphonia::core::audio::RawSampleBuffer;
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{SeekMode, SeekTo};
 use symphonia::core::sample::i24;
 use symphonia::core::units::Time;
 
-use crate::audio::{
-    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamContext, StreamParams, StreamingCommand,
-};
+use crate::audio::{BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams};
 use crate::song::Song;
 
 pub struct Player {
-    device_id: Option<u32>,
     device: Device,
-    host: Host,
-    is_playing: Arc<AtomicBool>,
 }
 
 impl Player {
@@ -27,10 +20,7 @@ impl Player {
             .create_device(device_id)
             .map_err(|err| anyhow!(err.to_string()))?;
         Ok(Player {
-            device_id,
             device,
-            host,
-            is_playing: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -38,21 +28,8 @@ impl Player {
     /// - params:
     ///    - song: song struct
     pub async fn play_song(&mut self, song: Arc<Song>) -> Result<()> {
-        self.device.stop();
-        if self.is_playing.load(std::sync::atomic::Ordering::Relaxed) {
-            self.is_playing.store(false, std::sync::atomic::Ordering::Relaxed);
-            tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
-        }
-        song.format.lock().unwrap().seek(
-            SeekMode::Accurate,
-            SeekTo::Time {
-                time: Time::default(),
-                track_id: None,
-            },
-        )?;
-        song.decoder.lock().unwrap().reset();
+        self.device.stop()?;
         let bits_per_sample = song.bits_per_sample;
-
         let streamparams = StreamParams {
             samplerate: song.sample,
             channels: song.channels as u8,
@@ -61,11 +38,21 @@ impl Player {
             exclusive: true,
         };
 
-        let device = self.device.clone();
-        let is_playing = self.is_playing.clone();
+        let mut device = self.device.clone();
+        device
+            .start(streamparams)
+            .map_err(|err| anyhow!(err.to_string()))?;
+
         std::thread::spawn(move || {
-            is_playing.store(true, std::sync::atomic::Ordering::Relaxed);
-            while is_playing.load(std::sync::atomic::Ordering::Relaxed) {
+            song.format.lock().unwrap().seek(
+                SeekMode::Accurate,
+                SeekTo::Time {
+                    time: Time::default(),
+                    track_id: None,
+                },
+            )?;
+            song.decoder.lock().unwrap().reset();
+            loop {
                 let packet = match song.format.lock().unwrap().next_packet() {
                     Ok(packet) => packet,
                     Err(Error::ResetRequired) => {
@@ -75,7 +62,7 @@ impl Player {
                         // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
                         match err.kind() {
                             std::io::ErrorKind::UnexpectedEof => {
-                                device.stop();
+                                device.stop()?;
                                 break;
                             }
                             _ => {
@@ -130,11 +117,6 @@ impl Player {
             }
             Ok::<(), anyhow::Error>(())
         });
-
-        let mut device = self.device.clone();
-        device
-            .start(StreamContext::new(streamparams))
-            .map_err(|err| anyhow!(err.to_string()))?;
 
         Ok(())
     }

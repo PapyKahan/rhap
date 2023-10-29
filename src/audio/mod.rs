@@ -62,9 +62,9 @@ pub trait DeviceTrait: Send + Sync {
     fn set_status(&self, status: StreamingCommand);
     fn get_status(&self) -> StreamingCommand;
     fn name(&self) -> String;
-    fn start(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>>;
-    fn stop(&self);
-    fn send(&self, i: u8) -> Result<(), std::sync::mpsc::SendError<u8>>;
+    fn start(&mut self, params: StreamParams) -> Result<()>;
+    fn stop(&mut self) -> Result<()>;
+    fn send(&self, i: u8) -> Result<()>;
 }
 
 #[derive(Clone)]
@@ -76,24 +76,12 @@ pub enum Device {
 impl Device {
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone)]
 pub enum StreamingCommand {
-    Start,
-    Stop,
+    None,
+    Data(u8),
     Pause,
-}
-
-#[derive(Clone)]
-pub struct StreamContext {
-    parameters: StreamParams,
-}
-
-impl StreamContext {
-    pub fn new(parameters: StreamParams) -> Self {
-        Self {
-            parameters,
-        }
-    }
+    Resume,
 }
 
 impl DeviceTrait for Device {
@@ -113,12 +101,12 @@ impl DeviceTrait for Device {
         device.name()
     }
 
-    fn start(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>> {
+    fn start(&mut self, params: StreamParams) -> Result<()> {
         let device = match self {
             Self::Wasapi(device) => device,
             Self::None => return Ok(()),
         };
-        device.start(context)
+        device.start(params)
     }
 
     fn set_status(&self, status: StreamingCommand) {
@@ -132,20 +120,20 @@ impl DeviceTrait for Device {
     fn get_status(&self) -> StreamingCommand {
         let device = match self {
             Self::Wasapi(device) => device,
-            Self::None => return StreamingCommand::Stop,
+            Self::None => return StreamingCommand::None,
         };
         device.get_status()
     }
 
-    fn stop(&self) {
+    fn stop(&mut self) -> Result<()> {
         let device = match self {
             Self::Wasapi(device) => device,
-            Self::None => return,
+            Self::None => return Ok(()),
         };
         device.stop()
     }
 
-    fn send(&self, i: u8) -> Result<(), std::sync::mpsc::SendError<u8>> {
+    fn send(&self, i: u8) -> Result<()> {
         let device = match self {
             Self::Wasapi(device) => device,
             Self::None => return Ok(()),
