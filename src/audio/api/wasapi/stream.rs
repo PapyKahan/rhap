@@ -152,7 +152,7 @@ impl Streamer {
                         }
                     };
                 } else {
-                    panic!("IAudioClient::Initialize: Other error {:?}", e);
+                    error!("IAudioClient::Initialize: Other error {:?}", e);
                 }
             }
         };

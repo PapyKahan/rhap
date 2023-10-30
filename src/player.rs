@@ -11,7 +11,9 @@ use crate::audio::{BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamPa
 use crate::song::Song;
 
 pub struct Player {
-    device: Device,
+    host: Host,
+    device_id: Option<u32>,
+    previous_device: Arc<Device>,
 }
 
 impl Player {
@@ -20,7 +22,9 @@ impl Player {
             .create_device(device_id)
             .map_err(|err| anyhow!(err.to_string()))?;
         Ok(Player {
-            device,
+            host,
+            device_id,
+            previous_device: Arc::new(device),
         })
     }
 
@@ -28,7 +32,15 @@ impl Player {
     /// - params:
     ///    - song: song struct
     pub async fn play_song(&mut self, song: Arc<Song>) -> Result<()> {
-        self.device.stop()?;
+        let device = Arc::get_mut(&mut self.previous_device).unwrap();
+        device.stop()?;
+
+        let mut device = self
+            .host
+            .create_device(self.device_id)
+            .map_err(|err| anyhow!(err.to_string()))?;
+        println!("device created");
+
         let bits_per_sample = song.bits_per_sample;
         let streamparams = StreamParams {
             samplerate: song.sample,
@@ -37,12 +49,11 @@ impl Player {
             buffer_length: 0,
             exclusive: true,
         };
-
-        let mut device = self.device.clone();
         device
             .start(streamparams)
             .map_err(|err| anyhow!(err.to_string()))?;
-
+        self.previous_device = Arc::new(device);
+        let device = Arc::clone(&self.previous_device);
         std::thread::spawn(move || {
             song.format.lock().unwrap().seek(
                 SeekMode::Accurate,
@@ -62,7 +73,8 @@ impl Player {
                         // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
                         match err.kind() {
                             std::io::ErrorKind::UnexpectedEof => {
-                                device.stop()?;
+                                //let device = Arc::get_mut(&mut device).unwrap();
+                                //device.stop()?;
                                 break;
                             }
                             _ => {
@@ -89,28 +101,40 @@ impl Player {
                         let mut sample_buffer = RawSampleBuffer::<u8>::new(duration, *spec);
                         sample_buffer.copy_interleaved_ref(decoded);
                         for i in sample_buffer.as_bytes().iter() {
-                            device.send(*i)?;
+                            if device.send(*i).is_err() {
+                                drop(device);
+                                return Ok(());
+                            }
                         }
                     }
                     BitsPerSample::Bits16 => {
                         let mut sample_buffer = RawSampleBuffer::<i16>::new(duration, *spec);
                         sample_buffer.copy_interleaved_ref(decoded);
                         for i in sample_buffer.as_bytes().iter() {
-                            device.send(*i)?;
+                            if device.send(*i).is_err() {
+                                drop(device);
+                                return Ok(());
+                            }
                         }
                     }
                     BitsPerSample::Bits24 => {
                         let mut sample_buffer = RawSampleBuffer::<i24>::new(duration, *spec);
                         sample_buffer.copy_interleaved_ref(decoded);
                         for i in sample_buffer.as_bytes().iter() {
-                            device.send(*i)?;
+                            if device.send(*i).is_err() {
+                                drop(device);
+                                return Ok(());
+                            }
                         }
                     }
                     BitsPerSample::Bits32 => {
                         let mut sample_buffer = RawSampleBuffer::<f32>::new(duration, *spec);
                         sample_buffer.copy_interleaved_ref(decoded);
                         for i in sample_buffer.as_bytes().iter() {
-                            device.send(*i)?;
+                            if device.send(*i).is_err() {
+                                drop(device);
+                                return Ok(());
+                            }
                         }
                     }
                 };
