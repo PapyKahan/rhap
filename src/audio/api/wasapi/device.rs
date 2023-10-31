@@ -1,35 +1,27 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use log::{debug, error};
+use wasapi::{ShareMode, calculate_period_100ns, Direction};
 use std::sync::{
     mpsc::{sync_channel, Receiver, SyncSender},
     Arc, Condvar, Mutex,
 };
 
-use super::stream::Streamer;
+use super::{stream::Streamer, com::com_initialize};
 use crate::audio::{DeviceTrait, StreamParams, StreamingCommand};
 
-#[derive(Clone)]
 pub struct Device {
     pub is_default: bool,
-    status: Arc<Mutex<StreamingCommand>>,
-    pub(super) pause_condition: Arc<Condvar>,
-    pub(super) inner_device: Arc<wasapi::Device>,
-    pub(super) receiver: Option<Arc<Receiver<StreamingCommand>>>,
+    pub(super) inner_device: wasapi::Device,
+    pub(super) receiver: Option<Receiver<StreamingCommand>>,
 }
 
 impl Device {
     pub(super) fn new(inner_device: wasapi::Device, is_default: bool) -> Self {
         Self {
-            inner_device: Arc::new(inner_device),
+            inner_device,
             receiver: Option::None,
             is_default,
-            status: Arc::new(Mutex::new(StreamingCommand::None)),
-            pause_condition: Arc::new(Condvar::new()),
         }
-    }
-
-    pub(super) fn wait_readiness(&self) {
-        let status = self.status.lock().expect("fail to lock status mutex");
-        let _ = self.pause_condition.wait(status);
     }
 }
 
@@ -47,32 +39,30 @@ impl DeviceTrait for Device {
 
     fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>> {
         let (tx, rx) = sync_channel::<StreamingCommand>(4096);
-        self.receiver = Option::Some(Arc::new(rx));
-        let device = self.clone();
+        let mut streamer = Streamer::new(&self, rx, params)?;
         std::thread::spawn(move || -> Result<()> {
-            let mut streamer = Streamer::new(&device, params)?;
             streamer.start()
         });
         Ok(tx)
     }
 
-    fn set_status(&self, status: StreamingCommand) {
-        let mut current_status = self.status.lock().expect("fail to lock mutex");
-        match *current_status {
-            StreamingCommand::Pause => {
-                match status {
-                    StreamingCommand::Resume => self.pause_condition.notify_all(),
-                    _ => (),
-                };
-                *current_status = status
-            }
-            _ => *current_status = status,
-        };
-    }
+    //fn set_status(&self, status: StreamingCommand) {
+    //    let mut current_status = self.status.lock().expect("fail to lock mutex");
+    //    match *current_status {
+    //        StreamingCommand::Pause => {
+    //            match status {
+    //                StreamingCommand::Resume => self.pause_condition.notify_all(),
+    //                _ => (),
+    //            };
+    //            *current_status = status
+    //        }
+    //        _ => *current_status = status,
+    //    };
+    //}
 
-    fn get_status(&self) -> StreamingCommand {
-        *self.status.lock().expect("fail to lock mutex")
-    }
+    //fn get_status(&self) -> StreamingCommand {
+    //    *self.status.lock().expect("fail to lock mutex")
+    //}
 
     fn stop(&mut self) -> Result<()> {
         if let Some(receiver) = self.receiver.take() {

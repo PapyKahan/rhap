@@ -1,4 +1,7 @@
-use crate::{audio::{Device, DeviceTrait, Host, HostTrait}, ui::{ROW_COLOR, ROW_ALTERNATE_COLOR, HIGHLIGHT_COLOR}};
+use crate::{
+    audio::{Device, DeviceTrait, Host, HostTrait},
+    ui::{HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_COLOR},
+};
 use anyhow::{anyhow, Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
@@ -11,7 +14,7 @@ use ratatui::{
 pub struct DeviceSelector {
     state: TableState,
     host: Host,
-    selected: Device,
+    selected: Option<String>,
     default: Device,
     devices: Vec<Device>,
 }
@@ -24,7 +27,7 @@ impl DeviceSelector {
         Ok(DeviceSelector {
             state,
             host,
-            selected: Device::None,
+            selected: None,
             default: Device::None,
             devices: Vec::new(),
         })
@@ -41,8 +44,10 @@ impl DeviceSelector {
             .map_err(|err| anyhow!(err.to_string()))?;
         self.state.select(Some(0));
 
-        if !self.devices.iter().any(|item| item.name() == self.selected.name()) {
-            self.selected = Device::None; 
+        if let Some(device) = self.selected.as_ref() {
+            if !self.devices.iter().any(|item| &item.name() == device) {
+                self.selected = None;
+            }
         }
 
         Ok(())
@@ -50,14 +55,12 @@ impl DeviceSelector {
 
     pub fn set_selected_device(&mut self) -> Result<()> {
         self.selected = match self.state.selected() {
-            Some(i) => {
-                if i < self.devices.len() {
-                    self.devices[i].clone()
-                } else {
-                    self.default.clone()
-                }
-            },
-            None => Device::None,
+            Some(i) => Some(if i < self.devices.len() {
+                self.devices[i].name()
+            } else {
+                self.default.name()
+            }),
+            None => None,
         };
         Ok(())
     }
@@ -70,7 +73,7 @@ impl DeviceSelector {
                 } else {
                     i + 1
                 }
-            },
+            }
             None => 0,
         };
         self.state.select(Some(i));
@@ -84,7 +87,7 @@ impl DeviceSelector {
                 } else {
                     i - 1
                 }
-            },
+            }
             None => 0,
         };
         self.state.select(Some(i));
@@ -103,14 +106,16 @@ impl DeviceSelector {
     }
 
     pub(crate) fn render<B: Backend>(&mut self, frame: &mut Frame<B>, area: Rect) -> Result<()> {
-        let selected_device = match self.selected {
-            Device::None => &self.default,
-            _ => &self.selected,
+        let default = &self.default.name().clone();
+        let selected_device_name = if let Some(device) = self.selected.as_ref() {
+            device
+        } else {
+            default
         };
 
         let mut items = Vec::new();
         for device in &self.devices {
-            let is_selected = device.name() == selected_device.name();
+            let is_selected = &device.name() == selected_device_name;
             let row = Row::new(vec![
                 Cell::from(if is_selected { "󰓃" } else { "  " }),
                 Cell::from(device.name()),

@@ -2,6 +2,10 @@ use anyhow::{anyhow, Result};
 use log::debug;
 use log::error;
 use std::sync::Arc;
+use std::sync::Condvar;
+use std::sync::Mutex;
+use std::sync::mpsc::Receiver;
+use std::time::Duration;
 use wasapi::calculate_period_100ns;
 use wasapi::AudioClient;
 use wasapi::AudioRenderClient;
@@ -21,11 +25,13 @@ use super::device::Device;
 use crate::audio::{StreamParams, StreamingCommand};
 
 pub struct Streamer {
-    device: Arc<Device>,
-    client: Arc<AudioClient>,
-    renderer: Arc<AudioRenderClient>,
-    eventhandle: Arc<Handle>,
+    client: AudioClient,
+    renderer: AudioRenderClient,
+    eventhandle: Handle,
     wave_format: WaveFormat,
+    pause_condition: Condvar,
+    status: Mutex<StreamingCommand>,
+    receiver: Receiver<StreamingCommand>,
 }
 
 unsafe impl Send for Streamer {}
@@ -52,7 +58,7 @@ impl Streamer {
         );
     }
 
-    pub(super) fn new(device: &Device, params: StreamParams) -> Result<Self> {
+    pub(super) fn new(device: &Device, receiver: Receiver<StreamingCommand>, params: StreamParams) -> Result<Self> {
         com_initialize();
         let mut client = device
             .inner_device
@@ -164,12 +170,18 @@ impl Streamer {
             .get_audiorenderclient()
             .map_err(|e| anyhow!("IAudioClient::GetAudioRenderClient failed: {}", e))?;
         Ok(Streamer {
-            device: Arc::new(device.to_owned()),
-            client: Arc::new(client),
-            renderer: Arc::new(renderer),
+            client,
+            renderer,
             wave_format,
-            eventhandle: Arc::new(eventhandle),
+            eventhandle,
+            pause_condition: Condvar::new(),
+            status: Mutex::new(StreamingCommand::None),
+            receiver,
         })
+    }
+    pub(super) fn wait_readiness(&self) {
+        let status = self.status.lock().expect("fail to lock status mutex");
+        let _ = self.pause_condition.wait(status);
     }
 
     pub(crate) fn start(&mut self) -> Result<()> {
@@ -178,7 +190,7 @@ impl Streamer {
             .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))?;
         let mut buffer = vec![];
         loop {
-            if let Ok(command) = self.device.receiver.as_ref().unwrap().recv() {
+            if let Ok(command) = self.receiver.recv() {
                 match command {
                     StreamingCommand::Data(data) => {
                         let available_frames =
@@ -208,18 +220,18 @@ impl Streamer {
                             .map_err(|e| anyhow!("WaitForSingleObject failed: {:?}", e))?;
                     }
                     StreamingCommand::Pause => {
+                        *self.status.lock().unwrap() = command;
                         self.client
                             .stop_stream()
                             .map_err(|e| anyhow!("IAudioClient::StopStream failed: {:?}", e))?;
-                        self.device.wait_readiness();
+                        self.wait_readiness();
                         self.client
                             .start_stream()
                             .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))?;
-                    },
+                    }
                     _ => {}
                 }
             } else {
-                println!("StreamingCommand::Stop");
                 return self.client
                     .stop_stream()
                     .map_err(|e| anyhow!("IAudioClient::StopStream failed: {:?}", e));
