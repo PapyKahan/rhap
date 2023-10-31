@@ -1,30 +1,28 @@
 use anyhow::{anyhow, Result};
 use log::error;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use symphonia::core::audio::RawSampleBuffer;
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{SeekMode, SeekTo};
 use symphonia::core::sample::i24;
 use symphonia::core::units::Time;
 
-use crate::audio::{BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams};
+use crate::audio::{BitsPerSample, DeviceTrait, Host, HostTrait, StreamParams, StreamingCommand};
 use crate::song::Song;
 
 pub struct Player {
     host: Host,
     device_id: Option<u32>,
-    previous_device: Arc<Device>,
+    is_playing: Arc<AtomicBool>
 }
 
 impl Player {
     pub fn new(host: Host, device_id: Option<u32>) -> Result<Self> {
-        let device = host
-            .create_device(device_id)
-            .map_err(|err| anyhow!(err.to_string()))?;
         Ok(Player {
             host,
             device_id,
-            previous_device: Arc::new(device),
+            is_playing: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -32,14 +30,11 @@ impl Player {
     /// - params:
     ///    - song: song struct
     pub async fn play_song(&mut self, song: Arc<Song>) -> Result<()> {
-        let device = Arc::get_mut(&mut self.previous_device).unwrap();
-        device.stop()?;
-
+        self.is_playing.store(false, Ordering::Relaxed);
         let mut device = self
             .host
             .create_device(self.device_id)
             .map_err(|err| anyhow!(err.to_string()))?;
-        println!("device created");
 
         let bits_per_sample = song.bits_per_sample;
         let streamparams = StreamParams {
@@ -49,11 +44,11 @@ impl Player {
             buffer_length: 0,
             exclusive: true,
         };
-        device
+        let stream = device
             .start(streamparams)
             .map_err(|err| anyhow!(err.to_string()))?;
-        self.previous_device = Arc::new(device);
-        let device = Arc::clone(&self.previous_device);
+        let is_playing = self.is_playing.clone();
+        println!("start streaming");
         std::thread::spawn(move || {
             song.format.lock().unwrap().seek(
                 SeekMode::Accurate,
@@ -63,7 +58,11 @@ impl Player {
                 },
             )?;
             song.decoder.lock().unwrap().reset();
+            is_playing.store(true, Ordering::Relaxed);
             loop {
+                if !is_playing.load(Ordering::Relaxed) {
+                    return Ok::<(), anyhow::Error>(())
+                }
                 let packet = match song.format.lock().unwrap().next_packet() {
                     Ok(packet) => packet,
                     Err(Error::ResetRequired) => {
@@ -73,8 +72,7 @@ impl Player {
                         // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
                         match err.kind() {
                             std::io::ErrorKind::UnexpectedEof => {
-                                //let device = Arc::get_mut(&mut device).unwrap();
-                                //device.stop()?;
+                                drop(stream);
                                 break;
                             }
                             _ => {
@@ -101,8 +99,7 @@ impl Player {
                         let mut sample_buffer = RawSampleBuffer::<u8>::new(duration, *spec);
                         sample_buffer.copy_interleaved_ref(decoded);
                         for i in sample_buffer.as_bytes().iter() {
-                            if device.send(*i).is_err() {
-                                drop(device);
+                            if stream.send(crate::audio::StreamingCommand::Data(*i)).is_err() {
                                 return Ok(());
                             }
                         }
@@ -111,8 +108,7 @@ impl Player {
                         let mut sample_buffer = RawSampleBuffer::<i16>::new(duration, *spec);
                         sample_buffer.copy_interleaved_ref(decoded);
                         for i in sample_buffer.as_bytes().iter() {
-                            if device.send(*i).is_err() {
-                                drop(device);
+                            if stream.send(crate::audio::StreamingCommand::Data(*i)).is_err() {
                                 return Ok(());
                             }
                         }
@@ -121,8 +117,7 @@ impl Player {
                         let mut sample_buffer = RawSampleBuffer::<i24>::new(duration, *spec);
                         sample_buffer.copy_interleaved_ref(decoded);
                         for i in sample_buffer.as_bytes().iter() {
-                            if device.send(*i).is_err() {
-                                drop(device);
+                            if stream.send(crate::audio::StreamingCommand::Data(*i)).is_err() {
                                 return Ok(());
                             }
                         }
@@ -131,7 +126,7 @@ impl Player {
                         let mut sample_buffer = RawSampleBuffer::<f32>::new(duration, *spec);
                         sample_buffer.copy_interleaved_ref(decoded);
                         for i in sample_buffer.as_bytes().iter() {
-                            if device.send(*i).is_err() {
+                            if stream.send(crate::audio::StreamingCommand::Data(*i)).is_err() {
                                 drop(device);
                                 return Ok(());
                             }

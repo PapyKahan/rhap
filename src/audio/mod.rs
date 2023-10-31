@@ -1,6 +1,8 @@
 pub(crate) mod api;
 
-use anyhow::Result;
+use std::sync::mpsc::SyncSender;
+
+use anyhow::{anyhow, Result};
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy)]
@@ -62,9 +64,8 @@ pub trait DeviceTrait: Send + Sync {
     fn set_status(&self, status: StreamingCommand);
     fn get_status(&self) -> StreamingCommand;
     fn name(&self) -> String;
-    fn start(&mut self, params: StreamParams) -> Result<()>;
+    fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>>;
     fn stop(&mut self) -> Result<()>;
-    fn send(&self, i: u8) -> Result<()>;
 }
 
 #[derive(Clone)]
@@ -101,10 +102,10 @@ impl DeviceTrait for Device {
         device.name()
     }
 
-    fn start(&mut self, params: StreamParams) -> Result<()> {
+    fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>> {
         let device = match self {
             Self::Wasapi(device) => device,
-            Self::None => return Ok(()),
+            Self::None => return Err(anyhow!("No host selected")),
         };
         device.start(params)
     }
@@ -131,14 +132,6 @@ impl DeviceTrait for Device {
             Self::None => return Ok(()),
         };
         device.stop()
-    }
-
-    fn send(&self, i: u8) -> Result<()> {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return Ok(()),
-        };
-        device.send(i)
     }
 }
 

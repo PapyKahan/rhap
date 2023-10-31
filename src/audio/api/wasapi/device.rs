@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::sync::{
-    mpsc::{sync_channel, Receiver, SendError, SyncSender},
+    mpsc::{sync_channel, Receiver, SyncSender},
     Arc, Condvar, Mutex,
 };
 
@@ -14,7 +14,6 @@ pub struct Device {
     pub(super) pause_condition: Arc<Condvar>,
     pub(super) inner_device: Arc<wasapi::Device>,
     pub(super) receiver: Option<Arc<Receiver<StreamingCommand>>>,
-    sender: Option<SyncSender<StreamingCommand>>,
 }
 
 impl Device {
@@ -22,7 +21,6 @@ impl Device {
         Self {
             inner_device: Arc::new(inner_device),
             receiver: Option::None,
-            sender: Option::None,
             is_default,
             status: Arc::new(Mutex::new(StreamingCommand::None)),
             pause_condition: Arc::new(Condvar::new()),
@@ -47,22 +45,15 @@ impl DeviceTrait for Device {
         self.inner_device.get_friendlyname().unwrap_or_default()
     }
 
-    fn start(&mut self, params: StreamParams) -> Result<()> {
-        if let Some(sender) = self.sender.take() {
-            drop(sender);
-        }
-        if let Some(receiver) = self.receiver.take() {
-            drop(receiver);
-        }
+    fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>> {
         let (tx, rx) = sync_channel::<StreamingCommand>(4096);
-        self.sender = Option::Some(tx);
         self.receiver = Option::Some(Arc::new(rx));
         let device = self.clone();
         std::thread::spawn(move || -> Result<()> {
             let mut streamer = Streamer::new(&device, params)?;
             streamer.start()
         });
-        Ok(())
+        Ok(tx)
     }
 
     fn set_status(&self, status: StreamingCommand) {
@@ -84,24 +75,9 @@ impl DeviceTrait for Device {
     }
 
     fn stop(&mut self) -> Result<()> {
-        if let Some(sender) = self.sender.take() {
-            drop(sender);
-        }
         if let Some(receiver) = self.receiver.take() {
             drop(receiver);
         }
         Ok(())
-    }
-
-    fn send(&self, i: u8) -> Result<()> {
-        if self.sender.is_none() {
-            return Ok(());
-        }
-        self.sender.as_ref().unwrap()
-            .send(StreamingCommand::Data(i))
-            .map_err(|err| match err {
-                SendError(StreamingCommand::Data(i)) => anyhow::anyhow!("fail to send {}", i),
-                SendError(_) => anyhow::anyhow!("fail to send command"),
-            })
     }
 }
