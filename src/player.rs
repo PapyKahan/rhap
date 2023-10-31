@@ -22,7 +22,7 @@ pub struct Player {
 
 impl Player {
     pub fn new(host: Host, device_id: Option<u32>) -> Result<Self> {
-        let mut device = host
+        let device = host
             .create_device(device_id)
             .map_err(|err| anyhow!(err.to_string()))?;
         Ok(Player {
@@ -40,7 +40,9 @@ impl Player {
     pub async fn play_song(&mut self, song: Arc<Song>) -> Result<()> {
         self.is_playing.store(false, Ordering::Relaxed);
         if let Some(stream) = self.previous_stream.take() {
+            stream.send(StreamingCommand::Stop)?;
             self.device.stop()?;
+            self.device.wait_till_ready()?;
             drop(stream);
         }
 

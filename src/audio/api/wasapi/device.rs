@@ -1,18 +1,14 @@
 use anyhow::{anyhow, Result};
-use log::{debug, error};
-use wasapi::{ShareMode, calculate_period_100ns, Direction};
-use std::sync::{
-    mpsc::{sync_channel, Receiver, SyncSender},
-    Arc, Condvar, Mutex,
-};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 
-use super::{stream::Streamer, com::com_initialize};
+use super::stream::Streamer;
 use crate::audio::{DeviceTrait, StreamParams, StreamingCommand};
 
 pub struct Device {
     pub is_default: bool,
     pub(super) inner_device: wasapi::Device,
     pub(super) receiver: Option<Receiver<StreamingCommand>>,
+    pub(super) stream_thread_handle: Option<std::thread::JoinHandle<Result<()>>>,
 }
 
 impl Device {
@@ -21,6 +17,7 @@ impl Device {
             inner_device,
             receiver: Option::None,
             is_default,
+            stream_thread_handle: Option::None,
         }
     }
 }
@@ -40,9 +37,11 @@ impl DeviceTrait for Device {
     fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>> {
         let (tx, rx) = sync_channel::<StreamingCommand>(4096);
         let mut streamer = Streamer::new(&self, rx, params)?;
-        std::thread::spawn(move || -> Result<()> {
-            streamer.start()
-        });
+        self.stream_thread_handle = Some(std::thread::spawn(move || -> Result<()> {
+            streamer.start()?;
+            println!("streamer stopped");
+            return Ok(());
+        }));
         Ok(tx)
     }
 
@@ -69,5 +68,16 @@ impl DeviceTrait for Device {
             drop(receiver);
         }
         Ok(())
+    }
+
+    fn wait_till_ready(&mut self) -> Result<()> {
+        if let Some(handle) = self.stream_thread_handle.take() {
+            handle
+                .join()
+                .unwrap_or_else(|_| Ok(()))
+                .map_err(|err| anyhow!(err.to_string()))
+        } else {
+            Ok(())
+        }
     }
 }

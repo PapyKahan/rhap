@@ -1,10 +1,9 @@
 use anyhow::{anyhow, Result};
 use log::debug;
 use log::error;
-use std::sync::Arc;
+use std::sync::mpsc::Receiver;
 use std::sync::Condvar;
 use std::sync::Mutex;
-use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use wasapi::calculate_period_100ns;
 use wasapi::AudioClient;
@@ -58,7 +57,11 @@ impl Streamer {
         );
     }
 
-    pub(super) fn new(device: &Device, receiver: Receiver<StreamingCommand>, params: StreamParams) -> Result<Self> {
+    pub(super) fn new(
+        device: &Device,
+        receiver: Receiver<StreamingCommand>,
+        params: StreamParams,
+    ) -> Result<Self> {
         com_initialize();
         let mut client = device
             .inner_device
@@ -229,10 +232,17 @@ impl Streamer {
                             .start_stream()
                             .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))?;
                     }
+                    StreamingCommand::Stop => {
+                        return Ok(());
+                    }
                     _ => {}
                 }
             } else {
-                return self.client
+                //self.client
+                //    .reset_stream()
+                //    .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))?;
+                return self
+                    .client
                     .stop_stream()
                     .map_err(|e| anyhow!("IAudioClient::StopStream failed: {:?}", e));
             }

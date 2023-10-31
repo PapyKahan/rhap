@@ -66,6 +66,7 @@ pub trait DeviceTrait: Send + Sync {
     fn name(&self) -> String;
     fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>>;
     fn stop(&mut self) -> Result<()>;
+    fn wait_till_ready(&mut self) -> Result<()>;
 }
 
 pub enum Device {
@@ -82,6 +83,7 @@ pub enum StreamingCommand {
     Data(u8),
     Pause,
     Resume,
+    Stop,
 }
 
 impl DeviceTrait for Device {
@@ -131,6 +133,14 @@ impl DeviceTrait for Device {
             Self::None => return Ok(()),
         };
         device.stop()
+    }
+
+    fn wait_till_ready(&mut self) -> Result<()> {
+        let device = match self {
+            Self::Wasapi(device) => device,
+            Self::None => return Ok(()),
+        };
+        device.wait_till_ready()
     }
 }
 
