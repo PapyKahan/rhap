@@ -54,14 +54,14 @@ impl App {
                 }
             })?;
 
-            let current_screen = self.layers.last().unwrap_or(&default);
 
-            // handle keys
+            // handle crossterm events
             if event::poll(std::time::Duration::from_millis(50))? {
+                let current_screen = self.layers.last().unwrap_or(&default);
                 if let Event::Key(key) = event::read()? {
                     match current_screen {
                         Screens::OutputSelector(selector) => {
-                            selector.borrow_mut().event_hanlder(key)?;
+                            selector.borrow_mut().key_event_handler(key)?;
                             if key.kind == event::KeyEventKind::Press {
                                 match key.code {
                                     KeyCode::Char('q') => {
@@ -92,11 +92,11 @@ impl App {
 
             let current_screen = self.layers.last().unwrap_or(&default);
             match current_screen {
-                Screens::OutputSelector(selector) => {
-                    //selector.borrow_mut().event_hanlder(key)?;
-                }
                 Screens::Default(playlist) => {
-                    playlist.borrow_mut().action().await?;
+                    playlist.borrow_mut().run().await?;
+                }
+                _ => {
+
                 }
             }
         }

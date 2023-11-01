@@ -93,7 +93,7 @@ impl DeviceSelector {
         self.state.select(Some(i));
     }
 
-    pub fn event_hanlder(&mut self, key: KeyEvent) -> Result<()> {
+    pub fn key_event_handler(&mut self, key: KeyEvent) -> Result<()> {
         if key.kind == KeyEventKind::Press {
             match key.code {
                 KeyCode::Up => self.previous(),

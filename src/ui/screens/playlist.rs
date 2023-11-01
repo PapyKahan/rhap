@@ -120,7 +120,7 @@ impl Playlist {
         Ok(())
     }
 
-    pub async fn action(&mut self) -> Result<()> {
+    pub async fn run(&mut self) -> Result<()> {
         if let Some(current_track) = self.current_track.clone() {
             if !current_track.is_streaming() && self.automatically_play_next {
                 self.current_track = None;
@@ -133,10 +133,15 @@ impl Playlist {
 
     pub(crate) fn render<B: Backend>(&mut self, frame: &mut Frame<B>, area: Rect) -> Result<()> {
         let mut items = Vec::new();
+        let current_track_title = if let Some(current_track_info) = self.current_track.clone() {
+            current_track_info.title
+        } else {
+            String::default()
+        };
+
         for song in &self.songs {
             let row = Row::new(vec![
-                //Cell::from(if is_selected { "󰓃" } else { "  " }),
-                Cell::from(" "),
+                Cell::from(if current_track_title == song.title { "󰐊" } else { "  " }),
                 Cell::from(song.title.clone()).style(Style::default().bg(
                     if items.len() % 2 == 0 {
                         ROW_COLOR_COL
