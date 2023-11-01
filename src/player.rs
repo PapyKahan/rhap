@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use log::error;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{Ordering, AtomicU64, AtomicBool};
 use std::sync::mpsc::SyncSender;
 use std::sync::Arc;
 use symphonia::core::audio::RawSampleBuffer;
@@ -17,7 +17,7 @@ use crate::song::Song;
 pub struct Player {
     device: Device,
     previous_stream: Option<SyncSender<StreamingCommand>>,
-    is_streaming: Arc<AtomicBool>,
+    is_playing: Arc<AtomicBool>
 }
 
 impl Player {
@@ -28,12 +28,12 @@ impl Player {
         Ok(Player {
             device,
             previous_stream: None,
-            is_streaming: Arc::new(AtomicBool::new(false)),
+            is_playing: Arc::new(AtomicBool::new(false))
         })
     }
 
     pub fn stop(&mut self) -> Result<()> {
-        self.is_streaming.store(false, Ordering::Relaxed);
+        self.is_playing.store(false, Ordering::Relaxed);
         if let Some(stream) = self.previous_stream.take() {
             stream.send(StreamingCommand::Stop)?;
             self.device.stop()?;
@@ -45,8 +45,7 @@ impl Player {
     /// Plays a FLAC file
     /// - params:
     ///    - song: song struct
-    pub fn play(&mut self, song: Arc<Song>) -> Result<()> {
-        self.is_streaming.store(true, Ordering::Relaxed);
+    pub async fn play(&mut self, song: Arc<Song>) -> Result<Arc<AtomicBool>> {
         self.stop()?;
         let bits_per_sample = song.bits_per_sample;
         let streamparams = StreamParams {
@@ -61,10 +60,14 @@ impl Player {
                 .start(streamparams)
                 .map_err(|err| anyhow!(err.to_string()))?,
         );
-        let is_streaming = self.is_streaming.clone();
         let stream = self.previous_stream.clone();
+        let progress = Arc::new(AtomicU64::new(0));
+
+        let report_progress = Arc::clone(&progress);
+        let is_streaming = Arc::new(AtomicBool::new(true));
+        let report_streaming = Arc::clone(&is_streaming);
+        let is_playing = self.is_playing.clone();
         std::thread::spawn(move || {
-            is_streaming.store(true, Ordering::Relaxed);
             if let Ok(mut format) = song.format.lock() {
                 format.seek(
                     SeekMode::Accurate,
@@ -81,11 +84,16 @@ impl Player {
             } else {
                 return Err(anyhow!("Fail to lock track decoder"));
             }
+            is_playing.store(true, Ordering::Relaxed);
             loop {
+                if !is_playing.load(Ordering::Relaxed) {
+                    break;
+                }
                 if let Some(ref streamer) = stream {
                     let mut format = if let Ok(format) = song.format.lock() {
                         format
                     } else {
+                        is_playing.store(false, Ordering::Relaxed);
                         return Err(anyhow!("Fail to lock format"));
                     };
 
@@ -111,10 +119,12 @@ impl Player {
                             break;
                         }
                     };
+                    progress.store(progress.load(Ordering::Relaxed) + packet.dur, Ordering::Relaxed);
 
                     let mut decoder = if let Ok(decoder) = song.decoder.lock() {
                         decoder
                     } else {
+                        is_playing.store(false, Ordering::Relaxed);
                         return Err(anyhow!("Fail to lock format"));
                     };
 
@@ -176,13 +186,10 @@ impl Player {
                 };
             }
             is_streaming.store(false, Ordering::Relaxed);
+            is_playing.store(false, Ordering::Relaxed);
             Ok::<(), anyhow::Error>(())
         });
 
-        Ok(())
-    }
-
-    pub fn is_streaming(&self) -> bool {
-        self.is_streaming.load(Ordering::Relaxed)
+        Ok(report_streaming)
     }
 }

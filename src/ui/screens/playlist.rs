@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{path::PathBuf, sync::{Arc, atomic::Ordering}, time::Duration};
 
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
@@ -84,9 +84,10 @@ impl Playlist {
     }
 
     async fn play(&mut self) -> Result<()> {
+        self.stop().await?;
         if let Some(index) = self.state.selected() {
             if let Some(song) = self.songs.get(index) {
-                self.player.play(song.clone())?;
+                let _ = self.player.play(song.clone()).await?;
             }
         }
         Ok(())
