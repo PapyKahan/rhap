@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
@@ -19,7 +19,8 @@ use crate::{
 pub struct Playlist {
     state: TableState,
     songs: Vec<Arc<Song>>,
-    player: Player
+    player: Player,
+    automatically_play_next: bool,
 }
 
 impl Playlist {
@@ -49,11 +50,12 @@ impl Playlist {
         Ok(Self {
             state: TableState::default(),
             songs,
-            player
+            player,
+            automatically_play_next: true
         })
     }
 
-    pub fn next(&mut self) {
+    pub fn select_next(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
                 if i >= self.songs.len() - 1 {
@@ -67,7 +69,7 @@ impl Playlist {
         self.state.select(Some(i));
     }
 
-    pub fn previous(&mut self) {
+    pub fn select_previous(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
                 if i == 0 {
@@ -84,9 +86,8 @@ impl Playlist {
     async fn play(&mut self) -> Result<()> {
         if let Some(index) = self.state.selected() {
             if let Some(song) = self.songs.get(index) {
-                self.player.play(song.clone()).await?
+                self.player.play(song.clone())?;
             }
-            // next track
         }
         Ok(())
     }
@@ -98,8 +99,8 @@ impl Playlist {
     pub async fn event_hanlder(&mut self, key: KeyEvent) -> Result<()> {
         if key.kind == KeyEventKind::Press {
             match key.code {
-                KeyCode::Up => self.previous(),
-                KeyCode::Down => self.next(),
+                KeyCode::Up => self.select_previous(),
+                KeyCode::Down => self.select_next(),
                 KeyCode::Enter => {
                     self.play().await?;
                 },

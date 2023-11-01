@@ -45,7 +45,8 @@ impl Player {
     /// Plays a FLAC file
     /// - params:
     ///    - song: song struct
-    pub async fn play(&mut self, song: Arc<Song>) -> Result<()> {
+    pub fn play(&mut self, song: Arc<Song>) -> Result<()> {
+        self.is_streaming.store(true, Ordering::Relaxed);
         self.stop()?;
         let bits_per_sample = song.bits_per_sample;
         let streamparams = StreamParams {
@@ -61,8 +62,9 @@ impl Player {
                 .map_err(|err| anyhow!(err.to_string()))?,
         );
         let is_streaming = self.is_streaming.clone();
-        let mut stream = self.previous_stream.clone();
+        let stream = self.previous_stream.clone();
         std::thread::spawn(move || {
+            is_streaming.store(true, Ordering::Relaxed);
             if let Ok(mut format) = song.format.lock() {
                 format.seek(
                     SeekMode::Accurate,
@@ -79,12 +81,7 @@ impl Player {
             } else {
                 return Err(anyhow!("Fail to lock track decoder"));
             }
-            is_streaming.store(true, Ordering::Relaxed);
             loop {
-                if !is_streaming.load(Ordering::Relaxed) {
-                    drop(stream.take());
-                    break;
-                }
                 if let Some(ref streamer) = stream {
                     let mut format = if let Ok(format) = song.format.lock() {
                         format
@@ -101,7 +98,6 @@ impl Player {
                             // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
                             match err.kind() {
                                 std::io::ErrorKind::UnexpectedEof => {
-                                    is_streaming.store(false, Ordering::Relaxed);
                                     break;
                                 }
                                 _ => {
@@ -179,9 +175,14 @@ impl Player {
                     }
                 };
             }
+            is_streaming.store(false, Ordering::Relaxed);
             Ok::<(), anyhow::Error>(())
         });
 
         Ok(())
+    }
+
+    pub fn is_streaming(&self) -> bool {
+        self.is_streaming.load(Ordering::Relaxed)
     }
 }
