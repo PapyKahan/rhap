@@ -1,36 +1,31 @@
-use std::sync::{Arc, Mutex, Condvar};
+use anyhow::{anyhow, Result};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 
 use super::stream::Streamer;
-use crate::audio::{DeviceTrait, StreamContext, PlaybackCommand};
+use crate::audio::{DeviceTrait, StreamParams, StreamingCommand};
 
-#[derive(Clone)]
 pub struct Device {
     pub is_default: bool,
-    status: Arc<Mutex<PlaybackCommand>>,
-    pub(super) wait_condition: Arc<Condvar>,
-    pub(super) inner_device: Arc<wasapi::Device>,
+    pub(super) inner_device: wasapi::Device,
+    pub(super) receiver: Option<Receiver<StreamingCommand>>,
+    pub(super) stream_thread_handle: Option<std::thread::JoinHandle<Result<()>>>,
 }
 
 impl Device {
     pub(super) fn new(inner_device: wasapi::Device, is_default: bool) -> Self {
         Self {
-            inner_device: Arc::new(inner_device),
+            inner_device,
+            receiver: Option::None,
             is_default,
-            status: Arc::new(Mutex::new(PlaybackCommand::Stop)),
-            wait_condition: Arc::new(Condvar::new())
+            stream_thread_handle: Option::None,
         }
-    }
-
-    pub(super) fn wait_readiness(&self) {
-        let status = self.status.lock().expect("fail to lock status mutex");
-        let _ = self.wait_condition.wait(status);
     }
 }
 
 unsafe impl Send for Device {}
 unsafe impl Sync for Device {}
 
-impl DeviceTrait for Device{
+impl DeviceTrait for Device {
     fn is_default(&self) -> bool {
         self.is_default
     }
@@ -39,40 +34,26 @@ impl DeviceTrait for Device{
         self.inner_device.get_friendlyname().unwrap_or_default()
     }
 
-    fn stream(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>> {
-        let mut streamer = Streamer::new(&self, context)?;
-        self.set_status(PlaybackCommand::Play);
-        streamer.start()?;
-        self.set_status(PlaybackCommand::Stop);
-        Ok(())
+    fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>> {
+        let (tx, rx) = sync_channel::<StreamingCommand>(8192);
+        let mut streamer = Streamer::new(&self, rx, params)?;
+        self.stream_thread_handle = Some(std::thread::spawn(move || -> Result<()> {
+            streamer.start()?;
+            return Ok(());
+        }));
+        Ok(tx)
     }
 
-    fn set_status(&self, status: PlaybackCommand) {
-        let mut current_status = self.status.lock().expect("fail to lock mutex");
-        match *current_status {
-            PlaybackCommand::Pause => {
-                match status {
-                    PlaybackCommand::Play => self.wait_condition.notify_all(),
-                    _ => ()
-                };
-                *current_status = status
-            },
-            _ => *current_status = status
-        };
-    }
-
-    fn is_playing(&self) -> bool {
-        match *self.status.lock().expect("fail to lock mutex") {
-            PlaybackCommand::Stop => false,
-            _ => true
+    fn stop(&mut self) -> Result<()> {
+        if let Some(receiver) = self.receiver.take() {
+            drop(receiver);
         }
-    }
-
-    fn get_status(&self) -> PlaybackCommand {
-        *self.status.lock().expect("fail to lock mutex")
-    }
-
-    fn stop(&self) {
-        self.set_status(PlaybackCommand::Stop)
+        if let Some(handle) = self.stream_thread_handle.take() {
+            handle
+                .join()
+                .unwrap_or_else(|_| Ok(()))
+                .map_err(|err| anyhow!(err.to_string()))?;
+        }
+        Ok(())
     }
 }

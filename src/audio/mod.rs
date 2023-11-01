@@ -1,7 +1,8 @@
-use std::{sync::{Arc, Mutex}, collections::VecDeque};
+pub(crate) mod api;
 
-use anyhow::Result;
-pub mod api;
+use std::sync::mpsc::SyncSender;
+
+use anyhow::{anyhow, Result};
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy)]
@@ -60,45 +61,35 @@ pub struct StreamParams {
 
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> bool;
-    fn is_playing(&self) -> bool;
-    fn set_status(&self, status: PlaybackCommand);
-    fn get_status(&self) -> PlaybackCommand;
+    //fn set_status(&self, status: StreamingCommand);
+    //fn get_status(&self) -> StreamingCommand;
     fn name(&self) -> String;
-    fn stream(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>>;
-    fn stop(&self);
+    fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>>;
+    fn stop(&mut self) -> Result<()>;
 }
 
-#[derive(Clone)]
 pub enum Device {
+    None,
     Wasapi(api::wasapi::device::Device),
 }
 
+impl Device {
+}
+
 #[derive(Copy, Clone)]
-pub enum PlaybackCommand {
-    Play,
-    Stop,
+pub enum StreamingCommand {
+    None,
+    Data(u8),
     Pause,
-}
-
-#[derive(Clone)]
-pub struct StreamContext {
-    source: Arc<Mutex<VecDeque<u8>>>,
-    parameters: StreamParams,
-}
-
-impl StreamContext {
-    pub fn new(source: Arc<Mutex<VecDeque<u8>>>, parameters: StreamParams) -> Self {
-        Self {
-            source,
-            parameters,
-        }
-    }
+    Resume,
+    Stop,
 }
 
 impl DeviceTrait for Device {
     fn is_default(&self) -> bool {
         let device = match self {
             Self::Wasapi(device) => device,
+            Self::None => return false,
         };
         device.is_default()
     }
@@ -106,41 +97,23 @@ impl DeviceTrait for Device {
     fn name(&self) -> String {
         let device = match self {
             Self::Wasapi(device) => device,
+            Self::None => return String::from("none"),
         };
         device.name()
     }
 
-    fn stream(&mut self, context: StreamContext) -> Result<(), Box<dyn std::error::Error>> {
+    fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>> {
         let device = match self {
             Self::Wasapi(device) => device,
+            Self::None => return Err(anyhow!("No host selected")),
         };
-        device.stream(context)
+        device.start(params)
     }
 
-    fn is_playing(&self) -> bool {
+    fn stop(&mut self) -> Result<()> {
         let device = match self {
             Self::Wasapi(device) => device,
-        };
-        device.is_playing()
-    }
-
-    fn set_status(&self, status: PlaybackCommand) {
-        let device = match self {
-            Self::Wasapi(device) => device,
-        };
-        device.set_status(status)
-    }
-
-    fn get_status(&self) -> PlaybackCommand {
-        let device = match self {
-            Self::Wasapi(device) => device,
-        };
-        device.get_status()
-    }
-
-    fn stop(&self) {
-        let device = match self {
-            Self::Wasapi(device) => device,
+            Self::None => return Ok(()),
         };
         device.stop()
     }
@@ -149,6 +122,7 @@ impl DeviceTrait for Device {
 pub trait HostTrait: Send + Sync {
     fn create_device(&self, id: Option<u32>) -> Result<Device, Box<dyn std::error::Error>>;
     fn get_devices(&self) -> Result<Vec<Device>, Box<dyn std::error::Error>>;
+    fn get_default_device(&self) -> Result<Device, Box<dyn std::error::Error>>;
 }
 
 #[derive(Clone, Copy)]
@@ -168,11 +142,19 @@ impl HostTrait for Host {
             Self::Wasapi(host) => host.create_device(id),
         }
     }
+
+    fn get_default_device(&self) -> Result<Device, Box<dyn std::error::Error>> {
+        match self {
+            Self::Wasapi(host) => host.get_default_device(),
+        }
+    }
 }
 
-pub(crate) fn create_host(host_name: &str) -> Host {
-    match host_name {
-        "wasapi" => Host::Wasapi(api::wasapi::host::Host::new()),
-        _ => Host::Wasapi(api::wasapi::host::Host::new()),
+impl Host {
+    pub(crate) fn new(name: &str) -> Self {
+        match name {
+            "wasapi" => Host::Wasapi(api::wasapi::host::Host::new()),
+            _ => Host::Wasapi(api::wasapi::host::Host::new()),
+        }
     }
 }
