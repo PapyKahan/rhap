@@ -13,8 +13,6 @@ use crate::audio::{BitsPerSample, DeviceTrait, Host, HostTrait, StreamParams, St
 use crate::song::Song;
 
 pub struct Player {
-    host: Host,
-    device_id: Option<u32>,
     device: Device,
     previous_stream: Option<SyncSender<StreamingCommand>>,
     is_playing: Arc<AtomicBool>,
@@ -26,26 +24,27 @@ impl Player {
             .create_device(device_id)
             .map_err(|err| anyhow!(err.to_string()))?;
         Ok(Player {
-            host,
-            device_id,
             device,
             previous_stream: None,
             is_playing: Arc::new(AtomicBool::new(false)),
         })
     }
 
-    /// Plays a FLAC file
-    /// - params:
-    ///    - song: song struct
-    pub async fn play_song(&mut self, song: Arc<Song>) -> Result<()> {
+    fn stop(&mut self) -> Result<()> {
         self.is_playing.store(false, Ordering::Relaxed);
         if let Some(stream) = self.previous_stream.take() {
             stream.send(StreamingCommand::Stop)?;
             self.device.stop()?;
-            self.device.wait_till_ready()?;
             drop(stream);
         }
+        Ok(())
+    }
 
+    /// Plays a FLAC file
+    /// - params:
+    ///    - song: song struct
+    pub async fn play_song(&mut self, song: Arc<Song>) -> Result<()> {
+        self.stop()?;
         let bits_per_sample = song.bits_per_sample;
         let streamparams = StreamParams {
             samplerate: song.sample,

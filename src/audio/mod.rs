@@ -66,7 +66,6 @@ pub trait DeviceTrait: Send + Sync {
     fn name(&self) -> String;
     fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>>;
     fn stop(&mut self) -> Result<()>;
-    fn wait_till_ready(&mut self) -> Result<()>;
 }
 
 pub enum Device {
@@ -111,36 +110,12 @@ impl DeviceTrait for Device {
         device.start(params)
     }
 
-    //fn set_status(&self, status: StreamingCommand) {
-    //    let device = match self {
-    //        Self::Wasapi(device) => device,
-    //        Self::None => return,
-    //    };
-    //    device.set_status(status)
-    //}
-
-    //fn get_status(&self) -> StreamingCommand {
-    //    let device = match self {
-    //        Self::Wasapi(device) => device,
-    //        Self::None => return StreamingCommand::None,
-    //    };
-    //    device.get_status()
-    //}
-
     fn stop(&mut self) -> Result<()> {
         let device = match self {
             Self::Wasapi(device) => device,
             Self::None => return Ok(()),
         };
         device.stop()
-    }
-
-    fn wait_till_ready(&mut self) -> Result<()> {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return Ok(()),
-        };
-        device.wait_till_ready()
     }
 }
 

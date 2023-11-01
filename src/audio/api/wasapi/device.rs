@@ -35,49 +35,25 @@ impl DeviceTrait for Device {
     }
 
     fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>> {
-        let (tx, rx) = sync_channel::<StreamingCommand>(4096);
+        let (tx, rx) = sync_channel::<StreamingCommand>(8192);
         let mut streamer = Streamer::new(&self, rx, params)?;
         self.stream_thread_handle = Some(std::thread::spawn(move || -> Result<()> {
             streamer.start()?;
-            println!("streamer stopped");
             return Ok(());
         }));
         Ok(tx)
     }
 
-    //fn set_status(&self, status: StreamingCommand) {
-    //    let mut current_status = self.status.lock().expect("fail to lock mutex");
-    //    match *current_status {
-    //        StreamingCommand::Pause => {
-    //            match status {
-    //                StreamingCommand::Resume => self.pause_condition.notify_all(),
-    //                _ => (),
-    //            };
-    //            *current_status = status
-    //        }
-    //        _ => *current_status = status,
-    //    };
-    //}
-
-    //fn get_status(&self) -> StreamingCommand {
-    //    *self.status.lock().expect("fail to lock mutex")
-    //}
-
     fn stop(&mut self) -> Result<()> {
         if let Some(receiver) = self.receiver.take() {
             drop(receiver);
         }
-        Ok(())
-    }
-
-    fn wait_till_ready(&mut self) -> Result<()> {
         if let Some(handle) = self.stream_thread_handle.take() {
             handle
                 .join()
                 .unwrap_or_else(|_| Ok(()))
-                .map_err(|err| anyhow!(err.to_string()))
-        } else {
-            Ok(())
+                .map_err(|err| anyhow!(err.to_string()))?;
         }
+        Ok(())
     }
 }

@@ -1,19 +1,29 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use anyhow::Result;
-use symphonia::core::{codecs::{DecoderOptions, Decoder}, io::MediaSourceStream, probe::Hint, formats::FormatReader, meta::{MetadataRevision, StandardTagKey}};
+use symphonia::core::{
+    codecs::{Decoder, DecoderOptions},
+    formats::{FormatReader, Track},
+    io::MediaSourceStream,
+    meta::{MetadataRevision, StandardTagKey},
+    probe::Hint
+};
 
-use crate::audio::{SampleRate, BitsPerSample};
+use crate::audio::{BitsPerSample, SampleRate};
 
 pub struct Song {
-    pub format : Arc<Mutex<Box<dyn FormatReader>>>,
+    pub format: Arc<Mutex<Box<dyn FormatReader>>>,
     pub decoder: Arc<Mutex<Box<dyn Decoder>>>,
     pub sample: SampleRate,
     pub channels: usize,
     pub bits_per_sample: BitsPerSample,
     pub title: String,
     pub artist: String,
-    //pub duration: Duration,
+    pub duration: u64,
+    track: Track,
 }
 
 impl Song {
@@ -33,18 +43,35 @@ impl Song {
         let channels = track.codec_params.channels.unwrap().count();
         let bits_per_sample = track.codec_params.bits_per_sample.unwrap_or(16) as u8;
 
-        let metadata = match format.metadata().current() {
+        let metadata = match format.metadata().skip_to_latest() {
             Some(metadata) => metadata.clone(),
             None => MetadataRevision::default().clone(),
         };
 
-        let artist = metadata.tags().iter().find(|e| e.std_key == Some(StandardTagKey::Artist)).unwrap().value.to_string();
-        let title = metadata.tags().iter().find(|e| e.std_key == Some(StandardTagKey::TrackTitle)).unwrap().value.to_string();
+        let artist = metadata
+            .tags()
+            .iter()
+            .find(|e| e.std_key == Some(StandardTagKey::Artist))
+            .unwrap()
+            .value
+            .to_string();
+        let title = metadata
+            .tags()
+            .iter()
+            .find(|e| e.std_key == Some(StandardTagKey::TrackTitle))
+            .unwrap()
+            .value
+            .to_string();
+        let dur = track
+            .codec_params
+            .n_frames
+            .map(|frames| track.codec_params.start_ts + frames);
+        let duration = dur.unwrap_or(u64::default());
 
         // Create a decoder for the track.
         let decoder = symphonia::default::get_codecs()
             .make(&track.codec_params, &DecoderOptions { verify: true })?;
-        
+
         Ok(Self {
             format: Arc::new(Mutex::new(format)),
             decoder: Arc::new(Mutex::new(decoder)),
@@ -52,7 +79,41 @@ impl Song {
             channels,
             bits_per_sample: BitsPerSample::from(bits_per_sample),
             title,
-            artist
+            artist,
+            duration,
+            track,
         })
+    }
+
+    pub fn info(&self) -> String {
+        format!(
+            "{}bits - {}KHz",
+            self.bits_per_sample as usize,
+            (self.sample as usize) as f32 / 1000.0
+        )
+    }
+
+    pub fn formated_duration(&self) -> String {
+        if let Some(tb) = self.track.codec_params.time_base {
+            let d = tb.calc_time(self.duration);
+            let hours = d.seconds / (60 * 60);
+            let mins = (d.seconds % (60 * 60)) / 60;
+            let secs = (d.seconds % 60) + d.frac as u64;
+            match hours {
+                0 => match mins {
+                    0 => {
+                        format!("00:{:0>2}", secs)
+                    }
+                    _ => {
+                        format!("{:0>2}:{:0>2}", mins, secs)
+                    }
+                },
+                _ => {
+                    format!("{}:{:0>2}:{:0>2}", hours, mins, secs)
+                }
+            }
+        } else {
+            String::default()
+        }
     }
 }

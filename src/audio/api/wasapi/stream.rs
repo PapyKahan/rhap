@@ -4,7 +4,6 @@ use log::error;
 use std::sync::mpsc::Receiver;
 use std::sync::Condvar;
 use std::sync::Mutex;
-use std::time::Duration;
 use wasapi::calculate_period_100ns;
 use wasapi::AudioClient;
 use wasapi::AudioRenderClient;
@@ -238,9 +237,6 @@ impl Streamer {
                     _ => {}
                 }
             } else {
-                //self.client
-                //    .reset_stream()
-                //    .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))?;
                 return self
                     .client
                     .stop_stream()

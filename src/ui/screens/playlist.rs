@@ -115,6 +115,14 @@ impl Playlist {
                     },
                 )),
                 Cell::from(song.artist.clone()),
+                Cell::from(song.info()).style(Style::default().bg(
+                    if items.len() % 2 == 0 {
+                        ROW_COLOR_COL
+                    } else {
+                        ROW_ALTERNATE_COLOR_COL
+                    },
+                )),
+                Cell::from(song.formated_duration()),
             ])
             .height(1)
             .style(Style::default().bg(if items.len() % 2 == 0 {
@@ -129,7 +137,9 @@ impl Playlist {
             .widths(&[
                 Constraint::Length(1),
                 Constraint::Percentage(20),
-                Constraint::Percentage(80),
+                Constraint::Percentage(60),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
             ])
             .block(
                 Block::default()
