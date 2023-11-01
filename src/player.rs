@@ -9,13 +9,15 @@ use symphonia::core::formats::{SeekMode, SeekTo};
 use symphonia::core::sample::i24;
 use symphonia::core::units::Time;
 
-use crate::audio::{BitsPerSample, DeviceTrait, Host, HostTrait, StreamParams, StreamingCommand, Device};
+use crate::audio::{
+    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamingCommand,
+};
 use crate::song::Song;
 
 pub struct Player {
     device: Device,
     previous_stream: Option<SyncSender<StreamingCommand>>,
-    is_playing: Arc<AtomicBool>,
+    is_streaming: Arc<AtomicBool>,
 }
 
 impl Player {
@@ -26,12 +28,12 @@ impl Player {
         Ok(Player {
             device,
             previous_stream: None,
-            is_playing: Arc::new(AtomicBool::new(false)),
+            is_streaming: Arc::new(AtomicBool::new(false)),
         })
     }
 
     pub fn stop(&mut self) -> Result<()> {
-        self.is_playing.store(false, Ordering::Relaxed);
+        self.is_streaming.store(false, Ordering::Relaxed);
         if let Some(stream) = self.previous_stream.take() {
             stream.send(StreamingCommand::Stop)?;
             self.device.stop()?;
@@ -58,25 +60,39 @@ impl Player {
                 .start(streamparams)
                 .map_err(|err| anyhow!(err.to_string()))?,
         );
-        let is_playing = self.is_playing.clone();
+        let is_streaming = self.is_streaming.clone();
         let mut stream = self.previous_stream.clone();
         std::thread::spawn(move || {
-            song.format.lock().unwrap().seek(
-                SeekMode::Accurate,
-                SeekTo::Time {
-                    time: Time::default(),
-                    track_id: None,
-                },
-            )?;
-            song.decoder.lock().unwrap().reset();
-            is_playing.store(true, Ordering::Relaxed);
+            if let Ok(mut format) = song.format.lock() {
+                format.seek(
+                    SeekMode::Accurate,
+                    SeekTo::Time {
+                        time: Time::default(),
+                        track_id: None,
+                    },
+                )?;
+            } else {
+                return Err(anyhow!("Fail to lock track format"));
+            }
+            if let Ok(mut decoder) = song.decoder.lock() {
+                decoder.reset();
+            } else {
+                return Err(anyhow!("Fail to lock track decoder"));
+            }
+            is_streaming.store(true, Ordering::Relaxed);
             loop {
-                if !is_playing.load(Ordering::Relaxed) {
+                if !is_streaming.load(Ordering::Relaxed) {
                     drop(stream.take());
                     break;
                 }
                 if let Some(ref streamer) = stream {
-                    let packet = match song.format.lock().unwrap().next_packet() {
+                    let mut format = if let Ok(format) = song.format.lock() {
+                        format
+                    } else {
+                        return Err(anyhow!("Fail to lock format"));
+                    };
+
+                    let packet = match format.next_packet() {
                         Ok(packet) => packet,
                         Err(Error::ResetRequired) => {
                             unimplemented!();
@@ -85,7 +101,7 @@ impl Player {
                             // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
                             match err.kind() {
                                 std::io::ErrorKind::UnexpectedEof => {
-                                    is_playing.store(false, Ordering::Relaxed);
+                                    is_streaming.store(false, Ordering::Relaxed);
                                     break;
                                 }
                                 _ => {
@@ -100,7 +116,12 @@ impl Player {
                         }
                     };
 
-                    let mut decoder = song.decoder.lock().unwrap();
+                    let mut decoder = if let Ok(decoder) = song.decoder.lock() {
+                        decoder
+                    } else {
+                        return Err(anyhow!("Fail to lock format"));
+                    };
+
                     let decoded = decoder.decode(&packet)?;
                     let spec = decoded.spec();
                     let duration = decoded.capacity() as u64;

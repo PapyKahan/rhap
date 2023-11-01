@@ -86,6 +86,7 @@ impl Playlist {
             if let Some(song) = self.songs.get(index) {
                 self.player.play(song.clone()).await?
             }
+            // next track
         }
         Ok(())
     }
