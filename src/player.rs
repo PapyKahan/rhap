@@ -20,6 +20,23 @@ pub struct Player {
     is_playing: Arc<AtomicBool>
 }
 
+#[derive(Clone)]
+pub struct CurrentTrackInfo {
+    is_streaming: Arc<AtomicBool>,
+    progress: Arc<AtomicU64>,
+    pub title: String,
+    pub artist: String,
+}
+
+impl CurrentTrackInfo {
+    pub fn is_streaming(&self) -> bool {
+        self.is_streaming.load(Ordering::Relaxed)
+    }
+    pub fn get_progress(&self) -> u64 {
+        self.progress.load(Ordering::Relaxed)
+    }
+}
+
 impl Player {
     pub fn new(host: Host, device_id: Option<u32>) -> Result<Self> {
         let device = host
@@ -45,7 +62,7 @@ impl Player {
     /// Plays a FLAC file
     /// - params:
     ///    - song: song struct
-    pub async fn play(&mut self, song: Arc<Song>) -> Result<Arc<AtomicBool>> {
+    pub async fn play(&mut self, song: Arc<Song>) -> Result<CurrentTrackInfo> {
         self.stop()?;
         let bits_per_sample = song.bits_per_sample;
         let streamparams = StreamParams {
@@ -67,6 +84,7 @@ impl Player {
         let is_streaming = Arc::new(AtomicBool::new(true));
         let report_streaming = Arc::clone(&is_streaming);
         let is_playing = self.is_playing.clone();
+        let report_song = song.clone();
         std::thread::spawn(move || {
             if let Ok(mut format) = song.format.lock() {
                 format.seek(
@@ -190,6 +208,11 @@ impl Player {
             Ok::<(), anyhow::Error>(())
         });
 
-        Ok(report_streaming)
+        Ok(CurrentTrackInfo {
+            is_streaming: report_streaming,
+            progress: report_progress,
+            title: report_song.title.clone(),
+            artist: report_song.artist.clone()
+        })
     }
 }

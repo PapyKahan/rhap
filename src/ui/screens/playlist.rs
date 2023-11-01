@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::{Arc, atomic::Ordering}, time::Duration};
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
@@ -13,13 +13,15 @@ use walkdir::WalkDir;
 
 use crate::{
     song::Song,
-    ui::{HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_COLOR, ROW_COLOR_COL, ROW_ALTERNATE_COLOR_COL}, player::Player,
+    ui::{HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_COLOR, ROW_COLOR_COL, ROW_ALTERNATE_COLOR_COL}, player::{Player, CurrentTrackInfo},
 };
+
 
 pub struct Playlist {
     state: TableState,
     songs: Vec<Arc<Song>>,
     player: Player,
+    current_track: Option<CurrentTrackInfo>,
     automatically_play_next: bool,
 }
 
@@ -51,6 +53,7 @@ impl Playlist {
             state: TableState::default(),
             songs,
             player,
+            current_track: None,
             automatically_play_next: true
         })
     }
@@ -87,7 +90,8 @@ impl Playlist {
         self.stop().await?;
         if let Some(index) = self.state.selected() {
             if let Some(song) = self.songs.get(index) {
-                let _ = self.player.play(song.clone()).await?;
+                let current_track_info = self.player.play(song.clone()).await?;
+                self.current_track = Some(current_track_info);
             }
         }
         Ok(())
@@ -103,12 +107,25 @@ impl Playlist {
                 KeyCode::Up => self.select_previous(),
                 KeyCode::Down => self.select_next(),
                 KeyCode::Enter => {
+                    self.current_track = None;
                     self.play().await?;
                 },
                 KeyCode::Char('s') => {
+                    self.current_track = None;
                     self.stop().await?;
                 }
                 _ => (),
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn action(&mut self) -> Result<()> {
+        if let Some(current_track) = self.current_track.clone() {
+            if !current_track.is_streaming() && self.automatically_play_next {
+                self.current_track = None;
+                self.select_next();
+                self.play().await?;
             }
         }
         Ok(())

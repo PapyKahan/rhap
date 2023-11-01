@@ -44,6 +44,7 @@ impl App {
     }
 
     pub async fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
+        let default = Screens::Default(self.playlist.clone());
         loop {
             terminal.draw(|frame| match self.render(frame) {
                 Ok(ok) => ok,
@@ -53,11 +54,12 @@ impl App {
                 }
             })?;
 
+            let current_screen = self.layers.last().unwrap_or(&default);
+
+            // handle keys
             if event::poll(std::time::Duration::from_millis(50))? {
                 if let Event::Key(key) = event::read()? {
-                    let default = Screens::Default(self.playlist.clone());
-                    let screen = self.layers.last().unwrap_or(&default);
-                    match screen {
+                    match current_screen {
                         Screens::OutputSelector(selector) => {
                             selector.borrow_mut().event_hanlder(key)?;
                             if key.kind == event::KeyEventKind::Press {
@@ -85,6 +87,16 @@ impl App {
                             }
                         }
                     }
+                }
+            }
+
+            let current_screen = self.layers.last().unwrap_or(&default);
+            match current_screen {
+                Screens::OutputSelector(selector) => {
+                    //selector.borrow_mut().event_hanlder(key)?;
+                }
+                Screens::Default(playlist) => {
+                    playlist.borrow_mut().action().await?;
                 }
             }
         }
