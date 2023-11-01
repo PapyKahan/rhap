@@ -82,11 +82,16 @@ impl Playlist {
     }
 
     async fn play(&mut self) -> Result<()> {
-        let index = self.state.selected().unwrap_or_default();
-        if let Some(song) = self.songs.get(index) {
-            self.player.play_song(song.clone()).await?
+        if let Some(index) = self.state.selected() {
+            if let Some(song) = self.songs.get(index) {
+                self.player.play(song.clone()).await?
+            }
         }
         Ok(())
+    }
+
+    async fn stop(&mut self) -> Result<()> {
+        self.player.stop()
     }
 
     pub async fn event_hanlder(&mut self, key: KeyEvent) -> Result<()> {
@@ -94,7 +99,12 @@ impl Playlist {
             match key.code {
                 KeyCode::Up => self.previous(),
                 KeyCode::Down => self.next(),
-                KeyCode::Enter => self.play().await?,
+                KeyCode::Enter => {
+                    self.play().await?;
+                },
+                KeyCode::Char('s') => {
+                    self.stop().await?;
+                }
                 _ => (),
             }
         }

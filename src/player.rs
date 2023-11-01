@@ -30,7 +30,7 @@ impl Player {
         })
     }
 
-    fn stop(&mut self) -> Result<()> {
+    pub fn stop(&mut self) -> Result<()> {
         self.is_playing.store(false, Ordering::Relaxed);
         if let Some(stream) = self.previous_stream.take() {
             stream.send(StreamingCommand::Stop)?;
@@ -43,7 +43,7 @@ impl Player {
     /// Plays a FLAC file
     /// - params:
     ///    - song: song struct
-    pub async fn play_song(&mut self, song: Arc<Song>) -> Result<()> {
+    pub async fn play(&mut self, song: Arc<Song>) -> Result<()> {
         self.stop()?;
         let bits_per_sample = song.bits_per_sample;
         let streamparams = StreamParams {
@@ -70,7 +70,6 @@ impl Player {
             )?;
             song.decoder.lock().unwrap().reset();
             is_playing.store(true, Ordering::Relaxed);
-
             loop {
                 if !is_playing.load(Ordering::Relaxed) {
                     drop(stream.take());
