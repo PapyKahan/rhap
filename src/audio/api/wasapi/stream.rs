@@ -191,6 +191,29 @@ impl Streamer {
             .start_stream()
             .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))?;
         let mut buffer = vec![];
+
+        // write an empty buffer to the device so there's no strange behavior at the begining.
+        for _ in 0..25 {
+            let available_frames = self
+                .client
+                .get_available_space_in_frames()
+                .map_err(|e| anyhow!("IAudioClient::GetAvailableSpaceInFrames failed: {:?}", e))?;
+            let available_buffer_len =
+                available_frames as usize * self.wave_format.get_blockalign() as usize;
+            let empty_buffer = vec![0; available_buffer_len];
+            self.renderer
+                .write_to_device(
+                    available_frames as usize,
+                    self.wave_format.get_blockalign() as usize,
+                    empty_buffer.as_slice(),
+                    None,
+                )
+                .map_err(|e| anyhow!("IAudioRenderClient::Write failed: {:?}", e))?;
+            self.eventhandle
+                .wait_for_event(1000)
+                .map_err(|e| anyhow!("WaitForSingleObject failed: {:?}", e))?;
+        }
+
         loop {
             if let Ok(command) = self.receiver.recv() {
                 match command {
@@ -211,7 +234,7 @@ impl Streamer {
                             .write_to_device(
                                 available_frames as usize,
                                 self.wave_format.get_blockalign() as usize,
-                                buffer.as_mut_slice(),
+                                buffer.as_slice(),
                                 None,
                             )
                             .map_err(|e| anyhow!("IAudioRenderClient::Write failed: {:?}", e))?;
