@@ -12,16 +12,17 @@ use ratatui::{
 use walkdir::WalkDir;
 
 use crate::{
+    player::{CurrentTrackInfo, Player},
     song::Song,
-    ui::{HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_COLOR, ROW_COLOR_COL, ROW_ALTERNATE_COLOR_COL}, player::{Player, CurrentTrackInfo},
+    ui::{HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_ALTERNATE_COLOR_COL, ROW_COLOR, ROW_COLOR_COL},
 };
-
 
 pub struct Playlist {
     state: TableState,
     songs: Vec<Arc<Song>>,
     player: Player,
-    current_track: Option<CurrentTrackInfo>,
+    playing_track: Option<CurrentTrackInfo>,
+    playing_track_list_index: usize,
     automatically_play_next: bool,
 }
 
@@ -47,14 +48,17 @@ impl Playlist {
                 songs.push(Arc::new(Song::new(f)?));
             }
         } else if path.is_file() {
-            songs.push(Arc::new(Song::new(path.into_os_string().into_string().unwrap())?));
+            songs.push(Arc::new(Song::new(
+                path.into_os_string().into_string().unwrap(),
+            )?));
         }
         Ok(Self {
             state: TableState::default(),
             songs,
             player,
-            current_track: None,
-            automatically_play_next: true
+            playing_track: None,
+            playing_track_list_index: 0,
+            automatically_play_next: true,
         })
     }
 
@@ -86,33 +90,59 @@ impl Playlist {
         self.state.select(Some(i));
     }
 
+    async fn next(&mut self) -> Result<()> {
+        self.playing_track_list_index = if self.playing_track_list_index + 1 > self.songs.len() - 1 {
+            0
+        } else {
+            self.playing_track_list_index + 1
+        };
+        self.play().await
+    }
+
+    async fn previous(&mut self) -> Result<()> {
+        self.playing_track_list_index = if self.playing_track_list_index == 0 {
+            self.songs.len() - 1
+        } else {
+            self.playing_track_list_index - 1
+        };
+        self.play().await
+    }
+
     async fn play(&mut self) -> Result<()> {
         self.stop().await?;
-        if let Some(index) = self.state.selected() {
-            if let Some(song) = self.songs.get(index) {
-                let current_track_info = self.player.play(song.clone()).await?;
-                self.current_track = Some(current_track_info);
-            }
+        if let Some(song) = self.songs.get(self.playing_track_list_index) {
+            let current_track_info = self.player.play(song.clone()).await?;
+            self.playing_track = Some(current_track_info);
         }
         Ok(())
     }
 
     async fn stop(&mut self) -> Result<()> {
+        self.playing_track = None;
         self.player.stop()
     }
 
     pub async fn event_hanlder(&mut self, key: KeyEvent) -> Result<()> {
         if key.kind == KeyEventKind::Press {
             match key.code {
-                KeyCode::Up => self.select_previous(),
-                KeyCode::Down => self.select_next(),
+                KeyCode::Up | KeyCode::Char('k') => self.select_previous(),
+                KeyCode::Down | KeyCode::Char('j') => self.select_next(),
                 KeyCode::Enter => {
-                    self.current_track = None;
+                    if let Some(some_selected_index) = self.state.selected() {
+                        self.playing_track_list_index = some_selected_index;
+                    } else {
+                        self.playing_track_list_index = 0;
+                    }
                     self.play().await?;
-                },
+                }
                 KeyCode::Char('s') => {
-                    self.current_track = None;
                     self.stop().await?;
+                }
+                KeyCode::Char('n') => {
+                    self.next().await?;
+                }
+                KeyCode::Char('p') => {
+                    self.previous().await?;
                 }
                 _ => (),
             }
@@ -121,9 +151,8 @@ impl Playlist {
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        if let Some(current_track) = self.current_track.clone() {
+        if let Some(current_track) = self.playing_track.clone() {
             if !current_track.is_streaming() && self.automatically_play_next {
-                self.current_track = None;
                 self.select_next();
                 self.play().await?;
             }
@@ -133,7 +162,7 @@ impl Playlist {
 
     pub(crate) fn render<B: Backend>(&mut self, frame: &mut Frame<B>, area: Rect) -> Result<()> {
         let mut items = Vec::new();
-        let current_track_title = if let Some(current_track_info) = self.current_track.clone() {
+        let current_track_title = if let Some(current_track_info) = self.playing_track.clone() {
             current_track_info.title
         } else {
             String::default()
@@ -141,7 +170,11 @@ impl Playlist {
 
         for song in &self.songs {
             let row = Row::new(vec![
-                Cell::from(if current_track_title == song.title { "󰐊" } else { "  " }),
+                Cell::from(if current_track_title == song.title {
+                    "󰐊"
+                } else {
+                    "  "
+                }),
                 Cell::from(song.title.clone()).style(Style::default().bg(
                     if items.len() % 2 == 0 {
                         ROW_COLOR_COL
@@ -150,13 +183,11 @@ impl Playlist {
                     },
                 )),
                 Cell::from(song.artist.clone()),
-                Cell::from(song.info()).style(Style::default().bg(
-                    if items.len() % 2 == 0 {
-                        ROW_COLOR_COL
-                    } else {
-                        ROW_ALTERNATE_COLOR_COL
-                    },
-                )),
+                Cell::from(song.info()).style(Style::default().bg(if items.len() % 2 == 0 {
+                    ROW_COLOR_COL
+                } else {
+                    ROW_ALTERNATE_COLOR_COL
+                })),
                 Cell::from(song.formated_duration()),
             ])
             .height(1)

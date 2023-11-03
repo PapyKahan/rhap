@@ -76,7 +76,7 @@ impl App {
                             if key.kind == event::KeyEventKind::Press {
                                 match key.code {
                                     KeyCode::Char('q') => return Ok(()),
-                                    KeyCode::Char('p') => {
+                                    KeyCode::Char('o') => {
                                         self.output_selector.borrow_mut().refresh_device_list()?;
                                         self.layers.push(Screens::OutputSelector(
                                             self.output_selector.clone(),
