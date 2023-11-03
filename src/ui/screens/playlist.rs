@@ -52,8 +52,10 @@ impl Playlist {
                 path.into_os_string().into_string().unwrap(),
             )?));
         }
+        let mut state = TableState::default();
+        state.select(Some(0));
         Ok(Self {
-            state: TableState::default(),
+            state,
             songs,
             player,
             playing_track: None,
@@ -91,7 +93,8 @@ impl Playlist {
     }
 
     async fn next(&mut self) -> Result<()> {
-        self.playing_track_list_index = if self.playing_track_list_index + 1 > self.songs.len() - 1 {
+        self.playing_track_list_index = if self.playing_track_list_index + 1 > self.songs.len() - 1
+        {
             0
         } else {
             self.playing_track_list_index + 1
@@ -128,8 +131,8 @@ impl Playlist {
                 KeyCode::Up | KeyCode::Char('k') => self.select_previous(),
                 KeyCode::Down | KeyCode::Char('j') => self.select_next(),
                 KeyCode::Enter => {
-                    if let Some(some_selected_index) = self.state.selected() {
-                        self.playing_track_list_index = some_selected_index;
+                    if let Some(index) = self.state.selected() {
+                        self.playing_track_list_index = index;
                     } else {
                         self.playing_track_list_index = 0;
                     }
@@ -162,41 +165,37 @@ impl Playlist {
 
     pub(crate) fn render<B: Backend>(&mut self, frame: &mut Frame<B>, area: Rect) -> Result<()> {
         let mut items = Vec::new();
-        let current_track_title = if let Some(current_track_info) = self.playing_track.clone() {
-            current_track_info.title
-        } else {
-            String::default()
-        };
-
-        for song in &self.songs {
-            let row = Row::new(vec![
-                Cell::from(if current_track_title == song.title {
-                    "󰐊"
-                } else {
-                    "  "
-                }),
-                Cell::from(song.title.clone()).style(Style::default().bg(
-                    if items.len() % 2 == 0 {
+        for index in 0..self.songs.len() {
+            if let Some(song) = self.songs.get(index) {
+                let row = Row::new(vec![
+                    Cell::from(if self.playing_track_list_index == index {
+                        "󰐊"
+                    } else {
+                        "  "
+                    }),
+                    Cell::from(song.title.clone()).style(Style::default().bg(
+                        if items.len() % 2 == 0 {
+                            ROW_COLOR_COL
+                        } else {
+                            ROW_ALTERNATE_COLOR_COL
+                        },
+                    )),
+                    Cell::from(song.artist.clone()),
+                    Cell::from(song.info()).style(Style::default().bg(if items.len() % 2 == 0 {
                         ROW_COLOR_COL
                     } else {
                         ROW_ALTERNATE_COLOR_COL
-                    },
-                )),
-                Cell::from(song.artist.clone()),
-                Cell::from(song.info()).style(Style::default().bg(if items.len() % 2 == 0 {
-                    ROW_COLOR_COL
+                    })),
+                    Cell::from(song.formated_duration()),
+                ])
+                .height(1)
+                .style(Style::default().bg(if items.len() % 2 == 0 {
+                    ROW_COLOR
                 } else {
-                    ROW_ALTERNATE_COLOR_COL
-                })),
-                Cell::from(song.formated_duration()),
-            ])
-            .height(1)
-            .style(Style::default().bg(if items.len() % 2 == 0 {
-                ROW_COLOR
-            } else {
-                ROW_ALTERNATE_COLOR
-            }));
-            items.push(row);
+                    ROW_ALTERNATE_COLOR
+                }));
+                items.push(row);
+            }
         }
         let table = Table::new(items)
             .highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
