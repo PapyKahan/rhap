@@ -156,8 +156,7 @@ impl Playlist {
     pub async fn run(&mut self) -> Result<()> {
         if let Some(current_track) = self.playing_track.clone() {
             if !current_track.is_streaming() && self.automatically_play_next {
-                self.select_next();
-                self.play().await?;
+                self.next().await?;
             }
         }
         Ok(())
