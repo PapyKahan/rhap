@@ -1,8 +1,9 @@
 pub(crate) mod api;
+pub(crate) mod host;
+pub(crate) mod device;
 
-use std::sync::mpsc::SyncSender;
-
-use anyhow::{anyhow, Result};
+pub use host::{HostTrait, Host};
+pub use device::{DeviceTrait, Device};
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy)]
@@ -59,23 +60,6 @@ pub struct StreamParams {
     pub exclusive: bool,
 }
 
-pub trait DeviceTrait: Send + Sync {
-    fn is_default(&self) -> bool;
-    //fn set_status(&self, status: StreamingCommand);
-    //fn get_status(&self) -> StreamingCommand;
-    fn name(&self) -> String;
-    fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>>;
-    fn stop(&mut self) -> Result<()>;
-}
-
-pub enum Device {
-    None,
-    Wasapi(api::wasapi::device::Device),
-}
-
-impl Device {
-}
-
 #[derive(Copy, Clone)]
 pub enum StreamingCommand {
     None,
@@ -85,76 +69,3 @@ pub enum StreamingCommand {
     Stop,
 }
 
-impl DeviceTrait for Device {
-    fn is_default(&self) -> bool {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return false,
-        };
-        device.is_default()
-    }
-
-    fn name(&self) -> String {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return String::from("none"),
-        };
-        device.name()
-    }
-
-    fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>> {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return Err(anyhow!("No host selected")),
-        };
-        device.start(params)
-    }
-
-    fn stop(&mut self) -> Result<()> {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return Ok(()),
-        };
-        device.stop()
-    }
-}
-
-pub trait HostTrait: Send + Sync {
-    fn create_device(&self, id: Option<u32>) -> Result<Device, Box<dyn std::error::Error>>;
-    fn get_devices(&self) -> Result<Vec<Device>, Box<dyn std::error::Error>>;
-    fn get_default_device(&self) -> Result<Device, Box<dyn std::error::Error>>;
-}
-
-#[derive(Clone, Copy)]
-pub enum Host {
-    Wasapi(api::wasapi::host::Host),
-}
-
-impl HostTrait for Host {
-    fn get_devices(&self) -> Result<Vec<Device>, Box<dyn std::error::Error>> {
-        match self {
-            Self::Wasapi(host) => host.get_devices(),
-        }
-    }
-
-    fn create_device(&self, id: Option<u32>) -> Result<Device, Box<dyn std::error::Error>> {
-        match self {
-            Self::Wasapi(host) => host.create_device(id),
-        }
-    }
-
-    fn get_default_device(&self) -> Result<Device, Box<dyn std::error::Error>> {
-        match self {
-            Self::Wasapi(host) => host.get_default_device(),
-        }
-    }
-}
-
-impl Host {
-    pub(crate) fn new(name: &str) -> Self {
-        match name {
-            "wasapi" => Host::Wasapi(api::wasapi::host::Host::new()),
-            _ => Host::Wasapi(api::wasapi::host::Host::new()),
-        }
-    }
-}
