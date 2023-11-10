@@ -26,7 +26,7 @@ impl App {
         })
     }
 
-    fn render<B: Backend>(&mut self, frame: &mut Frame<B>) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame) -> Result<()> {
         self.playlist.borrow_mut().render(frame, frame.size())?;
         let layer = if self.layers.is_empty() {
             return Ok(());
@@ -56,7 +56,7 @@ impl App {
 
 
             // handle crossterm events
-            if event::poll(std::time::Duration::from_millis(50))? {
+            if event::poll(std::time::Duration::from_millis(100))? {
                 let current_screen = self.layers.last().unwrap_or(&default);
                 if let Event::Key(key) = event::read()? {
                     match current_screen {

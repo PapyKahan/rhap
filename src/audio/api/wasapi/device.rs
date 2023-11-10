@@ -35,7 +35,7 @@ impl DeviceTrait for Device {
     }
 
     fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>> {
-        let (tx, rx) = sync_channel::<StreamingCommand>(8192);
+        let (tx, rx) = sync_channel::<StreamingCommand>(16384);
         let mut streamer = Streamer::new(&self, rx, params)?;
         self.stream_thread_handle = Some(std::thread::spawn(move || -> Result<()> {
             streamer.start()?;

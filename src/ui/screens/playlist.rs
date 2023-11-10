@@ -4,7 +4,7 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use rand::{seq::SliceRandom, thread_rng};
 use ratatui::{
-    prelude::{Alignment, Backend, Constraint, Rect},
+    prelude::{Alignment, Constraint, Rect},
     style::Style,
     widgets::{Block, BorderType, Borders, Cell, Clear, Row, Table, TableState},
     Frame,
@@ -125,6 +125,10 @@ impl Playlist {
         self.player.stop()
     }
 
+    async fn pause(&mut self) -> Result<()> {
+        self.player.pause()
+    }
+
     pub async fn event_hanlder(&mut self, key: KeyEvent) -> Result<()> {
         if key.kind == KeyEventKind::Press {
             match key.code {
@@ -146,6 +150,9 @@ impl Playlist {
                 }
                 KeyCode::Char('p') => {
                     self.previous().await?;
+                },
+                KeyCode::Char(' ') => {
+                    self.pause().await?;
                 }
                 _ => (),
             }
@@ -162,7 +169,7 @@ impl Playlist {
         Ok(())
     }
 
-    pub(crate) fn render<B: Backend>(&mut self, frame: &mut Frame<B>, area: Rect) -> Result<()> {
+    pub(crate) fn render(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         let mut items = Vec::new();
         for index in 0..self.songs.len() {
             if let Some(song) = self.songs.get(index) {

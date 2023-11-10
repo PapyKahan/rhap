@@ -186,6 +186,10 @@ impl Streamer {
         let _ = self.pause_condition.wait(status);
     }
 
+    fn resume(&self) {
+        self.pause_condition.notify_all()
+    }
+
     pub(crate) fn start(&mut self) -> Result<()> {
         self.client
             .start_stream()
@@ -253,6 +257,9 @@ impl Streamer {
                         self.client
                             .start_stream()
                             .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))?;
+                    }
+                    StreamingCommand::Resume => {
+                        self.resume()
                     }
                     StreamingCommand::Stop => {
                         return Ok(());

@@ -23,7 +23,6 @@ pub struct Player {
 #[derive(Clone)]
 pub struct CurrentTrackInfo {
     is_streaming: Arc<AtomicBool>,
-    progress: Arc<AtomicU64>,
     pub title: String,
     pub artist: String,
 }
@@ -31,9 +30,6 @@ pub struct CurrentTrackInfo {
 impl CurrentTrackInfo {
     pub fn is_streaming(&self) -> bool {
         self.is_streaming.load(Ordering::Relaxed)
-    }
-    pub fn get_progress(&self) -> u64 {
-        self.progress.load(Ordering::Relaxed)
     }
 }
 
@@ -59,6 +55,13 @@ impl Player {
         Ok(())
     }
 
+    pub fn pause(&mut self) -> Result<()> {
+        if let Some(stream) = self.previous_stream.take() {
+            stream.send(StreamingCommand::Pause)?;
+        }
+        Ok(())
+    }
+
     /// Plays a FLAC file
     /// - params:
     ///    - song: song struct
@@ -80,7 +83,6 @@ impl Player {
         let stream = self.previous_stream.clone();
         let progress = Arc::new(AtomicU64::new(0));
 
-        let report_progress = Arc::clone(&progress);
         let is_streaming = Arc::new(AtomicBool::new(true));
         let report_streaming = Arc::clone(&is_streaming);
         let is_playing = self.is_playing.clone();
@@ -210,7 +212,6 @@ impl Player {
 
         Ok(CurrentTrackInfo {
             is_streaming: report_streaming,
-            progress: report_progress,
             title: report_song.title.clone(),
             artist: report_song.artist.clone()
         })

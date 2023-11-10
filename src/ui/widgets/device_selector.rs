@@ -5,7 +5,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
-    prelude::{Alignment, Backend, Constraint, Rect},
+    prelude::{Alignment, Constraint, Rect},
     style::Style,
     widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
     Frame,
@@ -105,7 +105,7 @@ impl DeviceSelector {
         Ok(())
     }
 
-    pub(crate) fn render<B: Backend>(&mut self, frame: &mut Frame<B>, area: Rect) -> Result<()> {
+    pub(crate) fn render(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         let default = &self.default.name().clone();
         let selected_device_name = if let Some(device) = self.selected.as_ref() {
             device
