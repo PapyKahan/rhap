@@ -40,12 +40,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let devices = host.get_devices()?;
         let mut index = 0;
         for dev in devices {
+            let capabilities = dev.get_capabilities()?;
             println!(
                 "{} [{}]: {}",
                 if dev.is_default() { "->" } else { "  " },
                 index,
                 dev.name()
             );
+            if let Some(bitrate) = capabilities.bits_per_samples.last() {
+                println!("    Max bits per sample: {}bits", *bitrate as usize);
+            }
+            if let Some(rate) = capabilities.sample_rates.last() {
+                println!("    Max sample rate: {}Hz", *rate as usize);
+            }
             index = index + 1;
         }
         return Ok(());

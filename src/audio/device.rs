@@ -1,13 +1,12 @@
 use std::sync::mpsc::SyncSender;
 use anyhow::{anyhow, Result};
 
-use super::{StreamParams, StreamingCommand, api};
+use super::{StreamParams, StreamingCommand, api, Capabilities};
 
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> bool;
-    //fn set_status(&self, status: StreamingCommand);
-    //fn get_status(&self) -> StreamingCommand;
     fn name(&self) -> String;
+    fn get_capabilities(&self) -> Result<Capabilities>;
     fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>>;
     fn stop(&mut self) -> Result<()>;
 }
@@ -32,6 +31,14 @@ impl DeviceTrait for Device {
             Self::None => return String::from("none"),
         };
         device.name()
+    }
+
+    fn get_capabilities(&self) -> Result<Capabilities> {
+        let device = match self {
+            Self::Wasapi(device) => device,
+            Self::None => return Ok(Capabilities::default()),
+        };
+        device.get_capabilities()
     }
 
     fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>> {

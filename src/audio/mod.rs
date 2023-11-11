@@ -6,7 +6,7 @@ pub use host::{HostTrait, Host};
 pub use device::{DeviceTrait, Device};
 
 #[repr(u32)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SampleRate {
     Rate44100Hz = 44100,
     Rate48000Hz = 48000,
@@ -31,7 +31,7 @@ impl From<u32> for SampleRate {
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BitsPerSample {
     Bits8 = 8,
     Bits16 = 16,
@@ -47,6 +47,31 @@ impl From<u8> for BitsPerSample {
             24 => BitsPerSample::Bits24,
             32 => BitsPerSample::Bits32,
             _ => panic!("Invalid bits per sample"),
+        }
+    }
+}
+
+pub struct Capabilities {
+    pub sample_rates: Vec<SampleRate>,
+    pub bits_per_samples: Vec<BitsPerSample>,
+}
+
+impl Capabilities {
+    pub fn default() -> Self {
+        Self {
+            sample_rates: vec![
+                SampleRate::Rate44100Hz,
+                SampleRate::Rate48000Hz,
+                SampleRate::Rate88200Hz,
+                SampleRate::Rate96000Hz,
+                SampleRate::Rate176400Hz,
+                SampleRate::Rate192000Hz,
+            ],
+            bits_per_samples: vec![
+                BitsPerSample::Bits16,
+                BitsPerSample::Bits24,
+                BitsPerSample::Bits32,
+            ],
         }
     }
 }
