@@ -10,6 +10,12 @@ impl Host {
     pub(crate) fn new() -> Self {
         Self {}
     }
+
+    pub fn get_default_device() -> Result<wasapi::Device> {
+        com_initialize();
+        get_default_device(&Direction::Render)
+            .map_err(|e| anyhow!("get_default_device failed: {}", e))
+    }
 }
 
 impl HostTrait for Host {
@@ -17,24 +23,22 @@ impl HostTrait for Host {
         com_initialize();
         let devices_collection = DeviceCollection::new(&Direction::Render)
             .map_err(|e| anyhow!("DeviceCollection::new failed: {}", e))?;
-        let default_device = get_default_device(&Direction::Render)
-            .map_err(|e| anyhow!("get_default_device failed: {}", e))?;
+        let default_device = Self::get_default_device()?;
+        let default_device_id = default_device
+            .get_id()
+            .map_err(|e| anyhow!("Device::get_id failed: {}", e))?;
         let device = match id {
             Some(index) => devices_collection
                 .get_device_at_index(index)
                 .map_err(|e| anyhow!("DeviceCollection::get_device_at_index failed: {}", e))?,
-            _ => get_default_device(&Direction::Render)
-                .map_err(|e| anyhow!("get_default_device failed: {}", e))?,
+            _ => default_device,
         };
         let device_id = device
             .get_id()
             .map_err(|e| anyhow!("Device::get_id failed: {}", e))?;
         Ok(crate::audio::Device::Wasapi(Device::new(
             device,
-            device_id
-                == default_device
-                    .get_id()
-                    .map_err(|e| anyhow!("Device::get_id failed: {}", e))?,
+            device_id == default_device_id,
         )?))
     }
 
@@ -42,8 +46,10 @@ impl HostTrait for Host {
         com_initialize();
         let devices_collection = DeviceCollection::new(&Direction::Render)
             .map_err(|e| anyhow!("DeviceCollection::new failed: {}", e))?;
-        let default_device = get_default_device(&Direction::Render)
-            .map_err(|e| anyhow!("get_default_device failed: {}", e))?;
+        let default_device = Self::get_default_device()?;
+        let default_device_id = default_device
+            .get_id()
+            .map_err(|e| anyhow!("Device::get_id failed: {}", e))?;
         let mut enumerated_devices: Vec<crate::audio::Device> = vec![];
         for i in 0..devices_collection
             .get_nbr_devices()
@@ -57,19 +63,14 @@ impl HostTrait for Host {
                 .map_err(|e| anyhow!("Device::get_id failed: {}", e))?;
             enumerated_devices.push(crate::audio::Device::Wasapi(Device::new(
                 device,
-                device_id
-                    == default_device
-                        .get_id()
-                        .map_err(|e| anyhow!("Device::get_id failed: {}", e))?,
+                device_id == default_device_id,
             )?));
         }
         Ok(enumerated_devices)
     }
 
     fn get_default_device(&self) -> Result<crate::audio::Device> {
-        com_initialize();
-        let device = get_default_device(&Direction::Render)
-            .map_err(|e| anyhow!("get_default_device failed: {}", e))?;
+        let device = Self::get_default_device()?;
         Ok(crate::audio::Device::Wasapi(Device::new(device, true)?))
     }
 }

@@ -19,7 +19,6 @@ use windows::Win32::Media::Audio::AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED;
 use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 
 use super::com::com_initialize;
-use super::device::Device;
 use crate::audio::{StreamParams, StreamingCommand};
 
 pub struct Streamer {
@@ -57,13 +56,12 @@ impl Streamer {
     }
 
     pub(super) fn new(
-        device: &Device,
+        device: &wasapi::Device,
         receiver: Receiver<StreamingCommand>,
         params: StreamParams,
     ) -> Result<Self> {
         com_initialize();
         let mut client = device
-            .inner_device
             .get_iaudioclient()
             .map_err(|e| anyhow!("IAudioClient::GetAudioClient failed: {}", e))?;
         let wave_format = Streamer::create_waveformat_from(params.clone());
@@ -89,7 +87,7 @@ impl Streamer {
         let result = client.initialize_client(
             &wave_format,
             desired_period,
-            &device.inner_device.get_direction(),
+            &device.get_direction(),
             &sharemode,
             false,
         );
@@ -123,7 +121,7 @@ impl Streamer {
                             );
                             debug!("Aligned period in 100ns units: {}", aligned_period);
                             // 4. Get a new IAudioClient
-                            client = device.inner_device.get_iaudioclient().map_err(|e| {
+                            client = device.get_iaudioclient().map_err(|e| {
                                 anyhow!("IAudioClient::GetAudioClient failed: {}", e)
                             })?;
                             // 5. Call Initialize again on the created audio client.

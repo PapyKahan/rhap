@@ -6,10 +6,10 @@ use super::{com::com_initialize, stream::Streamer};
 use crate::audio::{Capabilities, DeviceTrait, StreamParams, StreamingCommand};
 
 pub struct Device {
-    pub is_default: bool,
-    pub(super) inner_device: wasapi::Device,
-    pub(super) receiver: Option<Receiver<StreamingCommand>>,
-    pub(super) stream_thread_handle: Option<std::thread::JoinHandle<Result<()>>>,
+    is_default: bool,
+    inner_device: wasapi::Device,
+    receiver: Option<Receiver<StreamingCommand>>,
+    stream_thread_handle: Option<std::thread::JoinHandle<Result<()>>>,
 }
 
 impl Device {
@@ -104,7 +104,7 @@ impl DeviceTrait for Device {
 
     fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>> {
         let (tx, rx) = sync_channel::<StreamingCommand>(16384);
-        let mut streamer = Streamer::new(&self, rx, params)?;
+        let mut streamer = Streamer::new(&self.inner_device, rx, params)?;
         self.stream_thread_handle = Some(std::thread::spawn(move || -> Result<()> {
             streamer.start()?;
             return Ok(());
