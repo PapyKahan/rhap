@@ -191,6 +191,7 @@ impl Streamer {
     }
 
     pub(crate) fn start(&mut self) -> Result<()> {
+        com_initialize();
         self.client
             .start_stream()
             .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))?;
@@ -258,9 +259,7 @@ impl Streamer {
                             .start_stream()
                             .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))?;
                     }
-                    StreamingCommand::Resume => {
-                        self.resume()
-                    }
+                    StreamingCommand::Resume => self.resume(),
                     StreamingCommand::Stop => {
                         return Ok(());
                     }

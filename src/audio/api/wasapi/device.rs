@@ -13,29 +13,16 @@ pub struct Device {
 }
 
 impl Device {
-    pub(super) fn new(inner_device: wasapi::Device, is_default: bool) -> Self {
-        Self {
+    pub(super) fn new(inner_device: wasapi::Device, is_default: bool) -> Result<Self> {
+        Ok(Self {
             inner_device,
             receiver: Option::None,
             is_default,
             stream_thread_handle: Option::None,
-        }
-    }
-}
-
-unsafe impl Send for Device {}
-unsafe impl Sync for Device {}
-
-impl DeviceTrait for Device {
-    fn is_default(&self) -> bool {
-        self.is_default
+        })
     }
 
-    fn name(&self) -> String {
-        self.inner_device.get_friendlyname().unwrap_or_default()
-    }
-
-    fn get_capabilities(&self) -> Result<Capabilities> {
+    fn capabilities(device: &wasapi::Device) -> Result<Capabilities> {
         let mut sample_rates = Vec::new();
         let mut bits_per_samples = Vec::new();
 
@@ -51,8 +38,7 @@ impl DeviceTrait for Device {
             };
             let default_capabilities = Capabilities::default();
             for samplerate in default_capabilities.sample_rates {
-                let client = self
-                    .inner_device
+                let client = device
                     .get_iaudioclient()
                     .map_err(|e| anyhow!("IAudioClient::GetAudioClient failed: {}", e))?;
                 let wave_format = WaveFormat::new(
@@ -93,12 +79,27 @@ impl DeviceTrait for Device {
             }
         }
 
-        wasapi::deinitialize();
-
         Ok(crate::audio::Capabilities {
             sample_rates,
             bits_per_samples,
         })
+    }
+}
+
+unsafe impl Send for Device {}
+unsafe impl Sync for Device {}
+
+impl DeviceTrait for Device {
+    fn is_default(&self) -> bool {
+        self.is_default
+    }
+
+    fn name(&self) -> String {
+        self.inner_device.get_friendlyname().unwrap_or_default()
+    }
+
+    fn get_capabilities(&self) -> Result<Capabilities> {
+        Device::capabilities(&self.inner_device)
     }
 
     fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>> {

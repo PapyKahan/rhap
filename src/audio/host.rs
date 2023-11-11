@@ -1,10 +1,11 @@
 use super::{Device, api};
+use anyhow::Result;
 
 
 pub trait HostTrait: Send + Sync {
-    fn create_device(&self, id: Option<u32>) -> Result<Device, Box<dyn std::error::Error>>;
-    fn get_devices(&self) -> Result<Vec<Device>, Box<dyn std::error::Error>>;
-    fn get_default_device(&self) -> Result<Device, Box<dyn std::error::Error>>;
+    fn create_device(&self, id: Option<u32>) -> Result<Device>;
+    fn get_devices(&self) -> Result<Vec<Device>>;
+    fn get_default_device(&self) -> Result<Device>;
 }
 
 #[derive(Clone, Copy)]
@@ -13,19 +14,19 @@ pub enum Host {
 }
 
 impl HostTrait for Host {
-    fn get_devices(&self) -> Result<Vec<Device>, Box<dyn std::error::Error>> {
+    fn get_devices(&self) -> Result<Vec<Device>> {
         match self {
             Self::Wasapi(host) => host.get_devices(),
         }
     }
 
-    fn create_device(&self, id: Option<u32>) -> Result<Device, Box<dyn std::error::Error>> {
+    fn create_device(&self, id: Option<u32>) -> Result<Device> {
         match self {
             Self::Wasapi(host) => host.create_device(id),
         }
     }
 
-    fn get_default_device(&self) -> Result<Device, Box<dyn std::error::Error>> {
+    fn get_default_device(&self) -> Result<Device> {
         match self {
             Self::Wasapi(host) => host.get_default_device(),
         }
