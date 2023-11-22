@@ -179,6 +179,7 @@ impl Streamer {
             receiver,
         })
     }
+
     pub(super) fn wait_readiness(&self) {
         let status = self.status.lock().expect("fail to lock status mutex");
         let _ = self.pause_condition.wait(status);
