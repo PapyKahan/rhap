@@ -1,13 +1,15 @@
-use std::sync::mpsc::SyncSender;
 use anyhow::{anyhow, Result};
+use std::sync::mpsc::SyncSender;
 
-use super::{StreamParams, StreamingCommand, api, Capabilities};
+use super::{api, Capabilities, StreamParams, StreamingCommand};
 
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> bool;
     fn name(&self) -> String;
     fn get_capabilities(&self) -> Result<Capabilities>;
-    fn start(&mut self, params: StreamParams) -> Result<(SyncSender<StreamingCommand>, SyncSender<u8>)>;
+    fn start(&mut self, params: StreamParams) -> Result<SyncSender<u8>>;
+    fn pause(&mut self) -> Result<()>;
+    fn resume(&mut self) -> Result<()>;
     fn stop(&mut self) -> Result<()>;
 }
 
@@ -41,12 +43,28 @@ impl DeviceTrait for Device {
         device.get_capabilities()
     }
 
-    fn start(&mut self, params: StreamParams) -> Result<(SyncSender<StreamingCommand>, SyncSender<u8>)> {
+    fn start(&mut self, params: StreamParams) -> Result<SyncSender<u8>> {
         let device = match self {
             Self::Wasapi(device) => device,
             Self::None => return Err(anyhow!("No host selected")),
         };
         device.start(params)
+    }
+
+    fn pause(&mut self) -> Result<()> {
+        let device = match self {
+            Self::Wasapi(device) => device,
+            Self::None => return Ok(()),
+        };
+        device.pause()
+    }
+
+    fn resume(&mut self) -> Result<()> {
+        let device = match self {
+            Self::Wasapi(device) => device,
+            Self::None => return Ok(()),
+        };
+        device.resume()
     }
 
     fn stop(&mut self) -> Result<()> {
@@ -57,4 +75,3 @@ impl DeviceTrait for Device {
         device.stop()
     }
 }
-

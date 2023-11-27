@@ -8,17 +8,17 @@ use crate::audio::{Capabilities, DeviceTrait, StreamParams, StreamingCommand};
 pub struct Device {
     is_default: bool,
     inner_device: wasapi::Device,
-    receiver: Option<Receiver<StreamingCommand>>,
     stream_thread_handle: Option<std::thread::JoinHandle<Result<()>>>,
+    command: Option<SyncSender<StreamingCommand>>,
 }
 
 impl Device {
     pub(super) fn new(inner_device: wasapi::Device, is_default: bool) -> Result<Self> {
         Ok(Self {
             inner_device,
-            receiver: Option::None,
             is_default,
             stream_thread_handle: Option::None,
+            command: Option::None,
         })
     }
 
@@ -102,20 +102,36 @@ impl DeviceTrait for Device {
         Device::capabilities(&self.inner_device)
     }
 
-    fn start(&mut self, params: StreamParams) -> Result<(SyncSender<StreamingCommand>, SyncSender<u8>)> {
+    fn start(&mut self, params: StreamParams) -> Result<SyncSender<u8>> {
         let (command_tx, command_rx) = sync_channel::<StreamingCommand>(16384);
+        self.command = Some(command_tx);
         let (data_tx, data_rx) = sync_channel::<u8>(16384);
         let mut streamer = Streamer::new(&self.inner_device, data_rx, command_rx, params)?;
         self.stream_thread_handle = Some(std::thread::spawn(move || -> Result<()> {
             streamer.start()?;
             return Ok(());
         }));
-        Ok((command_tx, data_tx))
+        Ok(data_tx)
+    }
+
+    fn pause(&mut self) -> Result<()> {
+        if let Some(command) = self.command.take() {
+            command.send(StreamingCommand::Pause)?;
+        }
+        Ok(())
+    }
+
+    fn resume(&mut self) -> Result<()> {
+        if let Some(command) = self.command.take() {
+            command.send(StreamingCommand::Resume)?;
+        }
+        Ok(())
     }
 
     fn stop(&mut self) -> Result<()> {
-        if let Some(receiver) = self.receiver.take() {
-            drop(receiver);
+        if let Some(command) = self.command.take() {
+            command.send(StreamingCommand::Stop)?;
+            drop(command);
         }
         if let Some(handle) = self.stream_thread_handle.take() {
             handle

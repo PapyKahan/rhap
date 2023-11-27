@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use log::error;
-use std::sync::atomic::{Ordering, AtomicU64, AtomicBool};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::SyncSender;
 use std::sync::Arc;
 use symphonia::core::audio::RawSampleBuffer;
@@ -9,16 +9,13 @@ use symphonia::core::formats::{SeekMode, SeekTo};
 use symphonia::core::sample::i24;
 use symphonia::core::units::Time;
 
-use crate::audio::{
-    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamingCommand,
-};
+use crate::audio::{BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams};
 use crate::song::Song;
 
 pub struct Player {
     device: Device,
     previous_stream: Option<SyncSender<u8>>,
-    previous_command: Option<SyncSender<StreamingCommand>>,
-    is_playing: Arc<AtomicBool>
+    is_playing: Arc<AtomicBool>,
 }
 
 #[derive(Clone)]
@@ -42,26 +39,21 @@ impl Player {
         Ok(Player {
             device,
             previous_stream: None,
-            previous_command: None,
-            is_playing: Arc::new(AtomicBool::new(false))
+            is_playing: Arc::new(AtomicBool::new(false)),
         })
     }
 
     pub fn stop(&mut self) -> Result<()> {
         self.is_playing.store(false, Ordering::Relaxed);
-        if let Some(command) = self.previous_command.take() {
-            command.send(StreamingCommand::Stop)?;
+        if let Some(stream) = self.previous_stream.take() {
             self.device.stop()?;
-            drop(command);
+            drop(stream);
         }
         Ok(())
     }
 
     pub fn pause(&mut self) -> Result<()> {
-        if let Some(command) = self.previous_command.take() {
-            command.send(StreamingCommand::Pause)?;
-        }
-        Ok(())
+        self.device.pause()
     }
 
     /// Plays a FLAC file
@@ -77,14 +69,13 @@ impl Player {
             buffer_length: 0,
             exclusive: true,
         };
-        let (command_sender, data_sender) = self.device
-                .start(streamparams)
-                .map_err(|err| anyhow!(err.to_string()))?;
+        let data_sender = self
+            .device
+            .start(streamparams)
+            .map_err(|err| anyhow!(err.to_string()))?;
         self.previous_stream = Some(data_sender);
-        self.previous_command = Some(command_sender);
         let stream = self.previous_stream.clone();
         let progress = Arc::new(AtomicU64::new(0));
-
         let is_streaming = Arc::new(AtomicBool::new(true));
         let report_streaming = Arc::clone(&is_streaming);
         let is_playing = self.is_playing.clone();
@@ -141,7 +132,10 @@ impl Player {
                             break;
                         }
                     };
-                    progress.store(progress.load(Ordering::Relaxed) + packet.dur, Ordering::Relaxed);
+                    progress.store(
+                        progress.load(Ordering::Relaxed) + packet.dur,
+                        Ordering::Relaxed,
+                    );
 
                     let mut decoder = if let Ok(decoder) = song.decoder.lock() {
                         decoder
@@ -160,10 +154,7 @@ impl Player {
                             let mut sample_buffer = RawSampleBuffer::<u8>::new(duration, *spec);
                             sample_buffer.copy_interleaved_ref(decoded);
                             for i in sample_buffer.as_bytes().iter() {
-                                if streamer
-                                    .send(*i)
-                                    .is_err()
-                                {
+                                if streamer.send(*i).is_err() {
                                     break;
                                 }
                             }
@@ -172,10 +163,7 @@ impl Player {
                             let mut sample_buffer = RawSampleBuffer::<i16>::new(duration, *spec);
                             sample_buffer.copy_interleaved_ref(decoded);
                             for i in sample_buffer.as_bytes().iter() {
-                                if streamer
-                                    .send(*i)
-                                    .is_err()
-                                {
+                                if streamer.send(*i).is_err() {
                                     break;
                                 }
                             }
@@ -184,10 +172,7 @@ impl Player {
                             let mut sample_buffer = RawSampleBuffer::<i24>::new(duration, *spec);
                             sample_buffer.copy_interleaved_ref(decoded);
                             for i in sample_buffer.as_bytes().iter() {
-                                if streamer
-                                    .send(*i)
-                                    .is_err()
-                                {
+                                if streamer.send(*i).is_err() {
                                     break;
                                 }
                             }
@@ -196,10 +181,7 @@ impl Player {
                             let mut sample_buffer = RawSampleBuffer::<f32>::new(duration, *spec);
                             sample_buffer.copy_interleaved_ref(decoded);
                             for i in sample_buffer.as_bytes().iter() {
-                                if streamer
-                                    .send(*i)
-                                    .is_err()
-                                {
+                                if streamer.send(*i).is_err() {
                                     break;
                                 }
                             }
@@ -215,7 +197,7 @@ impl Player {
         Ok(CurrentTrackInfo {
             is_streaming: report_streaming,
             title: report_song.title.clone(),
-            artist: report_song.artist.clone()
+            artist: report_song.artist.clone(),
         })
     }
 }
