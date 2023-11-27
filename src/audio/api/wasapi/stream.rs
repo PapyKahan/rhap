@@ -225,14 +225,15 @@ impl Streamer {
             .start_stream()
             .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))?;
 
-        let mut available_frames = 0;
-        let mut available_buffer_len = 0;
+        let mut available_frames = self
+            .client
+            .get_available_space_in_frames()
+            .map_err(|e| anyhow!("IAudioClient::GetAvailableSpaceInFrames failed: {:?}", e))?;
+        let mut available_buffer_len =
+            available_frames as usize * self.wave_format.get_blockalign() as usize;
 
         loop {
-            match self
-                .command_receiver
-                .recv_timeout(Duration::from_nanos(10))
-            {
+            match self.command_receiver.recv_timeout(Duration::from_nanos(10)) {
                 Ok(command) => match command {
                     StreamingCommand::Pause => self.pause()?,
                     StreamingCommand::Resume => self.resume(),
@@ -242,18 +243,6 @@ impl Streamer {
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return self.stop(),
             }
-
-            (available_frames, available_buffer_len) = if buffer.len() == 0 {
-                let frames = self.client.get_available_space_in_frames().map_err(|e| {
-                    anyhow!("IAudioClient::GetAvailableSpaceInFrames failed: {:?}", e)
-                })?;
-
-                let buffer_len = frames as usize * self.wave_format.get_blockalign() as usize;
-
-                (frames, buffer_len)
-            } else {
-                (available_frames, available_buffer_len)
-            };
 
             if let Ok(data) = self.data_receiver.recv() {
                 buffer.push(data);
@@ -272,7 +261,13 @@ impl Streamer {
                 self.eventhandle
                     .wait_for_event(1000)
                     .map_err(|e| anyhow!("WaitForSingleObject failed: {:?}", e))?;
+
                 buffer.clear();
+                available_frames = self.client.get_available_space_in_frames().map_err(|e| {
+                    anyhow!("IAudioClient::GetAvailableSpaceInFrames failed: {:?}", e)
+                })?;
+                available_buffer_len =
+                    available_frames as usize * self.wave_format.get_blockalign() as usize;
             } else {
                 return self.stop();
             }
