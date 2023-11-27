@@ -16,7 +16,8 @@ use crate::song::Song;
 
 pub struct Player {
     device: Device,
-    previous_stream: Option<SyncSender<StreamingCommand>>,
+    previous_stream: Option<SyncSender<u8>>,
+    previous_command: Option<SyncSender<StreamingCommand>>,
     is_playing: Arc<AtomicBool>
 }
 
@@ -41,23 +42,24 @@ impl Player {
         Ok(Player {
             device,
             previous_stream: None,
+            previous_command: None,
             is_playing: Arc::new(AtomicBool::new(false))
         })
     }
 
     pub fn stop(&mut self) -> Result<()> {
         self.is_playing.store(false, Ordering::Relaxed);
-        if let Some(stream) = self.previous_stream.take() {
-            stream.send(StreamingCommand::Stop)?;
+        if let Some(command) = self.previous_command.take() {
+            command.send(StreamingCommand::Stop)?;
             self.device.stop()?;
-            drop(stream);
+            drop(command);
         }
         Ok(())
     }
 
     pub fn pause(&mut self) -> Result<()> {
-        if let Some(stream) = self.previous_stream.take() {
-            stream.send(StreamingCommand::Pause)?;
+        if let Some(command) = self.previous_command.take() {
+            command.send(StreamingCommand::Pause)?;
         }
         Ok(())
     }
@@ -75,11 +77,11 @@ impl Player {
             buffer_length: 0,
             exclusive: true,
         };
-        self.previous_stream = Some(
-            self.device
+        let (command_sender, data_sender) = self.device
                 .start(streamparams)
-                .map_err(|err| anyhow!(err.to_string()))?,
-        );
+                .map_err(|err| anyhow!(err.to_string()))?;
+        self.previous_stream = Some(data_sender);
+        self.previous_command = Some(command_sender);
         let stream = self.previous_stream.clone();
         let progress = Arc::new(AtomicU64::new(0));
 
@@ -159,7 +161,7 @@ impl Player {
                             sample_buffer.copy_interleaved_ref(decoded);
                             for i in sample_buffer.as_bytes().iter() {
                                 if streamer
-                                    .send(crate::audio::StreamingCommand::Data(*i))
+                                    .send(*i)
                                     .is_err()
                                 {
                                     break;
@@ -171,7 +173,7 @@ impl Player {
                             sample_buffer.copy_interleaved_ref(decoded);
                             for i in sample_buffer.as_bytes().iter() {
                                 if streamer
-                                    .send(crate::audio::StreamingCommand::Data(*i))
+                                    .send(*i)
                                     .is_err()
                                 {
                                     break;
@@ -183,7 +185,7 @@ impl Player {
                             sample_buffer.copy_interleaved_ref(decoded);
                             for i in sample_buffer.as_bytes().iter() {
                                 if streamer
-                                    .send(crate::audio::StreamingCommand::Data(*i))
+                                    .send(*i)
                                     .is_err()
                                 {
                                     break;
@@ -195,7 +197,7 @@ impl Player {
                             sample_buffer.copy_interleaved_ref(decoded);
                             for i in sample_buffer.as_bytes().iter() {
                                 if streamer
-                                    .send(crate::audio::StreamingCommand::Data(*i))
+                                    .send(*i)
                                     .is_err()
                                 {
                                     break;

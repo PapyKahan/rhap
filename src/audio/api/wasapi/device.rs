@@ -102,14 +102,15 @@ impl DeviceTrait for Device {
         Device::capabilities(&self.inner_device)
     }
 
-    fn start(&mut self, params: StreamParams) -> Result<SyncSender<StreamingCommand>> {
-        let (tx, rx) = sync_channel::<StreamingCommand>(16384);
-        let mut streamer = Streamer::new(&self.inner_device, rx, params)?;
+    fn start(&mut self, params: StreamParams) -> Result<(SyncSender<StreamingCommand>, SyncSender<u8>)> {
+        let (command_tx, command_rx) = sync_channel::<StreamingCommand>(16384);
+        let (data_tx, data_rx) = sync_channel::<u8>(16384);
+        let mut streamer = Streamer::new(&self.inner_device, data_rx, command_rx, params)?;
         self.stream_thread_handle = Some(std::thread::spawn(move || -> Result<()> {
             streamer.start()?;
             return Ok(());
         }));
-        Ok(tx)
+        Ok((command_tx, data_tx))
     }
 
     fn stop(&mut self) -> Result<()> {

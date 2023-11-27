@@ -4,6 +4,7 @@ use log::error;
 use std::sync::mpsc::Receiver;
 use std::sync::Condvar;
 use std::sync::Mutex;
+use std::time::Duration;
 use wasapi::calculate_period_100ns;
 use wasapi::AudioClient;
 use wasapi::AudioRenderClient;
@@ -28,7 +29,8 @@ pub struct Streamer {
     wave_format: WaveFormat,
     pause_condition: Condvar,
     status: Mutex<StreamingCommand>,
-    receiver: Receiver<StreamingCommand>,
+    command_receiver: Receiver<StreamingCommand>,
+    data_receiver: Receiver<u8>,
 }
 
 unsafe impl Send for Streamer {}
@@ -57,7 +59,8 @@ impl Streamer {
 
     pub(super) fn new(
         device: &wasapi::Device,
-        receiver: Receiver<StreamingCommand>,
+        data_receiver: Receiver<u8>,
+        command_receiver: Receiver<StreamingCommand>,
         params: StreamParams,
     ) -> Result<Self> {
         com_initialize();
@@ -176,7 +179,8 @@ impl Streamer {
             eventhandle,
             pause_condition: Condvar::new(),
             status: Mutex::new(StreamingCommand::None),
-            receiver,
+            command_receiver,
+            data_receiver,
         })
     }
 
@@ -187,6 +191,13 @@ impl Streamer {
 
     fn resume(&self) {
         self.pause_condition.notify_all()
+    }
+
+    fn stop(&self) -> Result<()> {
+        return self
+            .client
+            .stop_stream()
+            .map_err(|e| anyhow!("IAudioClient::StopStream failed: {:?}", e));
     }
 
     pub(crate) fn start(&mut self) -> Result<()> {
@@ -214,61 +225,67 @@ impl Streamer {
             .start_stream()
             .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))?;
 
+        let mut available_frames = 0;
+        let mut available_buffer_len = 0;
+
         loop {
-            if let Ok(command) = self.receiver.recv() {
-                match command {
-                    StreamingCommand::Data(data) => {
-                        let available_frames =
-                            self.client.get_available_space_in_frames().map_err(|e| {
-                                anyhow!("IAudioClient::GetAvailableSpaceInFrames failed: {:?}", e)
-                            })?;
-                        let available_buffer_len =
-                            available_frames as usize * self.wave_format.get_blockalign() as usize;
-
-                        buffer.push(data);
-                        if buffer.len() != available_buffer_len {
-                            continue;
-                        }
-
-                        self.renderer
-                            .write_to_device(
-                                available_frames as usize,
-                                self.wave_format.get_blockalign() as usize,
-                                buffer.as_slice(),
-                                None,
-                            )
-                            .map_err(|e| anyhow!("IAudioRenderClient::Write failed: {:?}", e))?;
-
-                        self.eventhandle
-                            .wait_for_event(1000)
-                            .map_err(|e| anyhow!("WaitForSingleObject failed: {:?}", e))?;
-                        buffer.clear();
-                    }
-                    StreamingCommand::Pause => {
-                        *self.status.lock().unwrap() = command;
-                        self.client
-                            .stop_stream()
-                            .map_err(|e| anyhow!("IAudioClient::StopStream failed: {:?}", e))?;
-                        self.wait_readiness();
-                        self.client
-                            .start_stream()
-                            .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))?;
-                    }
+            match self
+                .command_receiver
+                .recv_timeout(Duration::from_nanos(10))
+            {
+                Ok(command) => match command {
+                    StreamingCommand::Pause => self.pause()?,
                     StreamingCommand::Resume => self.resume(),
-                    StreamingCommand::Stop => {
-                        return self
-                            .client
-                            .stop_stream()
-                            .map_err(|e| anyhow!("IAudioClient::StopStream failed: {:?}", e));
-                    }
+                    StreamingCommand::Stop => return self.stop(),
                     _ => {}
-                }
+                },
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return self.stop(),
+            }
+
+            (available_frames, available_buffer_len) = if buffer.len() == 0 {
+                let frames = self.client.get_available_space_in_frames().map_err(|e| {
+                    anyhow!("IAudioClient::GetAvailableSpaceInFrames failed: {:?}", e)
+                })?;
+
+                let buffer_len = frames as usize * self.wave_format.get_blockalign() as usize;
+
+                (frames, buffer_len)
             } else {
-                return self
-                    .client
-                    .stop_stream()
-                    .map_err(|e| anyhow!("IAudioClient::StopStream failed: {:?}", e));
+                (available_frames, available_buffer_len)
+            };
+
+            if let Ok(data) = self.data_receiver.recv() {
+                buffer.push(data);
+                if buffer.len() != available_buffer_len {
+                    continue;
+                }
+                self.renderer
+                    .write_to_device(
+                        available_frames as usize,
+                        self.wave_format.get_blockalign() as usize,
+                        buffer.as_slice(),
+                        None,
+                    )
+                    .map_err(|e| anyhow!("IAudioRenderClient::Write failed: {:?}", e))?;
+
+                self.eventhandle
+                    .wait_for_event(1000)
+                    .map_err(|e| anyhow!("WaitForSingleObject failed: {:?}", e))?;
+                buffer.clear();
+            } else {
+                return self.stop();
             }
         }
+    }
+
+    fn pause(&self) -> Result<()> {
+        self.client
+            .stop_stream()
+            .map_err(|e| anyhow!("IAudioClient::StopStream failed: {:?}", e))?;
+        self.wait_readiness();
+        self.client
+            .start_stream()
+            .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))
     }
 }

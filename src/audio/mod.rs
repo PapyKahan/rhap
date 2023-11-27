@@ -88,7 +88,6 @@ pub struct StreamParams {
 #[derive(Copy, Clone)]
 pub enum StreamingCommand {
     None,
-    Data(u8),
     Pause,
     Resume,
     Stop,
