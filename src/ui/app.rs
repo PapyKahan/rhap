@@ -54,7 +54,6 @@ impl App {
                 }
             })?;
 
-
             // handle crossterm events
             if event::poll(std::time::Duration::from_millis(100))? {
                 let current_screen = self.layers.last().unwrap_or(&default);
@@ -75,7 +74,9 @@ impl App {
                             playlist.borrow_mut().event_hanlder(key).await?;
                             if key.kind == event::KeyEventKind::Press {
                                 match key.code {
-                                    KeyCode::Char('q') => return Ok(()),
+                                    KeyCode::Char('q') => {
+                                        playlist.borrow_mut().stop()?;
+                                        return Ok(());},
                                     KeyCode::Char('o') => {
                                         self.output_selector.borrow_mut().refresh_device_list()?;
                                         self.layers.push(Screens::OutputSelector(
@@ -95,9 +96,7 @@ impl App {
                 Screens::Default(playlist) => {
                     playlist.borrow_mut().run().await?;
                 }
-                _ => {
-
-                }
+                _ => {}
             }
         }
     }

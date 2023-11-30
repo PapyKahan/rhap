@@ -237,11 +237,11 @@ impl Streamer {
                 Ok(command) => match command {
                     StreamingCommand::Pause => self.pause()?,
                     StreamingCommand::Resume => self.resume(),
-                    StreamingCommand::Stop => return self.stop(),
+                    StreamingCommand::Stop => break,
                     _ => {}
                 },
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return self.stop(),
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
             }
 
             if let Ok(data) = self.data_receiver.recv() {
@@ -269,9 +269,10 @@ impl Streamer {
                 available_buffer_len =
                     available_frames as usize * self.wave_format.get_blockalign() as usize;
             } else {
-                return self.stop();
+                break;
             }
         }
+        self.stop()
     }
 
     fn pause(&self) -> Result<()> {

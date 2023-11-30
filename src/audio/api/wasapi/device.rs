@@ -1,5 +1,6 @@
+use std::sync::mpsc::{SyncSender, sync_channel};
+
 use anyhow::{anyhow, Result};
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use wasapi::{ShareMode, WaveFormat};
 
 use super::{com::com_initialize, stream::Streamer};
@@ -8,7 +9,7 @@ use crate::audio::{Capabilities, DeviceTrait, StreamParams, StreamingCommand};
 pub struct Device {
     is_default: bool,
     inner_device: wasapi::Device,
-    stream_thread_handle: Option<std::thread::JoinHandle<Result<()>>>,
+    stream_thread_handle: Option<tokio::task::JoinHandle<Result<()>>>,
     command: Option<SyncSender<StreamingCommand>>,
 }
 
@@ -103,14 +104,13 @@ impl DeviceTrait for Device {
     }
 
     fn start(&mut self, params: StreamParams) -> Result<SyncSender<u8>> {
-        let (command_tx, command_rx) = sync_channel::<StreamingCommand>(16384);
+        let (command_tx, command_rx) = sync_channel::<StreamingCommand>(32);
         self.command = Some(command_tx);
-        let (data_tx, data_rx) = sync_channel::<u8>(16384);
+        let buffer = params.channels as usize * ((params.bits_per_sample as usize * params.samplerate as usize) / 8 as usize);
+        println!("buffer: {}", buffer);
+        let (data_tx, data_rx) = sync_channel::<u8>(buffer);
         let mut streamer = Streamer::new(&self.inner_device, data_rx, command_rx, params)?;
-        self.stream_thread_handle = Some(std::thread::spawn(move || -> Result<()> {
-            streamer.start()?;
-            return Ok(());
-        }));
+        self.stream_thread_handle = Some(tokio::spawn(async move { streamer.start() }));
         Ok(data_tx)
     }
 
@@ -134,10 +134,7 @@ impl DeviceTrait for Device {
             drop(command);
         }
         if let Some(handle) = self.stream_thread_handle.take() {
-            handle
-                .join()
-                .unwrap_or_else(|_| Ok(()))
-                .map_err(|err| anyhow!(err.to_string()))?;
+            handle.abort();
         }
         Ok(())
     }

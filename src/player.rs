@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Result};
 use log::error;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc::SyncSender;
 use std::sync::Arc;
+use std::sync::mpsc::SyncSender;
 use symphonia::core::audio::RawSampleBuffer;
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{SeekMode, SeekTo};
@@ -80,7 +80,7 @@ impl Player {
         let report_streaming = Arc::clone(&is_streaming);
         let is_playing = self.is_playing.clone();
         let report_song = song.clone();
-        std::thread::spawn(move || {
+        tokio::spawn(async move {
             if let Ok(mut format) = song.format.lock() {
                 format.seek(
                     SeekMode::Accurate,

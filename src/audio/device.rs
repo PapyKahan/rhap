@@ -1,7 +1,7 @@
-use anyhow::{anyhow, Result};
 use std::sync::mpsc::SyncSender;
 
 use super::{api, Capabilities, StreamParams};
+use anyhow::{anyhow, Result};
 
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> bool;

@@ -72,9 +72,9 @@ impl Song {
         Ok(Self {
             format: Arc::new(Mutex::new(format)),
             decoder: Arc::new(Mutex::new(decoder)),
-            sample: SampleRate::from(samplerate),
+            sample: SampleRate::from(samplerate as usize),
             channels,
-            bits_per_sample: BitsPerSample::from(bits_per_sample),
+            bits_per_sample: BitsPerSample::from(bits_per_sample as usize),
             title,
             artist,
             duration,

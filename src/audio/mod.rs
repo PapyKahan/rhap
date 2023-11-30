@@ -5,7 +5,7 @@ pub(crate) mod device;
 pub use host::{HostTrait, Host};
 pub use device::{DeviceTrait, Device};
 
-#[repr(u32)]
+#[repr(usize)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SampleRate {
     Rate44100Hz = 44100,
@@ -16,8 +16,8 @@ pub enum SampleRate {
     Rate192000Hz = 192000,
 }
 
-impl From<u32> for SampleRate {
-    fn from(value: u32) -> Self {
+impl From<usize> for SampleRate {
+    fn from(value: usize) -> Self {
         match value {
             44100 => SampleRate::Rate44100Hz,
             48000 => SampleRate::Rate48000Hz,
@@ -30,7 +30,7 @@ impl From<u32> for SampleRate {
     }
 }
 
-#[repr(u8)]
+#[repr(usize)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BitsPerSample {
     Bits8 = 8,
@@ -39,8 +39,8 @@ pub enum BitsPerSample {
     Bits32 = 32,
 }
 
-impl From<u8> for BitsPerSample {
-    fn from(value: u8) -> Self {
+impl From<usize> for BitsPerSample {
+    fn from(value: usize) -> Self {
         match value {
             8 => BitsPerSample::Bits8,
             16 => BitsPerSample::Bits16,
