@@ -175,7 +175,6 @@ impl Player {
 
                 };
             }
-            println!("task ended");
             is_streaming.store(false, Ordering::Relaxed);
             is_playing.store(false, Ordering::Relaxed);
             Ok::<(), anyhow::Error>(())
