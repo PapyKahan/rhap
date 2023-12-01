@@ -14,7 +14,9 @@ use crate::audio::{BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamPa
 use crate::song::Song;
 
 pub struct Player {
-    device: Device,
+    current_device: Option<Device>,
+    host: Host,
+    device_id: Option<u32>,
     previous_stream: Option<Sender<u8>>,
     streaming_handle: Option<JoinHandle<Result<()>>>,
     is_playing: Arc<AtomicBool>,
@@ -35,11 +37,10 @@ impl CurrentTrackInfo {
 
 impl Player {
     pub fn new(host: Host, device_id: Option<u32>) -> Result<Self> {
-        let device = host
-            .create_device(device_id)
-            .map_err(|err| anyhow!(err.to_string()))?;
         Ok(Player {
-            device,
+            current_device: None,
+            host,
+            device_id,
             previous_stream: None,
             streaming_handle: None,
             is_playing: Arc::new(AtomicBool::new(false)),
@@ -48,8 +49,10 @@ impl Player {
 
     pub fn stop(&mut self) -> Result<()> {
         self.is_playing.store(false, Ordering::Relaxed);
+        if let Some(device) = &mut self.current_device {
+            device.stop()?;
+        }
         if let Some(stream) = self.previous_stream.take() {
-            self.device.stop()?;
             drop(stream);
         }
         if let Some(handle) = self.streaming_handle.take() {
@@ -59,7 +62,10 @@ impl Player {
     }
 
     pub fn pause(&mut self) -> Result<()> {
-        self.device.pause()
+        if let Some(device) = &mut self.current_device {
+            device.pause()?;
+        }
+        Ok(())
     }
 
     /// Plays a FLAC file
@@ -74,10 +80,13 @@ impl Player {
             buffer_length: 0,
             exclusive: true,
         };
-        let data_sender = self
-            .device
+        let mut device = self.host
+            .create_device(self.device_id)
+            .map_err(|err| anyhow!(err.to_string()))?;
+        let data_sender = device
             .start(streamparams)
             .map_err(|err| anyhow!(err.to_string()))?;
+        self.current_device = Some(device);
         self.previous_stream = Some(data_sender);
         let stream = self.previous_stream.clone();
         let progress = Arc::new(AtomicU64::new(0));
