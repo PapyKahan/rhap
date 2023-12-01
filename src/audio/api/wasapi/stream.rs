@@ -7,7 +7,6 @@ use std::sync::Mutex;
 use wasapi::calculate_period_100ns;
 use wasapi::AudioClient;
 use wasapi::AudioRenderClient;
-use wasapi::Direction;
 use wasapi::Handle;
 use wasapi::ShareMode;
 use wasapi::WaveFormat;
@@ -39,7 +38,7 @@ impl Streamer {
     // WAVEFORMATEX documentation: https://learn.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatex
     // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
     #[inline(always)]
-    pub(super) fn create_waveformat_from(params: StreamParams) -> WaveFormat {
+    pub(super) fn create_waveformat_from(params: &StreamParams) -> WaveFormat {
         let sample_type = match params.bits_per_sample {
             crate::audio::BitsPerSample::Bits8 => &wasapi::SampleType::Int,
             crate::audio::BitsPerSample::Bits16 => &wasapi::SampleType::Int,
@@ -52,7 +51,7 @@ impl Streamer {
             sample_type,
             params.samplerate as usize,
             params.channels as usize,
-            None,
+            None
         );
     }
 
@@ -66,7 +65,7 @@ impl Streamer {
         let mut client = device
             .get_iaudioclient()
             .map_err(|e| anyhow!("IAudioClient::GetAudioClient failed: {}", e))?;
-        let wave_format = Streamer::create_waveformat_from(params.clone());
+        let wave_format = Streamer::create_waveformat_from(&params);
         let sharemode = match params.exclusive {
             true => ShareMode::Exclusive,
             false => ShareMode::Shared,
@@ -81,8 +80,7 @@ impl Streamer {
             default_device_period
         };
 
-        // Calculate desired period for better device compatibility. For our use case we don't
-        // care about having a low lattency playback thats why we don't use minimum device period.
+        // Calculate desired period for better device compatibility.
         let desired_period = client
             .calculate_aligned_period_near(3 * default_device_period / 2, Some(128), &wave_format)
             .map_err(|e| anyhow!("IAudioClient::CalculateAlignedPeriod failed: {}", e))?;
@@ -131,8 +129,8 @@ impl Streamer {
                                 .initialize_client(
                                     &wave_format,
                                     aligned_period as i64,
-                                    &Direction::Render,
-                                    &ShareMode::Exclusive,
+                                    &device.get_direction(),
+                                    &sharemode,
                                     false,
                                 )
                                 .map_err(|e| anyhow!("IAudioClient::Initialize failed: {}", e))?;
@@ -140,27 +138,28 @@ impl Streamer {
                         }
                         AUDCLNT_E_DEVICE_IN_USE => {
                             error!("IAudioClient::Initialize: The device is already in use");
-                            panic!("IAudioClient::Initialize failed");
+                            panic!("IAudioClient::Initialize: The device is already in use");
                         }
                         AUDCLNT_E_UNSUPPORTED_FORMAT => {
                             error!("IAudioClient::Initialize The device does not support the audio format");
-                            panic!("IAudioClient::Initialize failed");
+                            panic!("IAudioClient::Initialize The device does not support the audio format");
                         }
                         AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED => {
                             error!("IAudioClient::Initialize: Exclusive mode is not allowed");
-                            panic!("IAudioClient::Initialize failed");
+                            panic!("IAudioClient::Initialize: Exclusive mode is not allowed");
                         }
                         AUDCLNT_E_ENDPOINT_CREATE_FAILED => {
                             error!("IAudioClient::Initialize: Failed to create endpoint");
-                            panic!("IAudioClient::Initialize failed");
+                            panic!("IAudioClient::Initialize: Failed to create endpoint");
                         }
                         _ => {
                             error!("IAudioClient::Initialize: Other error, HRESULT: {:#010x}, info: {:?}", werr.code().0, werr.message());
-                            panic!("IAudioClient::Initialize failed");
+                            panic!("IAudioClient::Initialize: Other error, HRESULT: {:#010x}, info: {:?}", werr.code().0, werr.message());
                         }
                     };
                 } else {
                     error!("IAudioClient::Initialize: Other error {:?}", e);
+                    panic!("IAudioClient::Initialize failed {:?}", e);
                 }
             }
         };
