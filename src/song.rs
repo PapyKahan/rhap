@@ -1,13 +1,13 @@
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
 use anyhow::Result;
 use symphonia::core::{
     codecs::{Decoder, DecoderOptions},
     formats::{FormatReader, Track},
     io::MediaSourceStream,
     meta::{MetadataRevision, StandardTagKey},
-    probe::Hint
+    probe::Hint,
 };
+use tokio::sync::Mutex;
 
 use crate::audio::{BitsPerSample, SampleRate};
 

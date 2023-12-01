@@ -1,10 +1,9 @@
 use anyhow::{anyhow, Result};
 use log::debug;
 use log::error;
-use std::sync::mpsc::Receiver;
+use tokio::sync::mpsc::Receiver;
 use std::sync::Condvar;
 use std::sync::Mutex;
-use std::time::Duration;
 use wasapi::calculate_period_100ns;
 use wasapi::AudioClient;
 use wasapi::AudioRenderClient;
@@ -200,7 +199,7 @@ impl Streamer {
             .map_err(|e| anyhow!("IAudioClient::StopStream failed: {:?}", e));
     }
 
-    pub(crate) fn start(&mut self) -> Result<()> {
+    pub(crate) async fn start(&mut self) -> Result<()> {
         com_initialize();
         let mut buffer = vec![];
 
@@ -233,18 +232,18 @@ impl Streamer {
             available_frames as usize * self.wave_format.get_blockalign() as usize;
 
         loop {
-            match self.command_receiver.recv_timeout(Duration::from_nanos(10)) {
+            match self.command_receiver.try_recv() {
                 Ok(command) => match command {
                     StreamingCommand::Pause => self.pause()?,
                     StreamingCommand::Resume => self.resume(),
                     StreamingCommand::Stop => break,
                     _ => {}
                 },
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {},
+                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => break,
             }
 
-            if let Ok(data) = self.data_receiver.recv() {
+            if let Some(data) = self.data_receiver.recv().await {
                 buffer.push(data);
                 if buffer.len() != available_buffer_len {
                     continue;
@@ -257,11 +256,9 @@ impl Streamer {
                         None,
                     )
                     .map_err(|e| anyhow!("IAudioRenderClient::Write failed: {:?}", e))?;
-
                 self.eventhandle
                     .wait_for_event(1000)
                     .map_err(|e| anyhow!("WaitForSingleObject failed: {:?}", e))?;
-
                 buffer.clear();
                 available_frames = self.client.get_available_space_in_frames().map_err(|e| {
                     anyhow!("IAudioClient::GetAvailableSpaceInFrames failed: {:?}", e)

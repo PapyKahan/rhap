@@ -1,20 +1,22 @@
 use anyhow::{anyhow, Result};
 use log::error;
+use tokio::task::JoinHandle;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::sync::mpsc::SyncSender;
 use symphonia::core::audio::RawSampleBuffer;
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{SeekMode, SeekTo};
 use symphonia::core::sample::i24;
 use symphonia::core::units::Time;
+use tokio::sync::mpsc::Sender;
 
 use crate::audio::{BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams};
 use crate::song::Song;
 
 pub struct Player {
     device: Device,
-    previous_stream: Option<SyncSender<u8>>,
+    previous_stream: Option<Sender<u8>>,
+    streaming_handle: Option<JoinHandle<Result<()>>>,
     is_playing: Arc<AtomicBool>,
 }
 
@@ -39,6 +41,7 @@ impl Player {
         Ok(Player {
             device,
             previous_stream: None,
+            streaming_handle: None,
             is_playing: Arc::new(AtomicBool::new(false)),
         })
     }
@@ -48,6 +51,9 @@ impl Player {
         if let Some(stream) = self.previous_stream.take() {
             self.device.stop()?;
             drop(stream);
+        }
+        if let Some(handle) = self.streaming_handle.take() {
+            handle.abort();
         }
         Ok(())
     }
@@ -60,7 +66,6 @@ impl Player {
     /// - params:
     ///    - song: song struct
     pub async fn play(&mut self, song: Arc<Song>) -> Result<CurrentTrackInfo> {
-        self.stop()?;
         let bits_per_sample = song.bits_per_sample;
         let streamparams = StreamParams {
             samplerate: song.sample,
@@ -80,36 +85,23 @@ impl Player {
         let report_streaming = Arc::clone(&is_streaming);
         let is_playing = self.is_playing.clone();
         let report_song = song.clone();
-        tokio::spawn(async move {
-            if let Ok(mut format) = song.format.lock() {
-                format.seek(
-                    SeekMode::Accurate,
-                    SeekTo::Time {
-                        time: Time::default(),
-                        track_id: None,
-                    },
-                )?;
-            } else {
-                return Err(anyhow!("Fail to lock track format"));
-            }
-            if let Ok(mut decoder) = song.decoder.lock() {
-                decoder.reset();
-            } else {
-                return Err(anyhow!("Fail to lock track decoder"));
-            }
+        self.streaming_handle = Some(tokio::spawn(async move {
+            let mut format = song.format.lock().await;
+            format.seek(
+                SeekMode::Accurate,
+                SeekTo::Time {
+                    time: Time::default(),
+                    track_id: None,
+                },
+            )?;
+            let mut decoder = song.decoder.lock().await;
+            decoder.reset();
             is_playing.store(true, Ordering::Relaxed);
             loop {
                 if !is_playing.load(Ordering::Relaxed) {
                     break;
                 }
                 if let Some(ref streamer) = stream {
-                    let mut format = if let Ok(format) = song.format.lock() {
-                        format
-                    } else {
-                        is_playing.store(false, Ordering::Relaxed);
-                        return Err(anyhow!("Fail to lock format"));
-                    };
-
                     let packet = match format.next_packet() {
                         Ok(packet) => packet,
                         Err(Error::ResetRequired) => {
@@ -137,13 +129,6 @@ impl Player {
                         Ordering::Relaxed,
                     );
 
-                    let mut decoder = if let Ok(decoder) = song.decoder.lock() {
-                        decoder
-                    } else {
-                        is_playing.store(false, Ordering::Relaxed);
-                        return Err(anyhow!("Fail to lock format"));
-                    };
-
                     let decoded = decoder.decode(&packet)?;
                     let spec = decoded.spec();
                     let duration = decoded.capacity() as u64;
@@ -154,7 +139,7 @@ impl Player {
                             let mut sample_buffer = RawSampleBuffer::<u8>::new(duration, *spec);
                             sample_buffer.copy_interleaved_ref(decoded);
                             for i in sample_buffer.as_bytes().iter() {
-                                if streamer.send(*i).is_err() {
+                                if streamer.send(*i).await.is_err() {
                                     break;
                                 }
                             }
@@ -163,7 +148,7 @@ impl Player {
                             let mut sample_buffer = RawSampleBuffer::<i16>::new(duration, *spec);
                             sample_buffer.copy_interleaved_ref(decoded);
                             for i in sample_buffer.as_bytes().iter() {
-                                if streamer.send(*i).is_err() {
+                                if streamer.send(*i).await.is_err() {
                                     break;
                                 }
                             }
@@ -172,7 +157,7 @@ impl Player {
                             let mut sample_buffer = RawSampleBuffer::<i24>::new(duration, *spec);
                             sample_buffer.copy_interleaved_ref(decoded);
                             for i in sample_buffer.as_bytes().iter() {
-                                if streamer.send(*i).is_err() {
+                                if streamer.send(*i).await.is_err() {
                                     break;
                                 }
                             }
@@ -181,18 +166,20 @@ impl Player {
                             let mut sample_buffer = RawSampleBuffer::<f32>::new(duration, *spec);
                             sample_buffer.copy_interleaved_ref(decoded);
                             for i in sample_buffer.as_bytes().iter() {
-                                if streamer.send(*i).is_err() {
+                                if streamer.send(*i).await.is_err() {
                                     break;
                                 }
                             }
                         }
                     }
+
                 };
             }
+            println!("task ended");
             is_streaming.store(false, Ordering::Relaxed);
             is_playing.store(false, Ordering::Relaxed);
             Ok::<(), anyhow::Error>(())
-        });
+        }));
 
         Ok(CurrentTrackInfo {
             is_streaming: report_streaming,

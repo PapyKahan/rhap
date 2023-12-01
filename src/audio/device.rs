@@ -1,13 +1,12 @@
-use std::sync::mpsc::SyncSender;
-
 use super::{api, Capabilities, StreamParams};
 use anyhow::{anyhow, Result};
+use tokio::sync::mpsc::Sender;
 
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> bool;
     fn name(&self) -> String;
     fn get_capabilities(&self) -> Result<Capabilities>;
-    fn start(&mut self, params: StreamParams) -> Result<SyncSender<u8>>;
+    fn start(&mut self, params: StreamParams) -> Result<Sender<u8>>;
     fn pause(&mut self) -> Result<()>;
     fn resume(&mut self) -> Result<()>;
     fn stop(&mut self) -> Result<()>;
@@ -43,7 +42,7 @@ impl DeviceTrait for Device {
         device.get_capabilities()
     }
 
-    fn start(&mut self, params: StreamParams) -> Result<SyncSender<u8>> {
+    fn start(&mut self, params: StreamParams) -> Result<Sender<u8>> {
         let device = match self {
             Self::Wasapi(device) => device,
             Self::None => return Err(anyhow!("No host selected")),

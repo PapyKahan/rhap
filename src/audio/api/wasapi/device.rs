@@ -1,6 +1,5 @@
-use std::sync::mpsc::{SyncSender, sync_channel};
-
 use anyhow::{anyhow, Result};
+use tokio::sync::mpsc::{Sender, channel};
 use wasapi::{ShareMode, WaveFormat};
 
 use super::{com::com_initialize, stream::Streamer};
@@ -10,7 +9,7 @@ pub struct Device {
     is_default: bool,
     inner_device: wasapi::Device,
     stream_thread_handle: Option<tokio::task::JoinHandle<Result<()>>>,
-    command: Option<SyncSender<StreamingCommand>>,
+    command: Option<Sender<StreamingCommand>>,
 }
 
 impl Device {
@@ -103,38 +102,36 @@ impl DeviceTrait for Device {
         Device::capabilities(&self.inner_device)
     }
 
-    fn start(&mut self, params: StreamParams) -> Result<SyncSender<u8>> {
-        let (command_tx, command_rx) = sync_channel::<StreamingCommand>(32);
+    fn start(&mut self, params: StreamParams) -> Result<Sender<u8>> {
+        let (command_tx, command_rx) = channel::<StreamingCommand>(32);
         self.command = Some(command_tx);
         let buffer = params.channels as usize * ((params.bits_per_sample as usize * params.samplerate as usize) / 8 as usize);
-        println!("buffer: {}", buffer);
-        let (data_tx, data_rx) = sync_channel::<u8>(buffer);
+        let (data_tx, data_rx) = channel::<u8>(buffer);
         let mut streamer = Streamer::new(&self.inner_device, data_rx, command_rx, params)?;
-        self.stream_thread_handle = Some(tokio::spawn(async move { streamer.start() }));
+        self.stream_thread_handle = Some(tokio::spawn(async move { streamer.start().await }));
         Ok(data_tx)
     }
 
     fn pause(&mut self) -> Result<()> {
         if let Some(command) = self.command.take() {
-            command.send(StreamingCommand::Pause)?;
+            command.blocking_send(StreamingCommand::Pause)?;
         }
         Ok(())
     }
 
     fn resume(&mut self) -> Result<()> {
         if let Some(command) = self.command.take() {
-            command.send(StreamingCommand::Resume)?;
+            command.blocking_send(StreamingCommand::Resume)?;
         }
         Ok(())
     }
 
     fn stop(&mut self) -> Result<()> {
         if let Some(command) = self.command.take() {
-            command.send(StreamingCommand::Stop)?;
             drop(command);
         }
         if let Some(handle) = self.stream_thread_handle.take() {
-            handle.abort();
+            handle.abort_handle().abort();
         }
         Ok(())
     }
