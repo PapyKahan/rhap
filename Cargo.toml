@@ -5,10 +5,12 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
-clap = { version = "4.4.8", features = ["derive"] }
+arrayvec = "0.7.4"
+clap = { version = "4.4.11", features = ["derive"] }
 crossterm = "0.27.0"
 log = "0.4.20"
 rand = "0.8.5"
+rubato = "0.14.1"
 symphonia = { version = "0.5.3", features = ["all-formats", "all-codecs"] }
 tokio = { version = "1.34.0", features = ["full"] }
 walkdir = "2.4.0"

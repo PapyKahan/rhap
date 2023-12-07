@@ -17,6 +17,33 @@ pub enum Device {
     Wasapi(api::wasapi::device::Device),
 }
 
+impl Device {
+    pub fn adjust_stream_params(&self, params: StreamParams) -> Result<StreamParams> {
+        let capabilities = self.get_capabilities()?;
+        let contains_sample_rates = capabilities.sample_rates.contains(&params.samplerate);
+        let contains_bits_per_samples = capabilities.bits_per_samples.contains(&params.bits_per_sample);
+        if !contains_sample_rates || !contains_bits_per_samples {
+            let samplerate = if contains_sample_rates {
+                params.samplerate
+            } else {
+                *capabilities.sample_rates.last().unwrap()
+            };
+            let bits_per_sample = if contains_bits_per_samples {
+                params.bits_per_sample
+            } else {
+                *capabilities.bits_per_samples.last().unwrap()
+            };
+            return Ok(StreamParams {
+                samplerate,
+                bits_per_sample,
+                ..params
+            });
+        } else {
+            Ok(params)
+        }
+    }
+}
+
 impl DeviceTrait for Device {
     fn is_default(&self) -> bool {
         let device = match self {
