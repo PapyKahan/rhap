@@ -12,6 +12,7 @@ use tokio::task::JoinHandle;
 
 use crate::audio::{BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams};
 use crate::song::Song;
+use crate::tools::Resampler;
 
 pub struct Player {
     current_device: Option<Device>,
@@ -108,51 +109,57 @@ impl Player {
             decoder.reset();
             is_playing.store(true, Ordering::Relaxed);
 
-            loop {
-                if !is_playing.load(Ordering::Relaxed) {
-                    break;
-                }
-                if let Some(ref streamer) = stream {
-                    let packet = match format.next_packet() {
-                        Ok(packet) => packet,
-                        Err(Error::ResetRequired) => {
-                            unimplemented!();
+            // Not very efficient, but i can't create a RawSampleBuffer dynamically
+            // so i have to create one for each possible bits_per_sample and at eatch iteration
+            match streamparams.bits_per_sample {
+                BitsPerSample::Bits8 => {
+                    let mut resampler: Option<Resampler<i8>> = None;
+                    let mut previous_duration = u64::default();
+                    loop {
+                        if !is_playing.load(Ordering::Relaxed) {
+                            break;
                         }
-                        Err(Error::IoError(err)) => {
-                            // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
-                            match err.kind() {
-                                std::io::ErrorKind::UnexpectedEof => {
-                                    break;
+                        if let Some(ref streamer) = stream {
+                            let packet = match format.next_packet() {
+                                Ok(packet) => packet,
+                                Err(Error::ResetRequired) => {
+                                    unimplemented!();
                                 }
-                                _ => {
+                                Err(Error::IoError(err)) => {
+                                    // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
+                                    match err.kind() {
+                                        std::io::ErrorKind::UnexpectedEof => {
+                                            break;
+                                        }
+                                        _ => {
+                                            error!("Error reading packet: {:?}", err);
+                                            break;
+                                        }
+                                    }
+                                }
+                                Err(err) => {
                                     error!("Error reading packet: {:?}", err);
                                     break;
                                 }
-                            }
-                        }
-                        Err(err) => {
-                            error!("Error reading packet: {:?}", err);
-                            break;
-                        }
-                    };
-                    progress.store(
-                        progress.load(Ordering::Relaxed) + packet.dur,
-                        Ordering::Relaxed,
-                    );
+                            };
+                            progress.store(
+                                progress.load(Ordering::Relaxed) + packet.dur,
+                                Ordering::Relaxed,
+                            );
 
-                    let decoded = decoder.decode(&packet)?;
-                    let spec = decoded.spec();
-                    let duration = decoded.capacity() as u64;
-                    // Not very efficient, but i can't create a RawSampleBuffer dynamically
-                    // so i have to create one for each possible bits_per_sample and at eatch iteration
-                    match streamparams.bits_per_sample {
-                        BitsPerSample::Bits8 => {
+                            let decoded = decoder.decode(&packet)?;
+                            let spec = decoded.spec();
+                            let duration = decoded.capacity() as u64;
+                            if previous_duration != duration {
+                                previous_duration = duration;
+                                resampler = None;
+                            }
                             if song.sample != streamparams.samplerate {
-                                let mut r = crate::tools::Resampler::<i8>::new(
-                                    *spec,
-                                    streamparams.samplerate as usize,
-                                    duration,
-                                );
+                                let r = resampler.get_or_insert_with(|| crate::tools::Resampler::<i8>::new(
+                                        *spec,
+                                        streamparams.samplerate as usize,
+                                        duration,
+                                    ));
                                 if let Some(buffer) = r.resample(decoded) {
                                     for i in buffer.iter() {
                                         for j in i.to_ne_bytes().iter() {
@@ -181,85 +188,56 @@ impl Player {
                                 }
                             }
                         }
-                        BitsPerSample::Bits16 => {
-                            if song.sample != streamparams.samplerate {
-                                let mut r = crate::tools::Resampler::<i16>::new(
-                                    *spec,
-                                    streamparams.samplerate as usize,
-                                    duration,
-                                );
-                                if let Some(buffer) = r.resample(decoded) {
-                                    for i in buffer.iter() {
-                                        for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(*j).await.is_err() {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                                if let Some(buffer) = r.flush() {
-                                    for i in buffer.iter() {
-                                        for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(*j).await.is_err() {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                let mut sample_buffer =
-                                    RawSampleBuffer::<i16>::new(duration, *spec);
-                                sample_buffer.copy_interleaved_ref(decoded);
-                                for i in sample_buffer.as_bytes().iter() {
-                                    if streamer.send(*i).await.is_err() {
-                                        break;
-                                    }
-                                }
-                            }
+                    }
+                },
+                BitsPerSample::Bits16 => {
+                    let mut resampler: Option<Resampler<i16>> = None;
+                    let mut previous_duration = u64::default();
+                    loop {
+                        if !is_playing.load(Ordering::Relaxed) {
+                            break;
                         }
-                        BitsPerSample::Bits24 => {
-                            if song.sample != streamparams.samplerate {
-                                let mut r = crate::tools::Resampler::<i24>::new(
-                                    *spec,
-                                    streamparams.samplerate as usize,
-                                    duration,
-                                );
-                                if let Some(buffer) = r.resample(decoded) {
-                                    for i in buffer.iter() {
-                                        for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(*j).await.is_err() {
-                                                break;
-                                            }
+                        if let Some(ref streamer) = stream {
+                            let packet = match format.next_packet() {
+                                Ok(packet) => packet,
+                                Err(Error::ResetRequired) => {
+                                    unimplemented!();
+                                }
+                                Err(Error::IoError(err)) => {
+                                    // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
+                                    match err.kind() {
+                                        std::io::ErrorKind::UnexpectedEof => {
+                                            break;
+                                        }
+                                        _ => {
+                                            error!("Error reading packet: {:?}", err);
+                                            break;
                                         }
                                     }
                                 }
-                                if let Some(buffer) = r.flush() {
-                                    for i in buffer.iter() {
-                                        for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(*j).await.is_err() {
-                                                break;
-                                            }
-                                        }
-                                    }
+                                Err(err) => {
+                                    error!("Error reading packet: {:?}", err);
+                                    break;
                                 }
-                            } else {
-                                let mut sample_buffer =
-                                    RawSampleBuffer::<i24>::new(duration, *spec);
-                                sample_buffer.copy_interleaved_ref(decoded);
-                                for i in sample_buffer.as_bytes().iter() {
-                                    if streamer.send(*i).await.is_err() {
-                                        break;
-                                    }
-                                }
+                            };
+                            progress.store(
+                                progress.load(Ordering::Relaxed) + packet.dur,
+                                Ordering::Relaxed,
+                            );
+
+                            let decoded = decoder.decode(&packet)?;
+                            let spec = decoded.spec();
+                            let duration = decoded.capacity() as u64;
+                            if previous_duration != duration {
+                                previous_duration = duration;
+                                resampler = None;
                             }
-                        }
-                        BitsPerSample::Bits32 => {
                             if song.sample != streamparams.samplerate {
-                                let mut r = crate::tools::Resampler::<f32>::new(
-                                    *spec,
-                                    streamparams.samplerate as usize,
-                                    duration,
-                                );
+                                let r = resampler.get_or_insert_with(|| crate::tools::Resampler::<i16>::new(
+                                        *spec,
+                                        streamparams.samplerate as usize,
+                                        duration,
+                                    ));
                                 if let Some(buffer) = r.resample(decoded) {
                                     for i in buffer.iter() {
                                         for j in i.to_ne_bytes().iter() {
@@ -279,8 +257,7 @@ impl Player {
                                     }
                                 }
                             } else {
-                                let mut sample_buffer =
-                                    RawSampleBuffer::<f32>::new(duration, *spec);
+                                let mut sample_buffer = RawSampleBuffer::<i16>::new(duration, *spec);
                                 sample_buffer.copy_interleaved_ref(decoded);
                                 for i in sample_buffer.as_bytes().iter() {
                                     if streamer.send(*i).await.is_err() {
@@ -290,8 +267,164 @@ impl Player {
                             }
                         }
                     }
-                };
-            }
+                },
+                BitsPerSample::Bits24 => {
+                    let mut resampler: Option<Resampler<i24>> = None;
+                    let mut previous_duration = u64::default();
+                    loop {
+                        if !is_playing.load(Ordering::Relaxed) {
+                            break;
+                        }
+                        if let Some(ref streamer) = stream {
+                            let packet = match format.next_packet() {
+                                Ok(packet) => packet,
+                                Err(Error::ResetRequired) => {
+                                    unimplemented!();
+                                }
+                                Err(Error::IoError(err)) => {
+                                    // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
+                                    match err.kind() {
+                                        std::io::ErrorKind::UnexpectedEof => {
+                                            break;
+                                        }
+                                        _ => {
+                                            error!("Error reading packet: {:?}", err);
+                                            break;
+                                        }
+                                    }
+                                }
+                                Err(err) => {
+                                    error!("Error reading packet: {:?}", err);
+                                    break;
+                                }
+                            };
+                            progress.store(
+                                progress.load(Ordering::Relaxed) + packet.dur,
+                                Ordering::Relaxed,
+                            );
+
+                            let decoded = decoder.decode(&packet)?;
+                            let spec = decoded.spec();
+                            let duration = decoded.capacity() as u64;
+                            if previous_duration != duration {
+                                previous_duration = duration;
+                                resampler = None;
+                            }
+                            if song.sample != streamparams.samplerate {
+                                let r = resampler.get_or_insert_with(|| crate::tools::Resampler::<i24>::new(
+                                        *spec,
+                                        streamparams.samplerate as usize,
+                                        duration,
+                                    ));
+                                if let Some(buffer) = r.resample(decoded) {
+                                    for i in buffer.iter() {
+                                        for j in i.to_ne_bytes().iter() {
+                                            if streamer.send(*j).await.is_err() {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                if let Some(buffer) = r.flush() {
+                                    for i in buffer.iter() {
+                                        for j in i.to_ne_bytes().iter() {
+                                            if streamer.send(*j).await.is_err() {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                let mut sample_buffer = RawSampleBuffer::<i24>::new(duration, *spec);
+                                sample_buffer.copy_interleaved_ref(decoded);
+                                for i in sample_buffer.as_bytes().iter() {
+                                    if streamer.send(*i).await.is_err() {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                BitsPerSample::Bits32 => {
+                    let mut resampler: Option<Resampler<f32>> = None;
+                    let mut previous_duration = u64::default();
+                    loop {
+                        if !is_playing.load(Ordering::Relaxed) {
+                            break;
+                        }
+                        if let Some(ref streamer) = stream {
+                            let packet = match format.next_packet() {
+                                Ok(packet) => packet,
+                                Err(Error::ResetRequired) => {
+                                    unimplemented!();
+                                }
+                                Err(Error::IoError(err)) => {
+                                    // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
+                                    match err.kind() {
+                                        std::io::ErrorKind::UnexpectedEof => {
+                                            break;
+                                        }
+                                        _ => {
+                                            error!("Error reading packet: {:?}", err);
+                                            break;
+                                        }
+                                    }
+                                }
+                                Err(err) => {
+                                    error!("Error reading packet: {:?}", err);
+                                    break;
+                                }
+                            };
+                            progress.store(
+                                progress.load(Ordering::Relaxed) + packet.dur,
+                                Ordering::Relaxed,
+                            );
+
+                            let decoded = decoder.decode(&packet)?;
+                            let spec = decoded.spec();
+                            let duration = decoded.capacity() as u64;
+                            if previous_duration != duration {
+                                previous_duration = duration;
+                                resampler = None;
+                            }
+                            if song.sample != streamparams.samplerate {
+                                let r = resampler.get_or_insert_with(|| crate::tools::Resampler::<f32>::new(
+                                        *spec,
+                                        streamparams.samplerate as usize,
+                                        duration,
+                                    ));
+                                if let Some(buffer) = r.resample(decoded) {
+                                    for i in buffer.iter() {
+                                        for j in i.to_ne_bytes().iter() {
+                                            if streamer.send(*j).await.is_err() {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                if let Some(buffer) = r.flush() {
+                                    for i in buffer.iter() {
+                                        for j in i.to_ne_bytes().iter() {
+                                            if streamer.send(*j).await.is_err() {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                let mut sample_buffer = RawSampleBuffer::<f32>::new(duration, *spec);
+                                sample_buffer.copy_interleaved_ref(decoded);
+                                for i in sample_buffer.as_bytes().iter() {
+                                    if streamer.send(*i).await.is_err() {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
             is_streaming.store(false, Ordering::Relaxed);
             is_playing.store(false, Ordering::Relaxed);
             Ok::<(), anyhow::Error>(())
