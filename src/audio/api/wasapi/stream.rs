@@ -1,15 +1,17 @@
 use anyhow::{anyhow, Result};
 use log::debug;
 use log::error;
-use tokio::sync::mpsc::Receiver;
+use windows::Win32::Foundation::HANDLE;
 use std::sync::Condvar;
 use std::sync::Mutex;
+use tokio::sync::mpsc::Receiver;
 use wasapi::calculate_period_100ns;
 use wasapi::AudioClient;
 use wasapi::AudioRenderClient;
 use wasapi::Handle;
 use wasapi::ShareMode;
 use wasapi::WaveFormat;
+use windows::core::w;
 use windows::Win32::Foundation::E_INVALIDARG;
 use windows::Win32::Media::Audio::AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED;
 use windows::Win32::Media::Audio::AUDCLNT_E_DEVICE_IN_USE;
@@ -24,11 +26,22 @@ pub struct Streamer {
     client: AudioClient,
     renderer: AudioRenderClient,
     eventhandle: Handle,
+    taskhandle: Option<HANDLE>,
     wave_format: WaveFormat,
     pause_condition: Condvar,
     status: Mutex<StreamingCommand>,
     command_receiver: Receiver<StreamingCommand>,
     data_receiver: Receiver<u8>,
+}
+
+impl Drop for Streamer {
+    fn drop(&mut self) {
+        if let Some(handle) = self.taskhandle.take() {
+            unsafe {
+                let _ = windows::Win32::System::Threading::AvRevertMmThreadCharacteristics(handle);
+            }
+        }
+    }
 }
 
 unsafe impl Send for Streamer {}
@@ -51,7 +64,7 @@ impl Streamer {
             sample_type,
             params.samplerate as usize,
             params.channels as usize,
-            None
+            None,
         );
     }
 
@@ -175,6 +188,7 @@ impl Streamer {
             renderer,
             wave_format,
             eventhandle,
+            taskhandle: None,
             pause_condition: Condvar::new(),
             status: Mutex::new(StreamingCommand::None),
             command_receiver,
@@ -219,6 +233,14 @@ impl Streamer {
             )
             .map_err(|e| anyhow!("IAudioRenderClient::Write failed: {:?}", e))?;
 
+        self.taskhandle = Some(unsafe {
+            windows::Win32::System::Threading::AvSetMmThreadCharacteristicsW(
+                w!("Pro Audio"),
+                &mut 0,
+            )
+            .map_err(|e| anyhow!("AvSetMmThreadCharacteristics failed: {:?}", e))?
+        });
+
         self.client
             .start_stream()
             .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))?;
@@ -238,7 +260,7 @@ impl Streamer {
                     StreamingCommand::Stop => break,
                     _ => {}
                 },
-                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {},
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {}
                 Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => break,
             }
 
@@ -266,6 +288,12 @@ impl Streamer {
                     available_frames as usize * self.wave_format.get_blockalign() as usize;
             } else {
                 break;
+            }
+        }
+        if let Some(handle) = self.taskhandle.take() {
+            unsafe {
+                windows::Win32::System::Threading::AvRevertMmThreadCharacteristics(handle)
+                    .map_err(|e| anyhow!("AvRevertMmThreadCharacteristics failed: {:?}", e))?;
             }
         }
         self.stop()
