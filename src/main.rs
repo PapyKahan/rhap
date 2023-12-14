@@ -19,6 +19,7 @@ mod audio;
 mod player;
 mod song;
 mod ui;
+mod tools;
 
 use crate::audio::{DeviceTrait, HostTrait};
 
