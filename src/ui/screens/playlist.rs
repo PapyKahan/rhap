@@ -203,15 +203,14 @@ impl Playlist {
                 items.push(row);
             }
         }
-        let table = Table::new(items)
-            .highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
-            .widths(&[
+        let table = Table::new(items, &[
                 Constraint::Length(1),
                 Constraint::Percentage(20),
                 Constraint::Percentage(60),
                 Constraint::Percentage(10),
                 Constraint::Percentage(10),
             ])
+            .highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
             .block(
                 Block::default()
                     .title(format!("Playlist - {}", self.songs.len()))
