@@ -1,7 +1,9 @@
 use anyhow::{anyhow, Result};
 use log::debug;
 use log::error;
+use wasapi::BufferFlags;
 use windows::Win32::Foundation::HANDLE;
+use windows::Win32::Media::Audio::AUDCLNT_BUFFERFLAGS_SILENT;
 use std::sync::Condvar;
 use std::sync::Mutex;
 use tokio::sync::mpsc::Receiver;
@@ -84,13 +86,13 @@ impl Streamer {
             false => ShareMode::Shared,
         };
 
-        let (default_device_period, _) = client
+        let (_, min_device_period) = client
             .get_periods()
             .map_err(|e| anyhow!("IAudioClient::GetDevicePeriod failed: {}", e))?;
         let default_device_period = if params.buffer_length != 0 {
             (params.buffer_length * 1000000) / 100 as i64
         } else {
-            default_device_period
+            min_device_period
         };
 
         // Calculate desired period for better device compatibility.
@@ -229,7 +231,7 @@ impl Streamer {
                 available_frames as usize,
                 self.wave_format.get_blockalign() as usize,
                 empty_buffer.as_slice(),
-                None,
+                Some(BufferFlags::new(AUDCLNT_BUFFERFLAGS_SILENT.0 as u32))
             )
             .map_err(|e| anyhow!("IAudioRenderClient::Write failed: {:?}", e))?;
 
@@ -251,7 +253,6 @@ impl Streamer {
             .map_err(|e| anyhow!("IAudioClient::GetAvailableSpaceInFrames failed: {:?}", e))?;
         let mut available_buffer_len =
             available_frames as usize * self.wave_format.get_blockalign() as usize;
-
         loop {
             match self.command_receiver.try_recv() {
                 Ok(command) => match command {

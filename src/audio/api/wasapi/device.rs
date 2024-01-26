@@ -106,7 +106,7 @@ impl DeviceTrait for Device {
         let (command_tx, command_rx) = channel::<StreamingCommand>(32);
         self.command = Some(command_tx);
         let buffer = params.channels as usize * ((params.bits_per_sample as usize * params.samplerate as usize) / 8 as usize);
-        let (data_tx, data_rx) = channel::<u8>(buffer);
+        let (data_tx, data_rx) = channel::<u8>(buffer*4);
         let mut streamer = Streamer::new(&self.inner_device, data_rx, command_rx, params)?;
         self.stream_thread_handle = Some(tokio::spawn(async move { streamer.start().await }));
         Ok(data_tx)
