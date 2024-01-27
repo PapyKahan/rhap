@@ -288,6 +288,16 @@ impl Streamer {
                 available_buffer_len =
                     available_frames as usize * self.wave_format.get_blockalign() as usize;
             } else {
+                let bytes_per_frames = self.wave_format.get_blockalign() as usize;
+                let frames = buffer.len() / bytes_per_frames;
+                self.renderer
+                    .write_to_device(
+                        frames as usize,
+                        bytes_per_frames,
+                        buffer.as_slice(),
+                        None,
+                    )
+                    .map_err(|e| anyhow!("IAudioRenderClient::Write failed: {:?}", e))?;
                 break;
             }
         }
