@@ -8,14 +8,12 @@ use tokio::sync::mpsc::Receiver;
 use wasapi::calculate_period_100ns;
 use wasapi::AudioClient;
 use wasapi::AudioRenderClient;
-use wasapi::BufferFlags;
 use wasapi::Handle;
 use wasapi::ShareMode;
 use wasapi::WaveFormat;
 use windows::core::w;
 use windows::Win32::Foundation::E_INVALIDARG;
 use windows::Win32::Foundation::HANDLE;
-use windows::Win32::Media::Audio::AUDCLNT_BUFFERFLAGS_SILENT;
 use windows::Win32::Media::Audio::AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED;
 use windows::Win32::Media::Audio::AUDCLNT_E_DEVICE_IN_USE;
 use windows::Win32::Media::Audio::AUDCLNT_E_ENDPOINT_CREATE_FAILED;
@@ -23,6 +21,7 @@ use windows::Win32::Media::Audio::AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED;
 use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 
 use super::com::com_initialize;
+use crate::audio::StreamingData;
 use crate::audio::{StreamParams, StreamingCommand};
 
 const REFTIMES_PER_MILLISEC: i64 = 10000;
@@ -37,7 +36,7 @@ pub struct Streamer {
     status: Mutex<StreamingCommand>,
     desired_period: i64,
     command_receiver: Receiver<StreamingCommand>,
-    data_receiver: Receiver<u8>,
+    data_receiver: Receiver<StreamingData>,
 }
 
 impl Drop for Streamer {
@@ -76,7 +75,7 @@ impl Streamer {
 
     pub(super) fn new(
         device: &wasapi::Device,
-        data_receiver: Receiver<u8>,
+        data_receiver: Receiver<StreamingData>,
         command_receiver: Receiver<StreamingCommand>,
         params: StreamParams,
     ) -> Result<Self> {
@@ -251,7 +250,11 @@ impl Streamer {
                 Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => break,
             }
 
-            if let Some(data) = self.data_receiver.recv().await {
+            if let Some(streaming_data) = self.data_receiver.recv().await {
+                let data = match streaming_data {
+                    StreamingData::Data(data) => data,
+                    StreamingData::EndOfStream => break,
+                };
                 buffer.push(data);
                 if buffer.len() != available_buffer_len {
                     continue;

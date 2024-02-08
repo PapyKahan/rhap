@@ -93,3 +93,9 @@ pub enum StreamingCommand {
     Stop,
 }
 
+#[derive(Copy, Clone)]
+pub enum StreamingData {
+    Data(u8),
+    EndOfStream
+}
+

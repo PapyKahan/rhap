@@ -3,7 +3,7 @@ use tokio::sync::mpsc::{Sender, channel};
 use wasapi::{ShareMode, WaveFormat};
 
 use super::{com::com_initialize, stream::Streamer};
-use crate::audio::{Capabilities, DeviceTrait, StreamParams, StreamingCommand};
+use crate::audio::{Capabilities, DeviceTrait, StreamParams, StreamingCommand, StreamingData};
 
 pub struct Device {
     is_default: bool,
@@ -102,11 +102,11 @@ impl DeviceTrait for Device {
         Device::capabilities(&self.inner_device)
     }
 
-    fn start(&mut self, params: StreamParams) -> Result<Sender<u8>> {
+    fn start(&mut self, params: StreamParams) -> Result<Sender<StreamingData>> {
         let (command_tx, command_rx) = channel::<StreamingCommand>(32);
         self.command = Some(command_tx);
         let buffer = params.channels as usize * ((params.bits_per_sample as usize * params.samplerate as usize) / 8 as usize);
-        let (data_tx, data_rx) = channel::<u8>(buffer*4);
+        let (data_tx, data_rx) = channel::<StreamingData>(buffer*4);
         let mut streamer = Streamer::new(&self.inner_device, data_rx, command_rx, params)?;
         self.stream_thread_handle = Some(tokio::spawn(async move { streamer.start().await }));
         Ok(data_tx)
