@@ -17,7 +17,7 @@ walkdir = "2.4.0"
 wasapi = "0.14.0"
 
 [dependencies.ratatui]
-version = "0.25.0"
+version = "0.26.0"
 default-features = false
 features = ["crossterm", "all-widgets", "macros"]
 
