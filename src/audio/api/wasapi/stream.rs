@@ -63,14 +63,14 @@ impl Streamer {
             crate::audio::BitsPerSample::Bits24 => &wasapi::SampleType::Int,
             crate::audio::BitsPerSample::Bits32 => &wasapi::SampleType::Float,
         };
-        return WaveFormat::new(
+        WaveFormat::new(
             params.bits_per_sample as usize,
             params.bits_per_sample as usize,
             sample_type,
             params.samplerate as usize,
             params.channels as usize,
             None,
-        );
+        )
     }
 
     pub(super) fn new(
@@ -212,10 +212,10 @@ impl Streamer {
     }
 
     fn stop(&self) -> Result<()> {
-        return self
+        self
             .client
             .stop_stream()
-            .map_err(|e| anyhow!("IAudioClient::StopStream failed: {:?}", e));
+            .map_err(|e| anyhow!("IAudioClient::StopStream failed: {:?}", e))
     }
 
     pub(crate) async fn start(&mut self) -> Result<()> {
