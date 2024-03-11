@@ -27,7 +27,7 @@ impl Device {
     }
 
     pub fn get_client(&self) -> Result<AudioClient> {
-        unsafe { Ok(AudioClient(self.inner_device.Activate::<IAudioClient>(CLSCTX_ALL, None)?)) }
+        AudioClient::new(unsafe {self.inner_device.Activate::<IAudioClient>(CLSCTX_ALL, None)? })
     }
 
     fn capabilities(&self) -> Result<Capabilities> {
@@ -53,7 +53,7 @@ impl Device {
                 };
                 match sharemode {
                     ShareMode::Exclusive => {
-                        if let Ok(_) = client.is_supported(&wave_format, &sharemode) {
+                        if let Ok(_) = client.is_supported(wave_format, &sharemode) {
                             if !bits_per_samples.contains(&bits_per_sample) {
                                 bits_per_samples.push(bits_per_sample);
                             };
@@ -62,7 +62,7 @@ impl Device {
                             };
                         }
                     }
-                    ShareMode::Shared => match client.is_supported(&wave_format, &sharemode) {
+                    ShareMode::Shared => match client.is_supported(wave_format, &sharemode) {
                         Ok(_) => {
                             if !bits_per_samples.contains(&bits_per_sample) {
                                 bits_per_samples.push(bits_per_sample);
@@ -107,7 +107,7 @@ impl DeviceTrait for Device {
         self.command = Some(command_tx);
         let buffer = params.channels as usize * ((params.bits_per_sample as usize * params.samplerate as usize) / 8 as usize);
         let (data_tx, data_rx) = channel::<StreamingData>(buffer*4);
-        let mut streamer = Streamer::new(&self.inner_device, data_rx, command_rx, params)?;
+        let mut streamer = Streamer::new(&self, data_rx, command_rx, params)?;
         self.stream_thread_handle = Some(tokio::spawn(async move { streamer.start().await }));
         Ok(data_tx)
     }

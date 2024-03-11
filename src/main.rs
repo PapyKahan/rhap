@@ -44,9 +44,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let capabilities = dev.get_capabilities()?;
             println!(
                 "{} [{}]: {}",
-                if dev.is_default() { "->" } else { "  " },
+                if dev.is_default()? { "->" } else { "  " },
                 index,
-                dev.name()
+                dev.name()?
             );
             if let Some(bitrate) = capabilities.bits_per_samples.last() {
                 println!("    Max bits per sample: {}bits", *bitrate as usize);

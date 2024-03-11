@@ -1,6 +1,6 @@
-use std::cmp;
+use std::{cmp, slice};
 use num_integer::Integer;
-use windows::{Win32::{Foundation::RPC_E_CHANGED_MODE, System::Com::{CoInitializeEx, COINIT_MULTITHREADED, CoUninitialize}, Media::{Audio::{WAVEFORMATEXTENSIBLE, WAVEFORMATEX, WAVEFORMATEXTENSIBLE_0, WAVE_FORMAT_PCM, IAudioClient, AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, IAudioRenderClient}, KernelStreaming::{WAVE_FORMAT_EXTENSIBLE, KSDATAFORMAT_SUBTYPE_PCM}, Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT}}}, core::GUID};
+use windows::{core::GUID, Win32::{Foundation::RPC_E_CHANGED_MODE, Media::{Audio::{IAudioClient, IAudioRenderClient, AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0, WAVE_FORMAT_PCM}, KernelStreaming::{KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE}, Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT}}, System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED}}};
 use anyhow::{anyhow, Result};
 
 use crate::audio::BitsPerSample;
@@ -42,24 +42,29 @@ pub fn calculate_period_100ns(frames: i64, samplerate: i64) -> i64 {
     ((10000.0 * 1000.0 / samplerate as f64 * frames as f64) + 0.5) as i64
 }
 
+#[derive(Clone)]
 pub enum ShareMode {
     Exclusive,
     Shared,
 }
 
-pub struct AudioClient(pub IAudioClient);
+pub struct AudioClient
+{
+    pub inner_client: IAudioClient,
+    sharemode: Option<ShareMode>,
+}
 
 impl AudioClient {
-    pub fn is_supported(&self, format: &WaveFormat, share_mode : &ShareMode) -> Result<&WaveFormat> {
+    pub fn is_supported(&self, format: WaveFormat, share_mode : &ShareMode) -> Result<WaveFormat> {
         match share_mode {
             ShareMode::Exclusive => self.is_supported_exclusive(format),
             ShareMode::Shared => self.is_supported_shared(format),
         }
     }
 
-    fn is_supported_exclusive(&self, format: &WaveFormat) -> Result<&WaveFormat> {
+    fn is_supported_exclusive(&self, format: WaveFormat) -> Result<WaveFormat> {
         let first_test = unsafe {
-            self.0.IsFormatSupported(
+            self.inner_client.IsFormatSupported(
                     AUDCLNT_SHAREMODE_EXCLUSIVE,
                     &format.0.Format,
                     None,
@@ -72,7 +77,7 @@ impl AudioClient {
         if format.0.dwChannelMask <= 2 {
             let wave_format = format.0.Format.clone();
             unsafe {
-                self.0.IsFormatSupported(
+                self.inner_client.IsFormatSupported(
                     AUDCLNT_SHAREMODE_EXCLUSIVE,
                     &wave_format,
                     None,
@@ -83,10 +88,10 @@ impl AudioClient {
         Err(anyhow!("Format not supported"))
     }
 
-    fn is_supported_shared(&self, format: &WaveFormat) -> Result<&WaveFormat> {
+    fn is_supported_shared(&self, format: WaveFormat) -> Result<WaveFormat> {
         let mut closest_match: *mut WAVEFORMATEX = std::ptr::null_mut();
         let result = unsafe {
-            self.0.IsFormatSupported(
+            self.inner_client.IsFormatSupported(
                 AUDCLNT_SHAREMODE_SHARED,
                 &format.0.Format,
                 Some(&mut closest_match),
@@ -96,7 +101,7 @@ impl AudioClient {
             return Ok(format);
         } else {
             let fmt: WAVEFORMATEX = unsafe { closest_match.read() };
-            Ok(&WaveFormat::from_waveformatex(fmt)?)
+            Ok(WaveFormat::from_waveformatex(fmt)?)
         }
         
     }
@@ -105,7 +110,7 @@ impl AudioClient {
         let mut default_period = 0;
         let mut min_period = 0;
         unsafe {
-            self.0.GetDevicePeriod(Some(&mut default_period), Some(&mut min_period))?
+            self.inner_client.GetDevicePeriod(Some(&mut default_period), Some(&mut min_period))?
         };
         Ok((default_period, min_period))
     }
@@ -141,13 +146,102 @@ impl AudioClient {
         );
         Ok(aligned_period)
     }
+    
+    pub(crate) fn initialize(&mut self, format: &WaveFormat, desired_period: i64, sharemode: &ShareMode) -> Result<()> {
+        self.sharemode = Some(sharemode.clone());
+        let mode = match sharemode {
+            ShareMode::Exclusive => AUDCLNT_SHAREMODE_EXCLUSIVE,
+            ShareMode::Shared => AUDCLNT_SHAREMODE_SHARED,
+        };
+        let device_period = match sharemode {
+            ShareMode::Exclusive => desired_period,
+            ShareMode::Shared => 0,
+        };
+        let flags = match sharemode {
+            ShareMode::Exclusive => 0,
+            ShareMode::Shared => AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+        };
+        unsafe {
+            self.inner_client.Initialize(
+                mode,
+                flags,
+                desired_period,
+                device_period,
+                &format.0.Format,
+                None,
+            )?;
+        }
+        Ok(())
+    }
+    
+    pub(crate) fn get_buffer_size(&self) -> Result<usize> {
+        Ok(unsafe { self.inner_client.GetBufferSize()? as usize})
+    }
+    
+    pub(crate) fn get_renderer(&self) -> Result<AudioRenderClient> {
+        Ok(AudioRenderClient(unsafe { self.inner_client.GetService::<IAudioRenderClient>()? }))
+    }
+    
+    pub(crate) fn stop(&self) -> Result<()> {
+        Ok(unsafe { self.inner_client.Stop()? })
+    }
+    
+    pub(crate) fn get_available_frames(&self) -> Result<usize> {
+        let frames = match self.sharemode {
+            Some(ShareMode::Exclusive) => {
+                let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
+                buffer_frame_count
+            },
+            Some(ShareMode::Shared) => {
+                let padding_count = unsafe { self.inner_client.GetCurrentPadding()? as usize };
+                let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
+                buffer_frame_count - padding_count
+            }
+            _ => return Err(anyhow!("Client has not been initialized")),
+        };
+        Ok(frames)
+    }
+    
+    pub(crate) fn new(none: IAudioClient) -> Result<AudioClient> {
+        Ok(AudioClient {
+            inner_client: none,
+            sharemode: None,
+        })
+    }
+    
+    pub(crate) fn start(&self) -> Result<()> {
+        unsafe { self.inner_client.Start()? };
+        Ok(())
+    }
 }
 
-pub struct AudioRenderClient(pub IAudioRenderClient);
+pub struct AudioRenderClient(IAudioRenderClient);
+
+impl AudioRenderClient {
+    pub(crate) fn write(&self, available_frames: usize, n_block_align: usize, data: &[u8], buffer_flags: Option<u32>) -> Result<()> {
+        let nbr_bytes = available_frames * n_block_align;
+        if nbr_bytes != data.len() {
+            return Err(anyhow!(
+                    "Wrong length of data, got {}, expected {}",
+                    data.len(),
+                    nbr_bytes
+            ));
+        }
+        let bufferptr = unsafe { self.0.GetBuffer(available_frames as u32)? };
+        let bufferslice = unsafe { slice::from_raw_parts_mut(bufferptr, nbr_bytes) };
+        bufferslice.copy_from_slice(data);
+        let flags = match buffer_flags {
+            Some(bflags) => bflags,
+            None => 0,
+        };
+        unsafe { self.0.ReleaseBuffer(available_frames as u32, flags)? };
+        Ok(())
+    }
+}
 
 /// Struct wrapping a [WAVEFORMATEXTENSIBLE](https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible) format descriptor.
 #[derive(Clone)]
-pub struct WaveFormat(WAVEFORMATEXTENSIBLE);
+pub struct WaveFormat(pub WAVEFORMATEXTENSIBLE);
 
 impl WaveFormat {
     pub fn new(

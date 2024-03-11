@@ -56,12 +56,8 @@ impl HostTrait for Host {
         for i in 0..unsafe { devices_collection.GetCount()? }
         {
             let inner_device = unsafe { devices_collection.Item(i)? };
-            let device = Device::new( inner_device, default_device_id)?;
-            let device_id = device.get_id()?;
-            enumerated_devices.push(crate::audio::Device::Wasapi(Device::new(
-                inner_device,
-                default_device_id,
-            )?));
+            let device = Device::new( inner_device, default_device_id.clone())?;
+            enumerated_devices.push(crate::audio::Device::Wasapi(device));
         }
         Ok(enumerated_devices)
     }
