@@ -16,6 +16,7 @@ use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 
 use super::api::AudioClient;
 use super::api::AudioRenderClient;
+use super::api::EventHandle;
 use super::api::ShareMode;
 use super::api::WaveFormat;
 use super::api::com_initialize;
@@ -29,7 +30,7 @@ const REFTIMES_PER_MILLISEC: i64 = 10000;
 pub struct Streamer {
     client: AudioClient,
     renderer: AudioRenderClient,
-    eventhandle: Option<HANDLE>,
+    eventhandle: EventHandle,
     taskhandle: Option<HANDLE>,
     wave_format: WaveFormat,
     pause_condition: Condvar,
@@ -161,11 +162,12 @@ impl Streamer {
             }
         };
 
+        let eventhandle = client.set_get_eventhandle()?;
         let renderer = client.get_renderer()?;
         Ok(Streamer {
             client,
             renderer,
-            eventhandle: None,
+            eventhandle,
             wave_format,
             desired_period,
             taskhandle: None,
@@ -245,6 +247,7 @@ impl Streamer {
                     stream_started = !stream_started;
                 }
 
+                self.eventhandle.wait_for_event(1000)?;
                 buffer.clear();
                 available_frames = self.client.get_available_frames()?;
                 available_buffer_len =

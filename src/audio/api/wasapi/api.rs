@@ -1,6 +1,6 @@
 use std::{cmp, slice};
 use num_integer::Integer;
-use windows::{core::GUID, Win32::{Foundation::RPC_E_CHANGED_MODE, Media::{Audio::{IAudioClient, IAudioRenderClient, AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0, WAVE_FORMAT_PCM}, KernelStreaming::{KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE}, Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT}}, System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED}}};
+use windows::{core::GUID, Win32::{Foundation::{HANDLE, RPC_E_CHANGED_MODE, WAIT_OBJECT_0}, Media::{Audio::{IAudioClient, IAudioRenderClient, AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0, WAVE_FORMAT_PCM}, KernelStreaming::{KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE}, Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT}}, System::{Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED}, Threading::WaitForSingleObject}}};
 use anyhow::{anyhow, Result};
 
 use crate::audio::BitsPerSample;
@@ -158,7 +158,7 @@ impl AudioClient {
             ShareMode::Shared => 0,
         };
         let flags = match sharemode {
-            ShareMode::Exclusive => 0,
+            ShareMode::Exclusive => AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
             ShareMode::Shared => AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
         };
         unsafe {
@@ -213,7 +213,23 @@ impl AudioClient {
         unsafe { self.inner_client.Start()? };
         Ok(())
     }
+    
+    pub(crate) fn set_get_eventhandle(&self) -> Result<EventHandle> {
+        todo!()
+    }
 }
+
+pub struct EventHandle(HANDLE);
+impl EventHandle {
+    pub(crate) fn wait_for_event(&self, timeout: u32) -> Result<()> {
+        let retval = unsafe { WaitForSingleObject(self.0, timeout) };
+        if retval.0 != WAIT_OBJECT_0.0 {
+            return Err(anyhow!("Wait timed out"));
+        }
+        Ok(())
+    }
+}
+
 
 pub struct AudioRenderClient(IAudioRenderClient);
 
