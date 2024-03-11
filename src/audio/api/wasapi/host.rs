@@ -1,7 +1,7 @@
-use super::{com::com_initialize, device::Device};
+use super::{api::com_initialize, device::Device};
 use crate::audio::HostTrait;
 use anyhow::{anyhow, Result};
-use wasapi::{get_default_device, DeviceCollection, Direction};
+use windows::Win32::{Media::Audio::{eRender, eMultimedia, MMDeviceEnumerator, IMMDeviceEnumerator, DEVICE_STATE_ACTIVE}, System::Com::{CLSCTX_ALL, CoCreateInstance}};
 
 #[derive(Clone, Copy)]
 pub struct Host {}
@@ -11,66 +11,62 @@ impl Host {
         Self {}
     }
 
-    pub fn get_default_device() -> Result<wasapi::Device> {
+    pub fn get_default_device() -> Result<Device> {
         com_initialize();
-        get_default_device(&Direction::Render)
-            .map_err(|e| anyhow!("get_default_device failed: {}", e))
+        let enumerator: IMMDeviceEnumerator =
+            unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
+        let device = unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia)? };
+        let default_device_id = unsafe { device.GetId()?.to_string()? };
+        Ok(Device::new(device, default_device_id)?)
     }
 }
 
 impl HostTrait for Host {
     fn create_device(&self, id: Option<u32>) -> Result<crate::audio::Device> {
         com_initialize();
-        let devices_collection = DeviceCollection::new(&Direction::Render)
-            .map_err(|e| anyhow!("DeviceCollection::new failed: {}", e))?;
+        let enumerator: IMMDeviceEnumerator =
+            unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
+
+        let devices_collection = unsafe { enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)? };
+        
         let default_device = Self::get_default_device()?;
         let default_device_id = default_device
             .get_id()
             .map_err(|e| anyhow!("Device::get_id failed: {}", e))?;
         let device = match id {
-            Some(index) => devices_collection
-                .get_device_at_index(index)
-                .map_err(|e| anyhow!("DeviceCollection::get_device_at_index failed: {}", e))?,
+            Some(index) => {
+                Device::new(unsafe {
+                    devices_collection.Item(index)?
+                }, default_device_id)?
+        },
             _ => default_device,
         };
-        let device_id = device
-            .get_id()
-            .map_err(|e| anyhow!("Device::get_id failed: {}", e))?;
-        Ok(crate::audio::Device::Wasapi(Device::new(
-            device,
-            device_id == default_device_id,
-        )?))
+        Ok(crate::audio::Device::Wasapi(device))
     }
 
     fn get_devices(&self) -> Result<Vec<crate::audio::Device>> {
         com_initialize();
-        let devices_collection = DeviceCollection::new(&Direction::Render)
-            .map_err(|e| anyhow!("DeviceCollection::new failed: {}", e))?;
+        let enumerator : IMMDeviceEnumerator = unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
+        let devices_collection = unsafe { enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)? };
         let default_device = Self::get_default_device()?;
-        let default_device_id = default_device
-            .get_id()
-            .map_err(|e| anyhow!("Device::get_id failed: {}", e))?;
+        let default_device_id = default_device.get_id()?;
+
         let mut enumerated_devices: Vec<crate::audio::Device> = vec![];
-        for i in 0..devices_collection
-            .get_nbr_devices()
-            .map_err(|e| anyhow!("DeviceCollection::get_nbr_devices failed: {}", e))?
+        
+        for i in 0..unsafe { devices_collection.GetCount()? }
         {
-            let device = devices_collection
-                .get_device_at_index(i)
-                .map_err(|e| anyhow!("DeviceCollection::get_device_at_index failed: {}", e))?;
-            let device_id = device
-                .get_id()
-                .map_err(|e| anyhow!("Device::get_id failed: {}", e))?;
+            let inner_device = unsafe { devices_collection.Item(i)? };
+            let device = Device::new( inner_device, default_device_id)?;
+            let device_id = device.get_id()?;
             enumerated_devices.push(crate::audio::Device::Wasapi(Device::new(
-                device,
-                device_id == default_device_id,
+                inner_device,
+                default_device_id,
             )?));
         }
         Ok(enumerated_devices)
     }
 
     fn get_default_device(&self) -> Result<crate::audio::Device> {
-        let device = Self::get_default_device()?;
-        Ok(crate::audio::Device::Wasapi(Device::new(device, true)?))
+        Ok(crate::audio::Device::Wasapi(Self::get_default_device()?))
     }
 }

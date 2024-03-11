@@ -1,28 +1,36 @@
 use anyhow::{anyhow, Result};
 use tokio::sync::mpsc::{Sender, channel};
-use wasapi::{ShareMode, WaveFormat};
+use windows::Win32::{Media::Audio::{IMMDevice, IAudioClient}, System::Com::{STGM_READ, StructuredStorage::PropVariantToStringAlloc, CLSCTX_ALL}, Devices::FunctionDiscovery::PKEY_DeviceInterface_FriendlyName};
 
-use super::{com::com_initialize, stream::Streamer};
+use super::{api::{com_initialize, ShareMode, AudioClient, WaveFormat}, stream::Streamer};
 use crate::audio::{Capabilities, DeviceTrait, StreamParams, StreamingCommand, StreamingData};
 
 pub struct Device {
-    is_default: bool,
-    inner_device: wasapi::Device,
+    default_device_id: String,
+    inner_device: IMMDevice,
     stream_thread_handle: Option<tokio::task::JoinHandle<Result<()>>>,
     command: Option<Sender<StreamingCommand>>,
 }
 
 impl Device {
-    pub(super) fn new(inner_device: wasapi::Device, is_default: bool) -> Result<Self> {
+    pub(super) fn new(inner_device: IMMDevice, default_device_id: String) -> Result<Self> {
         Ok(Self {
             inner_device,
-            is_default,
+            default_device_id,
             stream_thread_handle: Option::None,
             command: Option::None,
         })
     }
 
-    fn capabilities(device: &wasapi::Device) -> Result<Capabilities> {
+    pub(super) fn get_id(&self) -> Result<String> {
+        Ok(unsafe { self.inner_device.GetId()?.to_string()? })
+    }
+
+    pub fn get_client(&self) -> Result<AudioClient> {
+        unsafe { Ok(AudioClient(self.inner_device.Activate::<IAudioClient>(CLSCTX_ALL, None)?)) }
+    }
+
+    fn capabilities(&self) -> Result<Capabilities> {
         let mut sample_rates = Vec::new();
         let mut bits_per_samples = Vec::new();
 
@@ -30,21 +38,11 @@ impl Device {
 
         com_initialize();
         for bits_per_sample in default_capabilities.bits_per_samples {
-            let sample_type = match bits_per_sample {
-                crate::audio::BitsPerSample::Bits8 => &wasapi::SampleType::Int,
-                crate::audio::BitsPerSample::Bits16 => &wasapi::SampleType::Int,
-                crate::audio::BitsPerSample::Bits24 => &wasapi::SampleType::Int,
-                crate::audio::BitsPerSample::Bits32 => &wasapi::SampleType::Float,
-            };
             let default_capabilities = Capabilities::default();
             for samplerate in default_capabilities.sample_rates {
-                let client = device
-                    .get_iaudioclient()
-                    .map_err(|e| anyhow!("IAudioClient::GetAudioClient failed: {}", e))?;
+                let client = self.get_client()?;
                 let wave_format = WaveFormat::new(
-                    bits_per_sample as usize,
-                    bits_per_sample as usize,
-                    sample_type,
+                    bits_per_sample,
                     samplerate as usize,
                     2,
                     None,
@@ -55,7 +53,7 @@ impl Device {
                 };
                 match sharemode {
                     ShareMode::Exclusive => {
-                        if let Ok(_) = client.is_supported_exclusive_with_quirks(&wave_format) {
+                        if let Ok(_) = client.is_supported(&wave_format, &sharemode) {
                             if !bits_per_samples.contains(&bits_per_sample) {
                                 bits_per_samples.push(bits_per_sample);
                             };
@@ -90,16 +88,18 @@ unsafe impl Send for Device {}
 unsafe impl Sync for Device {}
 
 impl DeviceTrait for Device {
-    fn is_default(&self) -> bool {
-        self.is_default
+    fn is_default(&self) -> Result<bool> {
+        Ok(self.default_device_id == self.get_id()?)
     }
 
-    fn name(&self) -> String {
-        self.inner_device.get_friendlyname().unwrap_or_default()
+    fn name(&self) -> Result<String> {
+        let store = unsafe { self.inner_device.OpenPropertyStore(STGM_READ)? };
+        let prop = unsafe { store.GetValue(&PKEY_DeviceInterface_FriendlyName)? };
+        Ok(unsafe { PropVariantToStringAlloc(&prop)?.to_string()? })
     }
 
     fn get_capabilities(&self) -> Result<Capabilities> {
-        Device::capabilities(&self.inner_device)
+        self.capabilities()
     }
 
     fn start(&mut self, params: StreamParams) -> Result<Sender<StreamingData>> {

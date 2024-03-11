@@ -3,8 +3,8 @@ use anyhow::{anyhow, Result};
 use tokio::sync::mpsc::Sender;
 
 pub trait DeviceTrait: Send + Sync {
-    fn is_default(&self) -> bool;
-    fn name(&self) -> String;
+    fn is_default(&self) -> Result<bool>;
+    fn name(&self) -> Result<String>;
     fn get_capabilities(&self) -> Result<Capabilities>;
     fn start(&mut self, params: StreamParams) -> Result<Sender<StreamingData>>;
     fn pause(&mut self) -> Result<()>;
@@ -45,18 +45,18 @@ impl Device {
 }
 
 impl DeviceTrait for Device {
-    fn is_default(&self) -> bool {
+    fn is_default(&self) -> Result<bool> {
         let device = match self {
             Self::Wasapi(device) => device,
-            Self::None => return false,
+            Self::None => return Ok(false),
         };
         device.is_default()
     }
 
-    fn name(&self) -> String {
+    fn name(&self) -> Result<String> {
         let device = match self {
             Self::Wasapi(device) => device,
-            Self::None => return String::from("none"),
+            Self::None => return Ok(String::from("none")),
         };
         device.name()
     }

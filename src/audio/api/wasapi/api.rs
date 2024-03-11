@@ -1,0 +1,213 @@
+use std::cmp;
+use num_integer::Integer;
+use windows::{Win32::{Foundation::RPC_E_CHANGED_MODE, System::Com::{CoInitializeEx, COINIT_MULTITHREADED, CoUninitialize}, Media::{Audio::{WAVEFORMATEXTENSIBLE, WAVEFORMATEX, WAVEFORMATEXTENSIBLE_0, WAVE_FORMAT_PCM, IAudioClient, AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, IAudioRenderClient}, KernelStreaming::{WAVE_FORMAT_EXTENSIBLE, KSDATAFORMAT_SUBTYPE_PCM}, Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT}}}, core::GUID};
+use anyhow::{anyhow, Result};
+
+use crate::audio::BitsPerSample;
+
+thread_local! {
+    static WASAPI_COM_INIT: ComWasapi = {
+        let result = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
+        if result.0 < 0 {
+            if result == RPC_E_CHANGED_MODE {
+                ComWasapi { is_ok: true }
+            } else {
+                panic!("Failed to initialize COM: HRESULT {}", result);
+            }
+        } else {
+            ComWasapi { is_ok: true }
+        }
+    }
+}
+
+struct ComWasapi {
+    is_ok: bool
+}
+
+impl Drop for ComWasapi {
+    #[inline]
+    fn drop(&mut self) {
+        if self.is_ok {
+            unsafe { CoUninitialize() }
+        }
+    }
+}
+
+#[inline]
+pub fn com_initialize() {
+    WASAPI_COM_INIT.with(|_| {})
+}
+
+pub fn calculate_period_100ns(frames: i64, samplerate: i64) -> i64 {
+    ((10000.0 * 1000.0 / samplerate as f64 * frames as f64) + 0.5) as i64
+}
+
+pub enum ShareMode {
+    Exclusive,
+    Shared,
+}
+
+pub struct AudioClient(pub IAudioClient);
+
+impl AudioClient {
+    pub fn is_supported(&self, format: &WaveFormat, share_mode : &ShareMode) -> Result<&WaveFormat> {
+        match share_mode {
+            ShareMode::Exclusive => self.is_supported_exclusive(format),
+            ShareMode::Shared => self.is_supported_shared(format),
+        }
+    }
+
+    fn is_supported_exclusive(&self, format: &WaveFormat) -> Result<&WaveFormat> {
+        let first_test = unsafe {
+            self.0.IsFormatSupported(
+                    AUDCLNT_SHAREMODE_EXCLUSIVE,
+                    &format.0.Format,
+                    None,
+                ).ok()
+        };
+        if first_test.is_ok() {
+            return Ok(format);
+        }
+        //perform a second test with WAVEFORMATEX if channel mask is less than 2
+        if format.0.dwChannelMask <= 2 {
+            let wave_format = format.0.Format.clone();
+            unsafe {
+                self.0.IsFormatSupported(
+                    AUDCLNT_SHAREMODE_EXCLUSIVE,
+                    &wave_format,
+                    None,
+                ).ok()?
+            };
+            return Ok(format);
+        }
+        Err(anyhow!("Format not supported"))
+    }
+
+    fn is_supported_shared(&self, format: &WaveFormat) -> Result<&WaveFormat> {
+        let mut closest_match: *mut WAVEFORMATEX = std::ptr::null_mut();
+        let result = unsafe {
+            self.0.IsFormatSupported(
+                AUDCLNT_SHAREMODE_SHARED,
+                &format.0.Format,
+                Some(&mut closest_match),
+            ).ok()
+        };
+        if result.is_ok() {
+            return Ok(format);
+        } else {
+            let fmt: WAVEFORMATEX = unsafe { closest_match.read() };
+            Ok(&WaveFormat::from_waveformatex(fmt)?)
+        }
+        
+    }
+
+    pub fn get_min_and_default_periods(&self) -> Result<(i64, i64)> {
+        let mut default_period = 0;
+        let mut min_period = 0;
+        unsafe {
+            self.0.GetDevicePeriod(Some(&mut default_period), Some(&mut min_period))?
+        };
+        Ok((default_period, min_period))
+    }
+
+    pub fn calculate_aligned_period_near(
+        &self,
+        desired_period: i64,
+        align_bytes: Option<u32>,
+        wave_fmt: &WaveFormat,
+    ) -> Result<i64> {
+        let (_, min_period) = self.get_min_and_default_periods()?;
+        let adjusted_period = cmp::max(desired_period, min_period);
+        let frame_bytes = wave_fmt.0.Format.nBlockAlign as u32;
+        let period_alignment_bytes = match align_bytes {
+            Some(0) => frame_bytes,
+            Some(bytes) => frame_bytes.lcm(&bytes),
+            None => frame_bytes,
+        };
+        let period_alignment_frames = period_alignment_bytes as i64 / frame_bytes as i64;
+        let desired_period_frames =
+            (adjusted_period as f64 * wave_fmt.0.Format.nSamplesPerSec as f64 / 10000000.0)
+                .round() as i64;
+        let min_period_frames =
+            (min_period as f64 * wave_fmt.0.Format.nSamplesPerSec as f64 / 10000000.0).ceil() as i64;
+        let mut nbr_segments = desired_period_frames / period_alignment_frames;
+        if nbr_segments * period_alignment_frames < min_period_frames {
+            // Add one segment if the value got rounded down below the minimum
+            nbr_segments += 1;
+        }
+        let aligned_period = calculate_period_100ns(
+            period_alignment_frames * nbr_segments,
+            wave_fmt.0.Format.nSamplesPerSec as i64,
+        );
+        Ok(aligned_period)
+    }
+}
+
+pub struct AudioRenderClient(pub IAudioRenderClient);
+
+/// Struct wrapping a [WAVEFORMATEXTENSIBLE](https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible) format descriptor.
+#[derive(Clone)]
+pub struct WaveFormat(WAVEFORMATEXTENSIBLE);
+
+impl WaveFormat {
+    pub fn new(
+        bits_per_sample: BitsPerSample,
+        samplerate: usize,
+        channels: usize,
+        channel_mask: Option<u32>,
+    ) -> Self {
+        let blockalign = channels * bits_per_sample as usize / 8;
+        let byterate = samplerate * blockalign;
+
+        let wave_format = WAVEFORMATEX {
+            cbSize: 22,
+            nAvgBytesPerSec: byterate as u32,
+            nBlockAlign: blockalign as u16,
+            nChannels: channels as u16,
+            nSamplesPerSec: samplerate as u32,
+            wBitsPerSample: bits_per_sample as u16,
+            wFormatTag: WAVE_FORMAT_EXTENSIBLE as u16,
+        };
+        let sample = WAVEFORMATEXTENSIBLE_0 {
+            wValidBitsPerSample: bits_per_sample as u16,
+        };
+        let subformat = match bits_per_sample {
+            BitsPerSample::Bits8 => KSDATAFORMAT_SUBTYPE_PCM,
+            BitsPerSample::Bits16 => KSDATAFORMAT_SUBTYPE_PCM,
+            BitsPerSample::Bits24 => KSDATAFORMAT_SUBTYPE_PCM,
+            BitsPerSample::Bits32 => KSDATAFORMAT_SUBTYPE_IEEE_FLOAT,
+        };
+        // https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
+        let mask = if let Some(given_mask) = channel_mask {
+            given_mask
+        } else {
+            match channels {
+                ch if ch <= 18 => {
+                    // setting bit for each channel
+                    (1 << ch) - 1
+                }
+                _ => 0,
+            }
+        };
+        let wave_fmt = WAVEFORMATEXTENSIBLE {
+            Format: wave_format,
+            Samples: sample,
+            SubFormat: subformat,
+            dwChannelMask: mask,
+        };
+        WaveFormat(wave_fmt)
+    }
+
+    /// convert from [WAVEFORMATEX](https://docs.microsoft.com/en-us/previous-versions/dd757713(v=vs.85)) structure
+    pub fn from_waveformatex(wavefmt: WAVEFORMATEX) -> Result<Self> {
+        let bits_per_sample = BitsPerSample::from(wavefmt.wBitsPerSample as usize);
+        let samplerate = wavefmt.nSamplesPerSec as usize;
+        let channels = wavefmt.nChannels as usize;
+        Ok(WaveFormat::new(
+            bits_per_sample,
+            samplerate,
+            channels,
+            None,
+        ))
+    }
+}

@@ -5,12 +5,6 @@ use std::sync::Condvar;
 use std::sync::Mutex;
 use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
-use wasapi::calculate_period_100ns;
-use wasapi::AudioClient;
-use wasapi::AudioRenderClient;
-use wasapi::Handle;
-use wasapi::ShareMode;
-use wasapi::WaveFormat;
 use windows::core::w;
 use windows::Win32::Foundation::E_INVALIDARG;
 use windows::Win32::Foundation::HANDLE;
@@ -20,8 +14,14 @@ use windows::Win32::Media::Audio::AUDCLNT_E_ENDPOINT_CREATE_FAILED;
 use windows::Win32::Media::Audio::AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED;
 use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 
-use super::com::com_initialize;
+use super::api::AudioClient;
+use super::api::AudioRenderClient;
+use super::api::ShareMode;
+use super::api::WaveFormat;
+use super::api::com_initialize;
+use super::device::Device;
 use crate::audio::StreamingData;
+use crate::audio::api::wasapi::api::calculate_period_100ns;
 use crate::audio::{StreamParams, StreamingCommand};
 
 const REFTIMES_PER_MILLISEC: i64 = 10000;
@@ -29,7 +29,7 @@ const REFTIMES_PER_MILLISEC: i64 = 10000;
 pub struct Streamer {
     client: AudioClient,
     renderer: AudioRenderClient,
-    eventhandle: Handle,
+    eventhandle: HANDLE,
     taskhandle: Option<HANDLE>,
     wave_format: WaveFormat,
     pause_condition: Condvar,
@@ -57,16 +57,8 @@ impl Streamer {
     // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
     #[inline(always)]
     pub(super) fn create_waveformat_from(params: &StreamParams) -> WaveFormat {
-        let sample_type = match params.bits_per_sample {
-            crate::audio::BitsPerSample::Bits8 => &wasapi::SampleType::Int,
-            crate::audio::BitsPerSample::Bits16 => &wasapi::SampleType::Int,
-            crate::audio::BitsPerSample::Bits24 => &wasapi::SampleType::Int,
-            crate::audio::BitsPerSample::Bits32 => &wasapi::SampleType::Float,
-        };
         WaveFormat::new(
-            params.bits_per_sample as usize,
-            params.bits_per_sample as usize,
-            sample_type,
+            params.bits_per_sample,
             params.samplerate as usize,
             params.channels as usize,
             None,
@@ -74,15 +66,13 @@ impl Streamer {
     }
 
     pub(super) fn new(
-        device: &wasapi::Device,
+        device: &Device,
         data_receiver: Receiver<StreamingData>,
         command_receiver: Receiver<StreamingCommand>,
         params: StreamParams,
     ) -> Result<Self> {
         com_initialize();
-        let mut client = device
-            .get_iaudioclient()
-            .map_err(|e| anyhow!("IAudioClient::GetAudioClient failed: {}", e))?;
+        let mut client = device.get_client()?;
         let wave_format = Streamer::create_waveformat_from(&params);
         let sharemode = match params.exclusive {
             true => ShareMode::Exclusive,
@@ -90,8 +80,7 @@ impl Streamer {
         };
 
         let (_, min_device_period) = client
-            .get_periods()
-            .map_err(|e| anyhow!("IAudioClient::GetDevicePeriod failed: {}", e))?;
+            .get_min_and_default_periods()?;
         let default_device_period = if params.buffer_length != 0 {
             (params.buffer_length * 1000000) / 100 as i64
         } else {
