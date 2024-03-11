@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use tokio::sync::mpsc::{Sender, channel};
 use windows::Win32::{Media::Audio::{IMMDevice, IAudioClient}, System::Com::{STGM_READ, StructuredStorage::PropVariantToStringAlloc, CLSCTX_ALL}, Devices::FunctionDiscovery::PKEY_DeviceInterface_FriendlyName};
 

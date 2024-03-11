@@ -1,6 +1,6 @@
 use std::{cmp, slice};
 use num_integer::Integer;
-use windows::{core::{GUID, PCSTR}, Win32::{Foundation::{HANDLE, RPC_E_CHANGED_MODE, WAIT_OBJECT_0}, Media::{Audio::{IAudioClient, IAudioRenderClient, AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0, WAVE_FORMAT_PCM}, KernelStreaming::{KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE}, Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT}}, System::{Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED}, Threading::{CreateEventA, WaitForSingleObject}}}};
+use windows::{core::PCSTR, Win32::{Foundation::{HANDLE, RPC_E_CHANGED_MODE, WAIT_OBJECT_0}, Media::{Audio::{IAudioClient, IAudioRenderClient, AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0}, KernelStreaming::{KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE}, Multimedia::KSDATAFORMAT_SUBTYPE_IEEE_FLOAT}, System::{Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED}, Threading::{CreateEventA, WaitForSingleObject}}}};
 use anyhow::{anyhow, Result};
 
 use crate::audio::BitsPerSample;

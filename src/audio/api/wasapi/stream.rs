@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use log::debug;
 use log::error;
 use std::sync::Condvar;
@@ -14,15 +14,15 @@ use windows::Win32::Media::Audio::AUDCLNT_E_ENDPOINT_CREATE_FAILED;
 use windows::Win32::Media::Audio::AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED;
 use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 
+use super::api::com_initialize;
 use super::api::AudioClient;
 use super::api::AudioRenderClient;
 use super::api::EventHandle;
 use super::api::ShareMode;
 use super::api::WaveFormat;
-use super::api::com_initialize;
 use super::device::Device;
-use crate::audio::StreamingData;
 use crate::audio::api::wasapi::api::calculate_period_100ns;
+use crate::audio::StreamingData;
 use crate::audio::{StreamParams, StreamingCommand};
 
 const REFTIMES_PER_MILLISEC: i64 = 10000;
@@ -80,8 +80,7 @@ impl Streamer {
             false => ShareMode::Shared,
         };
 
-        let (_, min_device_period) = client
-            .get_min_and_default_periods()?;
+        let (_, min_device_period) = client.get_min_and_default_periods()?;
         let default_device_period = if params.buffer_length != 0 {
             (params.buffer_length * 1000000) / 100 as i64
         } else {
@@ -89,13 +88,12 @@ impl Streamer {
         };
 
         // Calculate desired period for better device compatibility.
-        let mut desired_period = client
-            .calculate_aligned_period_near(3 * default_device_period / 2, Some(128), &wave_format)?;
-        let result = client.initialize(
+        let mut desired_period = client.calculate_aligned_period_near(
+            3 * default_device_period / 2,
+            Some(128),
             &wave_format,
-            desired_period,
-            &sharemode,
-        );
+        )?;
+        let result = client.initialize(&wave_format, desired_period, &sharemode);
 
         match result {
             Ok(()) => debug!("IAudioClient::Initialize ok"),
@@ -120,18 +118,13 @@ impl Streamer {
                             // 3. Calculate the aligned buffer size in 100-nanosecond units.
                             desired_period = calculate_period_100ns(
                                 buffersize as i64,
-                                wave_format.0.Format.nSamplesPerSec as i64
+                                wave_format.0.Format.nSamplesPerSec as i64,
                             );
                             debug!("Aligned period in 100ns units: {}", desired_period);
                             // 4. Get a new IAudioClient
                             client = device.get_client()?;
                             // 5. Call Initialize again on the created audio client.
-                            client
-                                .initialize(
-                                    &wave_format,
-                                    desired_period,
-                                    &sharemode,
-                                )?;
+                            client.initialize(&wave_format, desired_period, &sharemode)?;
                             debug!("IAudioClient::Initialize ok");
                         }
                         AUDCLNT_E_DEVICE_IN_USE => {
@@ -188,9 +181,7 @@ impl Streamer {
     }
 
     fn stop(&self) -> Result<()> {
-        self
-            .client
-            .stop()
+        self.client.stop()
     }
 
     pub(crate) async fn start(&mut self) -> Result<()> {
@@ -201,14 +192,11 @@ impl Streamer {
             windows::Win32::System::Threading::AvSetMmThreadCharacteristicsW(
                 w!("Pro Audio"),
                 &mut 0,
-            )
-            .map_err(|e| anyhow!("AvSetMmThreadCharacteristics failed: {:?}", e))?
+            )?
         });
 
         let mut stream_started = false;
-        let mut available_frames = self
-            .client
-            .get_available_frames()?;
+        let mut available_frames = self.client.get_available_frames()?;
         let mut available_buffer_len =
             available_frames as usize * self.wave_format.0.Format.nBlockAlign as usize;
 
@@ -234,13 +222,12 @@ impl Streamer {
                     continue;
                 }
 
-                self.renderer
-                    .write(
-                        available_frames as usize,
-                        self.wave_format.0.Format.nBlockAlign as usize,
-                        buffer.as_slice(),
-                        None,
-                    )?;
+                self.renderer.write(
+                    available_frames as usize,
+                    self.wave_format.0.Format.nBlockAlign as usize,
+                    buffer.as_slice(),
+                    None,
+                )?;
 
                 if !stream_started {
                     self.client.start()?;
@@ -252,7 +239,6 @@ impl Streamer {
                 available_frames = self.client.get_available_frames()?;
                 available_buffer_len =
                     available_frames as usize * self.wave_format.0.Format.nBlockAlign as usize;
-
             } else {
                 let bytes_per_frames = self.wave_format.0.Format.nBlockAlign as usize;
                 let frames = buffer.len() / bytes_per_frames;
@@ -267,8 +253,7 @@ impl Streamer {
         }
         if let Some(handle) = self.taskhandle.take() {
             unsafe {
-                windows::Win32::System::Threading::AvRevertMmThreadCharacteristics(handle)
-                    .map_err(|e| anyhow!("AvRevertMmThreadCharacteristics failed: {:?}", e))?;
+                windows::Win32::System::Threading::AvRevertMmThreadCharacteristics(handle)?
             }
         }
         self.stop()
