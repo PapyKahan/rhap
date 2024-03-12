@@ -45,7 +45,7 @@ impl DeviceSelector {
         self.state.select(Some(0));
 
         if let Some(device) = self.selected.as_ref() {
-            if !self.devices.iter().any(|item| &item.name() == device) {
+            if !self.devices.iter().any(|item| -> bool { &item.name().unwrap_or_default() == device }) {
                 self.selected = None;
             }
         }
@@ -56,9 +56,9 @@ impl DeviceSelector {
     pub fn set_selected_device(&mut self) -> Result<()> {
         self.selected = match self.state.selected() {
             Some(i) => Some(if i < self.devices.len() {
-                self.devices[i].name()
+                self.devices[i].name()?
             } else {
-                self.default.name()
+                self.default.name()?
             }),
             None => None,
         };
@@ -106,7 +106,7 @@ impl DeviceSelector {
     }
 
     pub(crate) fn render(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let default = &self.default.name().clone();
+        let default = &self.default.name()?.clone();
         let selected_device_name = if let Some(device) = self.selected.as_ref() {
             device
         } else {
@@ -115,10 +115,10 @@ impl DeviceSelector {
 
         let mut items = Vec::new();
         for device in &self.devices {
-            let is_selected = &device.name() == selected_device_name;
+            let is_selected = &device.name()? == selected_device_name;
             let row = Row::new(vec![
                 Cell::from(if is_selected { "󰓃" } else { "  " }),
-                Cell::from(device.name()),
+                Cell::from(device.name()?),
             ])
             .height(1)
             .style(Style::default().bg(if items.len() % 2 == 0 {

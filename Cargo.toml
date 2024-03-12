@@ -14,7 +14,7 @@ rubato = "0.15.0"
 symphonia = { version = "0.5.4", features = ["all-formats", "all-codecs"] }
 tokio = { version = "1.36.0", features = ["full"] }
 walkdir = "2.5.0"
-wasapi = "0.14.0"
+num-integer = "0.1.45"
 
 [dependencies.ratatui]
 version = "0.26.1"

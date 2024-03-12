@@ -1,16 +1,10 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use log::debug;
 use log::error;
 use std::sync::Condvar;
 use std::sync::Mutex;
 use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
-use wasapi::calculate_period_100ns;
-use wasapi::AudioClient;
-use wasapi::AudioRenderClient;
-use wasapi::Handle;
-use wasapi::ShareMode;
-use wasapi::WaveFormat;
 use windows::core::w;
 use windows::Win32::Foundation::E_INVALIDARG;
 use windows::Win32::Foundation::HANDLE;
@@ -20,7 +14,14 @@ use windows::Win32::Media::Audio::AUDCLNT_E_ENDPOINT_CREATE_FAILED;
 use windows::Win32::Media::Audio::AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED;
 use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 
-use super::com::com_initialize;
+use super::api::com_initialize;
+use super::api::AudioClient;
+use super::api::AudioRenderClient;
+use super::api::EventHandle;
+use super::api::ShareMode;
+use super::api::WaveFormat;
+use super::device::Device;
+use crate::audio::api::wasapi::api::calculate_period_100ns;
 use crate::audio::StreamingData;
 use crate::audio::{StreamParams, StreamingCommand};
 
@@ -29,7 +30,7 @@ const REFTIMES_PER_MILLISEC: i64 = 10000;
 pub struct Streamer {
     client: AudioClient,
     renderer: AudioRenderClient,
-    eventhandle: Handle,
+    eventhandle: EventHandle,
     taskhandle: Option<HANDLE>,
     wave_format: WaveFormat,
     pause_condition: Condvar,
@@ -57,16 +58,8 @@ impl Streamer {
     // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
     #[inline(always)]
     pub(super) fn create_waveformat_from(params: &StreamParams) -> WaveFormat {
-        let sample_type = match params.bits_per_sample {
-            crate::audio::BitsPerSample::Bits8 => &wasapi::SampleType::Int,
-            crate::audio::BitsPerSample::Bits16 => &wasapi::SampleType::Int,
-            crate::audio::BitsPerSample::Bits24 => &wasapi::SampleType::Int,
-            crate::audio::BitsPerSample::Bits32 => &wasapi::SampleType::Float,
-        };
         WaveFormat::new(
-            params.bits_per_sample as usize,
-            params.bits_per_sample as usize,
-            sample_type,
+            params.bits_per_sample,
             params.samplerate as usize,
             params.channels as usize,
             None,
@@ -74,24 +67,20 @@ impl Streamer {
     }
 
     pub(super) fn new(
-        device: &wasapi::Device,
+        device: &Device,
         data_receiver: Receiver<StreamingData>,
         command_receiver: Receiver<StreamingCommand>,
         params: StreamParams,
     ) -> Result<Self> {
         com_initialize();
-        let mut client = device
-            .get_iaudioclient()
-            .map_err(|e| anyhow!("IAudioClient::GetAudioClient failed: {}", e))?;
+        let mut client = device.get_client()?;
         let wave_format = Streamer::create_waveformat_from(&params);
         let sharemode = match params.exclusive {
             true => ShareMode::Exclusive,
             false => ShareMode::Shared,
         };
 
-        let (_, min_device_period) = client
-            .get_periods()
-            .map_err(|e| anyhow!("IAudioClient::GetDevicePeriod failed: {}", e))?;
+        let (_, min_device_period) = client.get_min_and_default_periods()?;
         let default_device_period = if params.buffer_length != 0 {
             (params.buffer_length * 1000000) / 100 as i64
         } else {
@@ -99,16 +88,12 @@ impl Streamer {
         };
 
         // Calculate desired period for better device compatibility.
-        let mut desired_period = client
-            .calculate_aligned_period_near(3 * default_device_period / 2, Some(128), &wave_format)
-            .map_err(|e| anyhow!("IAudioClient::CalculateAlignedPeriod failed: {}", e))?;
-        let result = client.initialize_client(
+        let mut desired_period = client.calculate_aligned_period_near(
+            3 * default_device_period / 2,
+            Some(128),
             &wave_format,
-            desired_period,
-            &device.get_direction(),
-            &sharemode,
-            false,
-        );
+        )?;
+        let result = client.initialize(&wave_format, desired_period, &sharemode);
 
         match result {
             Ok(()) => debug!("IAudioClient::Initialize ok"),
@@ -124,9 +109,7 @@ impl Streamer {
                             // https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize#examples
                             // Just panic on errors to keep it short and simple.
                             // 1. Call IAudioClient::GetBufferSize and receive the next-highest-aligned buffer size (in frames).
-                            let buffersize = client.get_bufferframecount().map_err(|e| {
-                                anyhow!("IAudioClient::GetBufferSize failed: {}", e)
-                            })?;
+                            let buffersize = client.get_buffer_size()?;
                             debug!(
                                 "Client next-highest-aligned buffer size: {} frames",
                                 buffersize
@@ -135,23 +118,13 @@ impl Streamer {
                             // 3. Calculate the aligned buffer size in 100-nanosecond units.
                             desired_period = calculate_period_100ns(
                                 buffersize as i64,
-                                wave_format.get_samplespersec() as i64,
+                                wave_format.0.Format.nSamplesPerSec as i64,
                             );
                             debug!("Aligned period in 100ns units: {}", desired_period);
                             // 4. Get a new IAudioClient
-                            client = device.get_iaudioclient().map_err(|e| {
-                                anyhow!("IAudioClient::GetAudioClient failed: {}", e)
-                            })?;
+                            client = device.get_client()?;
                             // 5. Call Initialize again on the created audio client.
-                            client
-                                .initialize_client(
-                                    &wave_format,
-                                    desired_period,
-                                    &device.get_direction(),
-                                    &sharemode,
-                                    false,
-                                )
-                                .map_err(|e| anyhow!("IAudioClient::Initialize failed: {}", e))?;
+                            client.initialize(&wave_format, desired_period, &sharemode)?;
                             debug!("IAudioClient::Initialize ok");
                         }
                         AUDCLNT_E_DEVICE_IN_USE => {
@@ -182,18 +155,14 @@ impl Streamer {
             }
         };
 
-        let eventhandle = client
-            .set_get_eventhandle()
-            .map_err(|e| anyhow!("IAudioClient::SetEventHandle failed: {}", e))?;
-        let renderer = client
-            .get_audiorenderclient()
-            .map_err(|e| anyhow!("IAudioClient::GetAudioRenderClient failed: {}", e))?;
+        let eventhandle = client.set_get_eventhandle()?;
+        let renderer = client.get_renderer()?;
         Ok(Streamer {
             client,
             renderer,
+            eventhandle,
             wave_format,
             desired_period,
-            eventhandle,
             taskhandle: None,
             pause_condition: Condvar::new(),
             status: Mutex::new(StreamingCommand::None),
@@ -212,10 +181,7 @@ impl Streamer {
     }
 
     fn stop(&self) -> Result<()> {
-        self
-            .client
-            .stop_stream()
-            .map_err(|e| anyhow!("IAudioClient::StopStream failed: {:?}", e))
+        self.client.stop()
     }
 
     pub(crate) async fn start(&mut self) -> Result<()> {
@@ -226,17 +192,13 @@ impl Streamer {
             windows::Win32::System::Threading::AvSetMmThreadCharacteristicsW(
                 w!("Pro Audio"),
                 &mut 0,
-            )
-            .map_err(|e| anyhow!("AvSetMmThreadCharacteristics failed: {:?}", e))?
+            )?
         });
 
         let mut stream_started = false;
-        let mut available_frames = self
-            .client
-            .get_available_space_in_frames()
-            .map_err(|e| anyhow!("IAudioClient::GetAvailableSpaceInFrames failed: {:?}", e))?;
+        let mut available_frames = self.client.get_available_frames()?;
         let mut available_buffer_len =
-            available_frames as usize * self.wave_format.get_blockalign() as usize;
+            available_frames as usize * self.wave_format.0.Format.nBlockAlign as usize;
 
         loop {
             match self.command_receiver.try_recv() {
@@ -260,38 +222,28 @@ impl Streamer {
                     continue;
                 }
 
-                self.renderer
-                    .write_to_device(
-                        available_frames as usize,
-                        self.wave_format.get_blockalign() as usize,
-                        buffer.as_slice(),
-                        None,
-                    )
-                    .map_err(|e| anyhow!("IAudioRenderClient::Write failed: {:?}", e))?;
+                self.renderer.write(
+                    available_frames as usize,
+                    self.wave_format.0.Format.nBlockAlign as usize,
+                    buffer.as_slice(),
+                    None,
+                )?;
 
                 if !stream_started {
-                    self.client
-                        .start_stream()
-                        .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))?;
+                    self.client.start()?;
                     stream_started = !stream_started;
                 }
 
-                self.eventhandle
-                    .wait_for_event(1000)
-                    .map_err(|e| anyhow!("WaitForSingleObject failed: {:?}", e))?;
+                self.eventhandle.wait_for_event(1000)?;
                 buffer.clear();
-                available_frames = self.client.get_available_space_in_frames().map_err(|e| {
-                    anyhow!("IAudioClient::GetAvailableSpaceInFrames failed: {:?}", e)
-                })?;
+                available_frames = self.client.get_available_frames()?;
                 available_buffer_len =
-                    available_frames as usize * self.wave_format.get_blockalign() as usize;
-
+                    available_frames as usize * self.wave_format.0.Format.nBlockAlign as usize;
             } else {
-                let bytes_per_frames = self.wave_format.get_blockalign() as usize;
+                let bytes_per_frames = self.wave_format.0.Format.nBlockAlign as usize;
                 let frames = buffer.len() / bytes_per_frames;
                 self.renderer
-                    .write_to_device(frames as usize, bytes_per_frames, buffer.as_slice(), None)
-                    .map_err(|e| anyhow!("IAudioRenderClient::Write failed: {:?}", e))?;
+                    .write(frames as usize, bytes_per_frames, buffer.as_slice(), None)?;
                 tokio::time::sleep(Duration::from_millis(
                     self.desired_period as u64 / REFTIMES_PER_MILLISEC as u64,
                 ))
@@ -301,20 +253,15 @@ impl Streamer {
         }
         if let Some(handle) = self.taskhandle.take() {
             unsafe {
-                windows::Win32::System::Threading::AvRevertMmThreadCharacteristics(handle)
-                    .map_err(|e| anyhow!("AvRevertMmThreadCharacteristics failed: {:?}", e))?;
+                windows::Win32::System::Threading::AvRevertMmThreadCharacteristics(handle)?
             }
         }
         self.stop()
     }
 
     fn pause(&self) -> Result<()> {
-        self.client
-            .stop_stream()
-            .map_err(|e| anyhow!("IAudioClient::StopStream failed: {:?}", e))?;
+        self.client.stop()?;
         self.wait_readiness();
-        self.client
-            .start_stream()
-            .map_err(|e| anyhow!("IAudioClient::StartStream failed: {:?}", e))
+        self.client.start()
     }
 }
