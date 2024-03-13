@@ -13,6 +13,13 @@ use windows::Win32::Media::Audio::AUDCLNT_E_DEVICE_IN_USE;
 use windows::Win32::Media::Audio::AUDCLNT_E_ENDPOINT_CREATE_FAILED;
 use windows::Win32::Media::Audio::AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED;
 use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
+use windows::Win32::System::Threading::AvRevertMmThreadCharacteristics;
+use windows::Win32::System::Threading::AvSetMmThreadCharacteristicsW;
+use windows::Win32::System::Threading::GetCurrentThread;
+use windows::Win32::System::Threading::GetThreadPriority;
+use windows::Win32::System::Threading::SetThreadPriority;
+use windows::Win32::System::Threading::THREAD_PRIORITY;
+use windows::Win32::System::Threading::THREAD_PRIORITY_HIGHEST;
 
 use super::api::com_initialize;
 use super::api::AudioClient;
@@ -32,6 +39,7 @@ pub struct Streamer {
     renderer: AudioRenderClient,
     eventhandle: EventHandle,
     taskhandle: Option<HANDLE>,
+    previous_priority: Option<THREAD_PRIORITY>,
     wave_format: WaveFormat,
     pause_condition: Condvar,
     status: Mutex<StreamingCommand>,
@@ -42,11 +50,7 @@ pub struct Streamer {
 
 impl Drop for Streamer {
     fn drop(&mut self) {
-        if let Some(handle) = self.taskhandle.take() {
-            unsafe {
-                let _ = windows::Win32::System::Threading::AvRevertMmThreadCharacteristics(handle);
-            }
-        }
+        self.revert_thread_priority();
     }
 }
 
@@ -163,6 +167,7 @@ impl Streamer {
             eventhandle,
             wave_format,
             desired_period,
+            previous_priority: None,
             taskhandle: None,
             pause_condition: Condvar::new(),
             status: Mutex::new(StreamingCommand::None),
@@ -184,17 +189,27 @@ impl Streamer {
         self.client.stop()
     }
 
+    fn set_thread_priority(&mut self) -> Result<()> {
+        self.previous_priority =
+            Some(unsafe { THREAD_PRIORITY(GetThreadPriority(GetCurrentThread())) });
+        unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST)? };
+        self.taskhandle = Some(unsafe { AvSetMmThreadCharacteristicsW(w!("Pro Audio"), &mut 0)? });
+        Ok(())
+    }
+
+    fn revert_thread_priority(&mut self) {
+        if let Some(previous_priority) = self.previous_priority.take() {
+            let _ = unsafe { SetThreadPriority(GetCurrentThread(), previous_priority) };
+        }
+        if let Some(handle) = self.taskhandle.take() {
+            let _ = unsafe { AvRevertMmThreadCharacteristics(handle) };
+        }
+    }
+
     pub(crate) async fn start(&mut self) -> Result<()> {
         com_initialize();
         let mut buffer = vec![];
-
-        self.taskhandle = Some(unsafe {
-            windows::Win32::System::Threading::AvSetMmThreadCharacteristicsW(
-                w!("Pro Audio"),
-                &mut 0,
-            )?
-        });
-
+        self.set_thread_priority()?;
         let mut stream_started = false;
         let mut available_frames = self.client.get_available_frames()?;
         let mut available_buffer_len =
@@ -251,11 +266,7 @@ impl Streamer {
                 break;
             }
         }
-        if let Some(handle) = self.taskhandle.take() {
-            unsafe {
-                windows::Win32::System::Threading::AvRevertMmThreadCharacteristics(handle)?
-            }
-        }
+        self.revert_thread_priority();
         self.stop()
     }
 
