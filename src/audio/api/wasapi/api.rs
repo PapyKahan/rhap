@@ -259,7 +259,7 @@ impl AudioRenderClient {
 
 /// Struct wrapping a [WAVEFORMATEXTENSIBLE](https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible) format descriptor.
 #[derive(Clone)]
-pub struct WaveFormat(pub WAVEFORMATEXTENSIBLE);
+pub struct WaveFormat(WAVEFORMATEXTENSIBLE);
 
 impl WaveFormat {
     pub fn new(
@@ -321,5 +321,13 @@ impl WaveFormat {
             channels,
             None,
         ))
+    }
+
+    pub(crate) fn get_samples_per_sec(&self) -> u32 {
+        self.0.Format.nSamplesPerSec
+    }
+
+    pub(crate) fn get_block_align(&self) -> u16 {
+        self.0.Format.nBlockAlign
     }
 }

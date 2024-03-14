@@ -122,7 +122,7 @@ impl Streamer {
                             // 3. Calculate the aligned buffer size in 100-nanosecond units.
                             desired_period = calculate_period_100ns(
                                 buffersize as i64,
-                                wave_format.0.Format.nSamplesPerSec as i64,
+                                wave_format.get_samples_per_sec() as i64,
                             );
                             debug!("Aligned period in 100ns units: {}", desired_period);
                             // 4. Get a new IAudioClient
@@ -208,12 +208,13 @@ impl Streamer {
 
     pub(crate) async fn start(&mut self) -> Result<()> {
         com_initialize();
-        let mut buffer = vec![];
         self.set_thread_priority()?;
+
+        let mut buffer = vec![];
         let mut stream_started = false;
         let mut available_frames = self.client.get_available_frames()?;
         let mut available_buffer_len =
-            available_frames as usize * self.wave_format.0.Format.nBlockAlign as usize;
+            available_frames as usize * self.wave_format.get_block_align() as usize;
 
         loop {
             match self.command_receiver.try_recv() {
@@ -239,7 +240,7 @@ impl Streamer {
 
                 self.renderer.write(
                     available_frames as usize,
-                    self.wave_format.0.Format.nBlockAlign as usize,
+                    self.wave_format.get_block_align() as usize,
                     buffer.as_slice(),
                     None,
                 )?;
@@ -253,9 +254,9 @@ impl Streamer {
                 buffer.clear();
                 available_frames = self.client.get_available_frames()?;
                 available_buffer_len =
-                    available_frames as usize * self.wave_format.0.Format.nBlockAlign as usize;
+                    available_frames as usize * self.wave_format.get_block_align() as usize;
             } else {
-                let bytes_per_frames = self.wave_format.0.Format.nBlockAlign as usize;
+                let bytes_per_frames = self.wave_format.get_block_align() as usize;
                 let frames = buffer.len() / bytes_per_frames;
                 self.renderer
                     .write(frames as usize, bytes_per_frames, buffer.as_slice(), None)?;
