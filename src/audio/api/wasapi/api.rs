@@ -51,6 +51,7 @@ pub enum ShareMode {
 pub struct AudioClient
 {
     pub inner_client: IAudioClient,
+    wave_format: Option<WaveFormat>,
     sharemode: Option<ShareMode>,
 }
 
@@ -149,6 +150,7 @@ impl AudioClient {
     
     pub(crate) fn initialize(&mut self, format: &WaveFormat, desired_period: i64, sharemode: &ShareMode) -> Result<()> {
         self.sharemode = Some(sharemode.clone());
+        self.wave_format = Some(format.clone());
         let mode = match sharemode {
             ShareMode::Exclusive => AUDCLNT_SHAREMODE_EXCLUSIVE,
             ShareMode::Shared => AUDCLNT_SHAREMODE_SHARED,
@@ -167,7 +169,7 @@ impl AudioClient {
                 flags,
                 desired_period,
                 device_period,
-                &format.0.Format,
+                format.get_format(),
                 None,
             )?;
         }
@@ -186,7 +188,7 @@ impl AudioClient {
         Ok(unsafe { self.inner_client.Stop()? })
     }
     
-    pub(crate) fn get_available_frames(&self) -> Result<usize> {
+    pub(crate) fn get_available_buffer_size(&self) -> Result<(usize, usize)> {
         let frames = match self.sharemode {
             Some(ShareMode::Exclusive) => {
                 let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
@@ -199,12 +201,18 @@ impl AudioClient {
             }
             _ => return Err(anyhow!("Client has not been initialized")),
         };
-        Ok(frames)
+        let size = if let Some(ref format) = self.wave_format {
+            frames * format.get_block_align() as usize
+        } else {
+            return Err(anyhow!("Client has not been initialized"));
+        };
+        Ok((frames, size))
     }
     
     pub(crate) fn new(none: IAudioClient) -> Result<AudioClient> {
         Ok(AudioClient {
             inner_client: none,
+            wave_format: None,
             sharemode: None,
         })
     }
@@ -329,5 +337,9 @@ impl WaveFormat {
 
     pub(crate) fn get_block_align(&self) -> u16 {
         self.0.Format.nBlockAlign
+    }
+
+    pub(crate) fn get_format(&self) -> &WAVEFORMATEX {
+        &self.0.Format
     }
 }

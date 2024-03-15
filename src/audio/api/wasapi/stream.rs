@@ -212,9 +212,7 @@ impl Streamer {
 
         let mut buffer = vec![];
         let mut stream_started = false;
-        let mut available_frames = self.client.get_available_frames()?;
-        let mut available_buffer_len =
-            available_frames as usize * self.wave_format.get_block_align() as usize;
+        let (mut available_buffer_in_frames, mut available_buffer_size) = self.client.get_available_buffer_size()?;
 
         loop {
             match self.command_receiver.try_recv() {
@@ -234,12 +232,12 @@ impl Streamer {
                     StreamingData::EndOfStream => break,
                 };
                 buffer.push(data);
-                if buffer.len() != available_buffer_len {
+                if buffer.len() != available_buffer_size {
                     continue;
                 }
 
                 self.renderer.write(
-                    available_frames as usize,
+                    available_buffer_in_frames,
                     self.wave_format.get_block_align() as usize,
                     buffer.as_slice(),
                     None,
@@ -252,9 +250,7 @@ impl Streamer {
 
                 self.eventhandle.wait_for_event(1000)?;
                 buffer.clear();
-                available_frames = self.client.get_available_frames()?;
-                available_buffer_len =
-                    available_frames as usize * self.wave_format.get_block_align() as usize;
+                (available_buffer_in_frames, available_buffer_size) = self.client.get_available_buffer_size()?;
             } else {
                 let bytes_per_frames = self.wave_format.get_block_align() as usize;
                 let frames = buffer.len() / bytes_per_frames;
