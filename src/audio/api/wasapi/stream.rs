@@ -58,17 +58,6 @@ unsafe impl Send for Streamer {}
 unsafe impl Sync for Streamer {}
 
 impl Streamer {
-    // WAVEFORMATEX documentation: https://learn.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatex
-    // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
-    #[inline(always)]
-    pub(super) fn create_waveformat_from(params: &StreamParams) -> WaveFormat {
-        WaveFormat::new(
-            params.bits_per_sample,
-            params.samplerate as usize,
-            params.channels as usize,
-            None,
-        )
-    }
 
     pub(super) fn new(
         device: &Device,
@@ -78,13 +67,13 @@ impl Streamer {
     ) -> Result<Self> {
         com_initialize();
         let mut client = device.get_client()?;
-        let wave_format = Streamer::create_waveformat_from(&params);
+        let wave_format = WaveFormat::from(&params);
         let sharemode = match params.exclusive {
             true => ShareMode::Exclusive,
             false => ShareMode::Shared,
         };
 
-        let (_, min_device_period) = client.get_min_and_default_periods()?;
+        let (_, min_device_period) = client.get_default_and_min_periods()?;
         let default_device_period = if params.buffer_length != 0 {
             (params.buffer_length * 1000000) / 100 as i64
         } else {

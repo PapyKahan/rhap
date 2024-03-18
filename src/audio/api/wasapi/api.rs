@@ -3,7 +3,7 @@ use num_integer::Integer;
 use windows::{core::PCSTR, Win32::{Foundation::{HANDLE, RPC_E_CHANGED_MODE, WAIT_OBJECT_0}, Media::{Audio::{IAudioClient, IAudioRenderClient, AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, WAVEFORMATEX, WAVEFORMATEXTENSIBLE, WAVEFORMATEXTENSIBLE_0}, KernelStreaming::{KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE}, Multimedia::KSDATAFORMAT_SUBTYPE_IEEE_FLOAT}, System::{Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED}, Threading::{CreateEventA, WaitForSingleObject}}}};
 use anyhow::{anyhow, Result};
 
-use crate::audio::BitsPerSample;
+use crate::audio::{BitsPerSample, StreamParams};
 
 thread_local! {
     static WASAPI_COM_INIT: ComWasapi = {
@@ -107,7 +107,7 @@ impl AudioClient {
         
     }
 
-    pub fn get_min_and_default_periods(&self) -> Result<(i64, i64)> {
+    pub fn get_default_and_min_periods(&self) -> Result<(i64, i64)> {
         let mut default_period = 0;
         let mut min_period = 0;
         unsafe {
@@ -122,9 +122,9 @@ impl AudioClient {
         align_bytes: Option<u32>,
         wave_fmt: &WaveFormat,
     ) -> Result<i64> {
-        let (_, min_period) = self.get_min_and_default_periods()?;
+        let (_, min_period) = self.get_default_and_min_periods()?;
         let adjusted_period = cmp::max(desired_period, min_period);
-        let frame_bytes = wave_fmt.0.Format.nBlockAlign as u32;
+        let frame_bytes = wave_fmt.get_block_align() as u32;
         let period_alignment_bytes = match align_bytes {
             Some(0) => frame_bytes,
             Some(bytes) => frame_bytes.lcm(&bytes),
@@ -147,7 +147,7 @@ impl AudioClient {
         );
         Ok(aligned_period)
     }
-    
+
     pub(crate) fn initialize(&mut self, format: &WaveFormat, desired_period: i64, sharemode: &ShareMode) -> Result<()> {
         self.sharemode = Some(sharemode.clone());
         self.wave_format = Some(format.clone());
@@ -341,5 +341,15 @@ impl WaveFormat {
 
     pub(crate) fn get_format(&self) -> &WAVEFORMATEX {
         &self.0.Format
+    }
+}
+
+// WAVEFORMATEX documentation: https://learn.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatex
+// WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
+impl From<&StreamParams> for WaveFormat
+{
+    #[inline(always)]
+    fn from(value: &StreamParams) -> Self {
+        WaveFormat::new(value.bits_per_sample, value.samplerate as usize, value.channels as usize, None)
     }
 }
