@@ -44,8 +44,7 @@ impl Device {
                 let wave_format = WaveFormat::new(
                     bits_per_sample,
                     samplerate as usize,
-                    2,
-                    None,
+                    2
                 );
                 let sharemode = match true {
                     true => ShareMode::Exclusive,
