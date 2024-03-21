@@ -74,8 +74,8 @@ where
         //let ratio = to_sample_rate as f64 / spec.rate as f64;
         //let sinc_len = 256;
         //let oversampling_factor = 128;
-        //let interpolation = SincInterpolationType::Linear;
-        //let window = WindowFunction::Blackman2;
+        //let interpolation = SincInterpolationType::Nearest;
+        //let window = WindowFunction::BlackmanHarris2;
 
         //let f_cutoff = calculate_cutoff(sinc_len, window);
         //let params = SincInterpolationParameters {
@@ -86,12 +86,13 @@ where
         //    window,
         //};
         //let resampler = rubato::SincFixedIn::<f64>::new(ratio, 1.1, params, duration, num_channels).unwrap();
-        //let resampler = rubato::FastFixedIn::<f64>::new(ratio, 1.1, rubato::PolynomialDegree::Linear, duration, num_channels).unwrap();
+        //let resampler = rubato::FastFixedIn::<f64>::new(ratio, 1.1, rubato::PolynomialDegree::Nearest, duration, num_channels).unwrap();
+
         let resampler = rubato::FftFixedIn::<f64>::new(
             spec.rate as usize,
             to_sample_rate,
             duration,
-            duration,
+            duration / (spec.rate as usize / to_sample_rate),
             num_channels,
         )
         .unwrap();

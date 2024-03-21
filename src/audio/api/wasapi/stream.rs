@@ -1,6 +1,11 @@
 use anyhow::Result;
 use log::debug;
 use log::error;
+use windows::Win32::System::Threading::GetCurrentProcess;
+use windows::Win32::System::Threading::GetPriorityClass;
+use windows::Win32::System::Threading::HIGH_PRIORITY_CLASS;
+use windows::Win32::System::Threading::PROCESS_CREATION_FLAGS;
+use windows::Win32::System::Threading::SetPriorityClass;
 use std::sync::Condvar;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -39,7 +44,8 @@ pub struct Streamer {
     renderer: AudioRenderClient,
     eventhandle: EventHandle,
     taskhandle: Option<HANDLE>,
-    previous_priority: Option<THREAD_PRIORITY>,
+    previous_process_priority: Option<PROCESS_CREATION_FLAGS>,
+    previous_thread_priority: Option<THREAD_PRIORITY>,
     wave_format: WaveFormat,
     pause_condition: Condvar,
     status: Mutex<StreamingCommand>,
@@ -151,7 +157,8 @@ impl Streamer {
             eventhandle,
             wave_format,
             desired_period,
-            previous_priority: None,
+            previous_process_priority: None,
+            previous_thread_priority: None,
             taskhandle: None,
             pause_condition: Condvar::new(),
             status: Mutex::new(StreamingCommand::None),
@@ -173,16 +180,45 @@ impl Streamer {
         self.client.stop()
     }
 
-    fn set_thread_priority(&mut self) -> Result<()> {
-        self.previous_priority =
-            Some(unsafe { THREAD_PRIORITY(GetThreadPriority(GetCurrentThread())) });
+    /// Sets the process and thread priorities for the current audio stream.
+    ///
+    /// This function performs the following operations:
+    /// 1. Stores the current process priority class.
+    /// 2. Sets the process priority class to `HIGH_PRIORITY_CLASS`.
+    /// 3. Stores the current thread priority.
+    /// 4. Sets the thread priority to `THREAD_PRIORITY_HIGHEST`.
+    /// 5. Sets the thread characteristics to "Pro Audio".
+    ///
+    /// # Safety
+    ///
+    /// This function uses unsafe blocks to call Windows API functions.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if any of the Windows API function calls fail.
+    ///
+    /// # Returns
+    ///
+    /// This function returns `Ok(())` if all operations are successful.
+    fn set_process_and_thread_priorities(&mut self) -> Result<()> {
+        // Store the current process priority class
+        self.previous_process_priority = Some(unsafe { PROCESS_CREATION_FLAGS(GetPriorityClass(GetCurrentProcess())) });
+        // Set the process priority class to HIGH_PRIORITY_CLASS
+        unsafe { SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)?}
+        // Store the current thread priority
+        self.previous_thread_priority = Some(unsafe { THREAD_PRIORITY(GetThreadPriority(GetCurrentThread())) });
+        // Set the thread priority to THREAD_PRIORITY_HIGHEST
         unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST)? };
+        // Set the thread characteristics to "Pro Audio"
         self.taskhandle = Some(unsafe { AvSetMmThreadCharacteristicsW(w!("Pro Audio"), &mut 0)? });
         Ok(())
     }
 
     fn revert_thread_priority(&mut self) {
-        if let Some(previous_priority) = self.previous_priority.take() {
+        if let Some(previous_priority) = self.previous_process_priority.take() {
+            let _ = unsafe { SetPriorityClass(GetCurrentProcess(), previous_priority) };
+        }
+        if let Some(previous_priority) = self.previous_thread_priority.take() {
             let _ = unsafe { SetThreadPriority(GetCurrentThread(), previous_priority) };
         }
         if let Some(handle) = self.taskhandle.take() {
@@ -192,7 +228,7 @@ impl Streamer {
 
     pub(crate) async fn start(&mut self) -> Result<()> {
         com_initialize();
-        self.set_thread_priority()?;
+        self.set_process_and_thread_priorities()?;
 
         let mut buffer = vec![];
         let mut stream_started = false;
