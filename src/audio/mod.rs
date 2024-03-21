@@ -90,7 +90,6 @@ pub enum StreamingCommand {
     None,
     Pause,
     Resume,
-    Stop,
 }
 
 #[derive(Copy, Clone)]

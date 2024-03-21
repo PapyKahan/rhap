@@ -5,7 +5,7 @@ mod utils;
 pub(crate) mod screens;
 pub(crate) mod widgets;
 
-pub use app::{App, Screens};
+pub use app::App;
 
 const ROW_COLOR: Color = Color::Rgb(80, 80, 80);
 const ROW_COLOR_COL: Color = Color::Rgb(85, 85, 85);

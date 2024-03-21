@@ -208,7 +208,6 @@ impl Streamer {
                 Ok(command) => match command {
                     StreamingCommand::Pause => self.pause()?,
                     StreamingCommand::Resume => self.resume(),
-                    StreamingCommand::Stop => break,
                     _ => {}
                 },
                 Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {}
