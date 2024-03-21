@@ -74,15 +74,10 @@ impl Streamer {
         };
 
         let (_, min_device_period) = client.get_default_and_min_periods()?;
-        let default_device_period = if params.buffer_length != 0 {
-            (params.buffer_length * 1000000) / 100 as i64
-        } else {
-            min_device_period
-        };
 
         // Calculate desired period for better device compatibility.
         let mut desired_period = client.calculate_aligned_period_near(
-            3 * default_device_period / 2,
+            3 * min_device_period / 2,
             Some(128),
             &wave_format,
         )?;

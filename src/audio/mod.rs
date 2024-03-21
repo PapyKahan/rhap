@@ -81,7 +81,6 @@ pub struct StreamParams {
     pub channels: u8,
     pub samplerate: SampleRate,
     pub bits_per_sample: BitsPerSample,
-    pub buffer_length: i64,
     pub exclusive: bool,
 }
 

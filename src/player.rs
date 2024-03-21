@@ -77,7 +77,6 @@ impl Player {
             samplerate: song.sample,
             channels: song.channels as u8,
             bits_per_sample: song.bits_per_sample,
-            buffer_length: 0,
             exclusive: true,
         };
         let mut device = self

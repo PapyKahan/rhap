@@ -102,6 +102,7 @@ impl DeviceTrait for Device {
     }
 
     fn start(&mut self, params: StreamParams) -> Result<Sender<StreamingData>> {
+        self.stop()?;
         let (command_tx, command_rx) = channel::<StreamingCommand>(32);
         self.command = Some(command_tx);
         let buffer = params.channels as usize * ((params.bits_per_sample as usize * params.samplerate as usize) / 8 as usize);
