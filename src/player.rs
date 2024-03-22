@@ -154,7 +154,7 @@ impl Player {
                             if song.sample != streamparams.samplerate {
                                 let r = resampler.get_or_insert_with(|| {
                                     crate::tools::Resampler::<i8>::new(
-                                        *spec,
+                                        spec,
                                         streamparams.samplerate as usize,
                                         duration,
                                     )
@@ -192,7 +192,7 @@ impl Player {
                             if song.sample != streamparams.samplerate {
                                 let r = resampler.get_or_insert_with(|| {
                                     crate::tools::Resampler::<i16>::new(
-                                        *spec,
+                                        spec,
                                         streamparams.samplerate as usize,
                                         duration,
                                     )
@@ -231,7 +231,7 @@ impl Player {
                             if song.sample != streamparams.samplerate {
                                 let r = resampler.get_or_insert_with(|| {
                                     crate::tools::Resampler::<i24>::new(
-                                        *spec,
+                                        spec,
                                         streamparams.samplerate as usize,
                                         duration,
                                     )
@@ -270,7 +270,7 @@ impl Player {
                             if song.sample != streamparams.samplerate {
                                 let r = resampler.get_or_insert_with(|| {
                                     crate::tools::Resampler::<f32>::new(
-                                        *spec,
+                                        spec,
                                         streamparams.samplerate as usize,
                                         duration,
                                     )

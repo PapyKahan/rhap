@@ -10,23 +10,25 @@ use symphonia::core::audio::{AudioBuffer, AudioBufferRef, Signal, SignalSpec};
 use symphonia::core::conv::{FromSample, IntoSample};
 use symphonia::core::sample::Sample;
 
+
 pub struct Resampler<T> {
-    resampler: rubato::FftFixedIn<f64>,
-    //resampler: rubato::FastFixedIn<f64>,
-    //resampler: rubato::SincFixedIn<f64>,
-    input: Vec<Vec<f64>>,
-    output: Vec<Vec<f64>>,
+    resampler: rubato::FftFixedIn<f32>,
+    //resampler: rubato::FastFixedIn<f32>,
+    //resampler: rubato::SincFixedIn<f32>,
+    input: Vec<Vec<f32>>,
+    output: Vec<Vec<f32>>,
     interleaved: Vec<T>,
     duration: usize,
 }
 
+
 impl<T> Resampler<T>
 where
-    T: Sample + FromSample<f64> + IntoSample<f64>,
+    T: Sample + FromSample<f32> + IntoSample<f32>,
 {
     fn resample_inner(&mut self) -> &[T] {
         {
-            let mut input: arrayvec::ArrayVec<&[f64], 32> = Default::default();
+            let mut input: arrayvec::ArrayVec<&[f32], 32> = Default::default();
 
             for channel in self.input.iter() {
                 input.push(&channel[..self.duration]);
@@ -65,16 +67,16 @@ where
 
 impl<T> Resampler<T>
 where
-    T: Sample + FromSample<f64> + IntoSample<f64>,
+    T: Sample + FromSample<f32> + IntoSample<f32>,
 {
-    pub fn new(spec: SignalSpec, to_sample_rate: usize, duration: u64) -> Self {
+    pub fn new(spec: &SignalSpec, to_sample_rate: usize, duration: u64) -> Self {
         let duration = duration as usize;
-        let num_channels = spec.channels.count();
+        let num_channels = 2;
 
-        //let ratio = to_sample_rate as f64 / spec.rate as f64;
+        //let ratio = to_sample_rate as f32 / spec.rate as f32;
         //let sinc_len = 256;
         //let oversampling_factor = 128;
-        //let interpolation = SincInterpolationType::Nearest;
+        //let interpolation = SincInterpolationType::Cubic;
         //let window = WindowFunction::BlackmanHarris2;
 
         //let f_cutoff = calculate_cutoff(sinc_len, window);
@@ -85,14 +87,21 @@ where
         //    oversampling_factor,
         //    window,
         //};
-        //let resampler = rubato::SincFixedIn::<f64>::new(ratio, 1.1, params, duration, num_channels).unwrap();
-        //let resampler = rubato::FastFixedIn::<f64>::new(ratio, 1.1, rubato::PolynomialDegree::Nearest, duration, num_channels).unwrap();
+        //let resampler = rubato::SincFixedIn::<f32>::new(ratio, 1.0, params, duration, num_channels).unwrap();
 
-        let resampler = rubato::FftFixedIn::<f64>::new(
+        //let resampler = rubato::FastFixedIn::<f32>::new(ratio, 1.1, rubato::PolynomialDegree::Quintic, duration, num_channels).unwrap();
+
+        let subchunk_size = if spec.rate as usize > to_sample_rate {
+            duration / (spec.rate as usize / to_sample_rate)
+        } else {
+            duration / (to_sample_rate / spec.rate as usize)
+        };
+
+        let resampler = rubato::FftFixedIn::<f32>::new(
             spec.rate as usize,
             to_sample_rate,
             duration,
-            duration / (spec.rate as usize / to_sample_rate),
+            subchunk_size,
             num_channels,
         )
         .unwrap();
@@ -139,7 +148,7 @@ where
             // Fill each input channel buffer with silence to the next multiple of the resampler
             // duration.
             for channel in self.input.iter_mut() {
-                channel.resize(len + (self.duration - partial_len), f64::MID);
+                channel.resize(len + (self.duration - partial_len), f32::MID);
             }
         }
 
@@ -147,7 +156,7 @@ where
     }
 }
 
-fn convert_samples_any(input: &AudioBufferRef<'_>, output: &mut [Vec<f64>]) {
+fn convert_samples_any(input: &AudioBufferRef<'_>, output: &mut [Vec<f32>]) {
     match input {
         AudioBufferRef::U8(input) => convert_samples(input, output),
         AudioBufferRef::U16(input) => convert_samples(input, output),
@@ -162,9 +171,9 @@ fn convert_samples_any(input: &AudioBufferRef<'_>, output: &mut [Vec<f64>]) {
     }
 }
 
-fn convert_samples<S>(input: &AudioBuffer<S>, output: &mut [Vec<f64>])
+fn convert_samples<S>(input: &AudioBuffer<S>, output: &mut [Vec<f32>])
 where
-    S: Sample + IntoSample<f64>,
+    S: Sample + IntoSample<f32>,
 {
     for (c, dst) in output.iter_mut().enumerate() {
         let src = input.chan(c);

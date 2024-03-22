@@ -10,7 +10,7 @@ clap = { version = "4.5.3", features = ["derive"] }
 crossterm = "0.27.0"
 log = "0.4.21"
 rand = "0.8.5"
-rubato = "0.15.0"
+rubato = { version = "0.15.0", features = ["fft_resampler", "realfft"] }
 symphonia = { version = "0.5.4", features = ["all-formats", "all-codecs"] }
 tokio = { version = "1.36.0", features = ["full"] }
 walkdir = "2.5.0"
