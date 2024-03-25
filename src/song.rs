@@ -1,6 +1,7 @@
-use std::sync::Arc;
 use anyhow::Result;
+use std::sync::Arc;
 use symphonia::core::{
+    audio::Layout,
     codecs::{Decoder, DecoderOptions},
     formats::{FormatReader, Track},
     io::MediaSourceStream,
@@ -30,14 +31,16 @@ impl Song {
         let hint = Hint::new();
         let meta_opts = Default::default();
         let fmt_opts = Default::default();
-        let probed = symphonia::default::get_probe()
-            .format(&hint, mss, &fmt_opts, &meta_opts)
-            .expect("unsupported format");
+        let probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts)?;
 
         let mut format = probed.format;
         let track = format.tracks().get(0).unwrap().clone();
-        let samplerate = track.codec_params.sample_rate.unwrap();
-        let channels = track.codec_params.channels.unwrap().count();
+        let samplerate = track.codec_params.sample_rate.unwrap_or(44100);
+        let channels = track
+            .codec_params
+            .channels
+            .unwrap_or(Layout::Stereo.into_channels())
+            .count();
         let bits_per_sample = track.codec_params.bits_per_sample.unwrap_or(16) as u8;
 
         let metadata = match format.metadata().skip_to_latest() {
@@ -59,11 +62,8 @@ impl Song {
             .unwrap()
             .value
             .to_string();
-        let dur = track
-            .codec_params
-            .n_frames
-            .map(|frames| track.codec_params.start_ts + frames);
-        let duration = dur.unwrap_or(u64::default());
+        let duration = track
+            .codec_params.time_base.unwrap_or(Default::default()).calc_time(track.codec_params.n_frames.unwrap_or(0)).seconds;
 
         // Create a decoder for the track.
         let decoder = symphonia::default::get_codecs()

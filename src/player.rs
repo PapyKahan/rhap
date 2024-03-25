@@ -10,7 +10,9 @@ use symphonia::core::units::Time;
 use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 
-use crate::audio::{BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamingData};
+use crate::audio::{
+    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamingData,
+};
 use crate::song::Song;
 use crate::tools::Resampler;
 
@@ -79,14 +81,9 @@ impl Player {
             bits_per_sample: song.bits_per_sample,
             exclusive: true,
         };
-        let mut device = self
-            .host
-            .create_device(self.device_id)
-            .map_err(|err| anyhow!(err.to_string()))?;
+        let mut device = self.host.create_device(self.device_id)?;
         let streamparams = device.adjust_stream_params(streamparams)?;
-        let data_sender = device
-            .start(streamparams)
-            .map_err(|err| anyhow!(err.to_string()))?;
+        let data_sender = device.start(streamparams)?;
         self.current_device = Some(device);
         self.previous_stream = Some(data_sender);
         let stream = self.previous_stream.clone();
@@ -162,7 +159,8 @@ impl Player {
                                 if let Some(buffer) = r.resample(decoded) {
                                     for i in buffer.iter() {
                                         for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
+                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
+                                            {
                                                 break;
                                             }
                                         }
@@ -171,7 +169,8 @@ impl Player {
                                 if let Some(buffer) = r.flush() {
                                     for i in buffer.iter() {
                                         for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
+                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
+                                            {
                                                 break;
                                             }
                                         }
@@ -200,7 +199,8 @@ impl Player {
                                 if let Some(buffer) = r.resample(decoded) {
                                     for i in buffer.iter() {
                                         for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
+                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
+                                            {
                                                 break;
                                             }
                                         }
@@ -209,7 +209,8 @@ impl Player {
                                 if let Some(buffer) = r.flush() {
                                     for i in buffer.iter() {
                                         for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
+                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
+                                            {
                                                 break;
                                             }
                                         }
@@ -239,7 +240,8 @@ impl Player {
                                 if let Some(buffer) = r.resample(decoded) {
                                     for i in buffer.iter() {
                                         for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
+                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
+                                            {
                                                 break;
                                             }
                                         }
@@ -248,7 +250,8 @@ impl Player {
                                 if let Some(buffer) = r.flush() {
                                     for i in buffer.iter() {
                                         for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
+                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
+                                            {
                                                 break;
                                             }
                                         }
@@ -278,7 +281,8 @@ impl Player {
                                 if let Some(buffer) = r.resample(decoded) {
                                     for i in buffer.iter() {
                                         for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
+                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
+                                            {
                                                 break;
                                             }
                                         }
@@ -287,7 +291,8 @@ impl Player {
                                 if let Some(buffer) = r.flush() {
                                     for i in buffer.iter() {
                                         for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
+                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
+                                            {
                                                 break;
                                             }
                                         }
