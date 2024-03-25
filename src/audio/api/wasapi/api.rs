@@ -266,6 +266,7 @@ impl EventHandle {
 
 pub struct AudioRenderClient(IAudioRenderClient);
 impl AudioRenderClient {
+    #[inline(always)]
     pub(crate) fn write(
         &self,
         available_frames: usize,
@@ -357,6 +358,7 @@ impl WaveFormat {
         self.0.Format.nSamplesPerSec
     }
 
+    #[inline(always)]
     pub(crate) fn get_block_align(&self) -> u16 {
         self.0.Format.nBlockAlign
     }

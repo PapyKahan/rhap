@@ -6,8 +6,6 @@ use windows::Win32::System::Threading::GetPriorityClass;
 use windows::Win32::System::Threading::HIGH_PRIORITY_CLASS;
 use windows::Win32::System::Threading::PROCESS_CREATION_FLAGS;
 use windows::Win32::System::Threading::SetPriorityClass;
-use std::sync::Condvar;
-use std::sync::Mutex;
 use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
 use windows::core::w;
@@ -35,7 +33,7 @@ use super::api::WaveFormat;
 use super::device::Device;
 use crate::audio::api::wasapi::api::calculate_period_100ns;
 use crate::audio::StreamingData;
-use crate::audio::{StreamParams, StreamingCommand};
+use crate::audio::StreamParams;
 
 const REFTIMES_PER_MILLISEC: i64 = 10000;
 
@@ -47,10 +45,7 @@ pub struct Streamer {
     previous_process_priority: Option<PROCESS_CREATION_FLAGS>,
     previous_thread_priority: Option<THREAD_PRIORITY>,
     wave_format: WaveFormat,
-    pause_condition: Condvar,
-    status: Mutex<StreamingCommand>,
     desired_period: i64,
-    command_receiver: Receiver<StreamingCommand>,
     data_receiver: Receiver<StreamingData>,
 }
 
@@ -68,7 +63,6 @@ impl Streamer {
     pub(super) fn new(
         device: &Device,
         data_receiver: Receiver<StreamingData>,
-        command_receiver: Receiver<StreamingCommand>,
         params: StreamParams,
     ) -> Result<Self> {
         com_initialize();
@@ -160,20 +154,8 @@ impl Streamer {
             previous_process_priority: None,
             previous_thread_priority: None,
             taskhandle: None,
-            pause_condition: Condvar::new(),
-            status: Mutex::new(StreamingCommand::None),
-            command_receiver,
             data_receiver,
         })
-    }
-
-    pub(super) fn wait_readiness(&self) {
-        let status = self.status.lock().expect("fail to lock status mutex");
-        let _ = self.pause_condition.wait(status);
-    }
-
-    fn resume(&self) {
-        self.pause_condition.notify_all()
     }
 
     fn stop(&self) -> Result<()> {
@@ -235,16 +217,6 @@ impl Streamer {
         let (mut available_buffer_in_frames, mut available_buffer_size) = self.client.get_available_buffer_size()?;
 
         loop {
-            match self.command_receiver.try_recv() {
-                Ok(command) => match command {
-                    StreamingCommand::Pause => self.pause()?,
-                    StreamingCommand::Resume => self.resume(),
-                    _ => {}
-                },
-                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {}
-                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => break,
-            }
-
             if let Some(streaming_data) = self.data_receiver.recv().await {
                 let data = match streaming_data {
                     StreamingData::Data(data) => data,
@@ -284,11 +256,5 @@ impl Streamer {
         }
         self.revert_thread_priority();
         self.stop()
-    }
-
-    fn pause(&self) -> Result<()> {
-        self.client.stop()?;
-        self.wait_readiness();
-        self.client.start()
     }
 }

@@ -103,11 +103,11 @@ impl DeviceTrait for Device {
 
     fn start(&mut self, params: StreamParams) -> Result<Sender<StreamingData>> {
         self.stop()?;
-        let (command_tx, command_rx) = channel::<StreamingCommand>(32);
+        let (command_tx, _) = channel::<StreamingCommand>(32);
         self.command = Some(command_tx);
         let buffer = params.channels as usize * ((params.bits_per_sample as usize * params.samplerate as usize) / 8 as usize);
         let (data_tx, data_rx) = channel::<StreamingData>(buffer);
-        let mut streamer = Streamer::new(&self, data_rx, command_rx, params)?;
+        let mut streamer = Streamer::new(&self, data_rx, params)?;
         self.stream_thread_handle = Some(tokio::spawn(async move { streamer.start().await }));
         Ok(data_tx)
     }
