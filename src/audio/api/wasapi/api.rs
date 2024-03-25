@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use num_integer::Integer;
-use std::{cmp, slice};
+use std::cmp;
 use windows::{
     core::PCSTR,
     Win32::{
@@ -224,6 +224,7 @@ impl AudioClient {
             }
             _ => return Err(anyhow!("Client has not been initialized")),
         };
+
         let size = if let Some(ref format) = self.wave_format {
             frames * format.get_block_align() as usize
         } else {
@@ -264,7 +265,6 @@ impl EventHandle {
 }
 
 pub struct AudioRenderClient(IAudioRenderClient);
-
 impl AudioRenderClient {
     pub(crate) fn write(
         &self,
@@ -274,21 +274,22 @@ impl AudioRenderClient {
         buffer_flags: Option<u32>,
     ) -> Result<()> {
         let nbr_bytes = available_frames * n_block_align;
-        if nbr_bytes != data.len() {
+        if nbr_bytes > data.len() {
             return Err(anyhow!(
                 "Wrong length of data, got {}, expected {}",
                 data.len(),
                 nbr_bytes
             ));
         }
-        let bufferptr = unsafe { self.0.GetBuffer(available_frames as u32)? };
-        let bufferslice = unsafe { slice::from_raw_parts_mut(bufferptr, nbr_bytes) };
-        bufferslice.copy_from_slice(data);
         let flags = match buffer_flags {
             Some(bflags) => bflags,
             None => 0,
         };
-        unsafe { self.0.ReleaseBuffer(available_frames as u32, flags)? };
+        unsafe {
+            let buffer_ptr = self.0.GetBuffer(available_frames as u32)?;
+            std::ptr::copy_nonoverlapping(data.as_ptr(), buffer_ptr, nbr_bytes);
+            self.0.ReleaseBuffer(available_frames as u32, flags)?;
+        }
         Ok(())
     }
 }
@@ -373,7 +374,7 @@ impl From<&StreamParams> for WaveFormat {
         WaveFormat::new(
             value.bits_per_sample,
             value.samplerate as usize,
-            value.channels as usize
+            value.channels as usize,
         )
     }
 }
