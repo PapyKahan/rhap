@@ -14,7 +14,7 @@ use crate::audio::{
     BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamingData,
 };
 use crate::song::Song;
-use crate::tools::Resampler;
+use crate::tools::ResamplerUtil;
 
 pub struct Player {
     current_device: Option<Device>,
@@ -143,14 +143,14 @@ impl Player {
                     let duration = decoded.capacity() as u64;
                     match streamparams.bits_per_sample {
                         BitsPerSample::Bits8 => {
-                            let mut resampler: Option<Resampler<i8>> = None;
+                            let mut resampler: Option<ResamplerUtil<i8>> = None;
                             if previous_duration != duration {
                                 previous_duration = duration;
                                 resampler = None;
                             }
                             if song.sample != streamparams.samplerate {
                                 let r = resampler.get_or_insert_with(|| {
-                                    crate::tools::Resampler::<i8>::new(
+                                    crate::tools::ResamplerUtil::<i8>::new(
                                         spec,
                                         streamparams.samplerate as usize,
                                         duration,
@@ -187,10 +187,10 @@ impl Player {
                             }
                         }
                         BitsPerSample::Bits16 => {
-                            let mut resampler: Option<Resampler<i16>> = None;
+                            let mut resampler: Option<ResamplerUtil<i16>> = None;
                             if song.sample != streamparams.samplerate {
                                 let r = resampler.get_or_insert_with(|| {
-                                    crate::tools::Resampler::<i16>::new(
+                                    crate::tools::ResamplerUtil::<i16>::new(
                                         spec,
                                         streamparams.samplerate as usize,
                                         duration,
@@ -228,10 +228,10 @@ impl Player {
                             }
                         }
                         BitsPerSample::Bits24 => {
-                            let mut resampler: Option<Resampler<i24>> = None;
+                            let mut resampler: Option<ResamplerUtil<i24>> = None;
                             if song.sample != streamparams.samplerate {
                                 let r = resampler.get_or_insert_with(|| {
-                                    crate::tools::Resampler::<i24>::new(
+                                    crate::tools::ResamplerUtil::<i24>::new(
                                         spec,
                                         streamparams.samplerate as usize,
                                         duration,
@@ -269,10 +269,10 @@ impl Player {
                             }
                         }
                         BitsPerSample::Bits32 => {
-                            let mut resampler: Option<Resampler<f32>> = None;
+                            let mut resampler: Option<ResamplerUtil<f32>> = None;
                             if song.sample != streamparams.samplerate {
                                 let r = resampler.get_or_insert_with(|| {
-                                    crate::tools::Resampler::<f32>::new(
+                                    crate::tools::ResamplerUtil::<f32>::new(
                                         spec,
                                         streamparams.samplerate as usize,
                                         duration,

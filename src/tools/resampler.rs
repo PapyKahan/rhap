@@ -9,9 +9,10 @@
 use symphonia::core::audio::{AudioBuffer, AudioBufferRef, Signal, SignalSpec};
 use symphonia::core::conv::{FromSample, IntoSample};
 use symphonia::core::sample::Sample;
+use rubato::Resampler;
 
 
-pub struct Resampler<T> {
+pub struct ResamplerUtil<T> {
     resampler: rubato::FftFixedIn<f32>,
     //resampler: rubato::FastFixedIn<f32>,
     //resampler: rubato::SincFixedIn<f32>,
@@ -22,21 +23,19 @@ pub struct Resampler<T> {
 }
 
 
-impl<T> Resampler<T>
+impl<T> ResamplerUtil<T>
 where
     T: Sample + FromSample<f32> + IntoSample<f32>,
 {
     fn resample_inner(&mut self) -> &[T] {
         {
             let mut input: arrayvec::ArrayVec<&[f32], 32> = Default::default();
-
             for channel in self.input.iter() {
                 input.push(&channel[..self.duration]);
             }
 
             // Resample.
-            rubato::Resampler::process_into_buffer(
-                &mut self.resampler,
+            self.resampler.process_into_buffer(
                 &input,
                 &mut self.output,
                 None,
@@ -52,8 +51,7 @@ where
         // Interleave the planar samples from Rubato.
         let num_channels = self.output.len();
 
-        self.interleaved
-            .resize(num_channels * self.output[0].len(), T::MID);
+        self.interleaved.resize(num_channels * self.output[0].len(), T::MID);
 
         for (i, frame) in self.interleaved.chunks_exact_mut(num_channels).enumerate() {
             for (ch, s) in frame.iter_mut().enumerate() {
@@ -65,7 +63,7 @@ where
     }
 }
 
-impl<T> Resampler<T>
+impl<T> ResamplerUtil<T>
 where
     T: Sample + FromSample<f32> + IntoSample<f32>,
 {
@@ -106,14 +104,13 @@ where
         )
         .unwrap();
 
-        let output = rubato::Resampler::output_buffer_allocate(&resampler, true);
-
-        let input = vec![Vec::with_capacity(duration); num_channels];
+        let output_buffer = resampler.output_buffer_allocate(true);
+        let input_buffer = vec![Vec::with_capacity(duration); num_channels];
 
         Self {
             resampler,
-            input,
-            output,
+            input: input_buffer,
+            output: output_buffer,
             duration,
             interleaved: Default::default(),
         }
