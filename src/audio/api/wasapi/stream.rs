@@ -12,7 +12,7 @@ use crate::audio::StreamParams;
 use crate::audio::StreamingData;
 
 const REFTIMES_PER_MILLISEC: i64 = 10000;
-const REFTIMES_PER_SEC: i64 = 10000000;
+//const REFTIMES_PER_SEC: i64 = 10000000;
 
 pub struct Streamer {
     client: AudioClient,
