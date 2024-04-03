@@ -83,8 +83,6 @@ impl Streamer {
 
                 self.eventhandle.wait_for_event(1000)?;
                 buffer.clear();
-                (available_buffer_in_frames, available_buffer_size) =
-                    self.client.get_available_buffer_size(&self.format)?;
             } else {
                 let bytes_per_frames = self.format.get_block_align() as usize;
                 let frames = buffer.len() / bytes_per_frames;

@@ -494,7 +494,6 @@ impl ThreadPriority {
         let previous_process_priority =
             unsafe { PROCESS_CREATION_FLAGS(GetPriorityClass(GetCurrentProcess())) };
         unsafe { SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)? }
-        println!("Thread priority set to high");
         let previous_thread_priority =
             unsafe { THREAD_PRIORITY(GetThreadPriority(GetCurrentThread())) };
         unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST)? };
@@ -507,7 +506,6 @@ impl ThreadPriority {
     }
 
     fn revert_thread_priority(&mut self) -> Result<()> {
-        println!("Reverting thread priority");
         unsafe {
             SetPriorityClass(GetCurrentProcess(), self.previous_process_priority)?;
             SetThreadPriority(GetCurrentThread(), self.previous_thread_priority)?;
