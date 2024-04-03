@@ -1,6 +1,14 @@
 use anyhow::{anyhow, Result};
+use log::debug;
+use log::error;
 use num_integer::Integer;
 use std::cmp;
+use windows::Win32::Foundation::E_INVALIDARG;
+use windows::Win32::Media::Audio::AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED;
+use windows::Win32::Media::Audio::AUDCLNT_E_DEVICE_IN_USE;
+use windows::Win32::Media::Audio::AUDCLNT_E_ENDPOINT_CREATE_FAILED;
+use windows::Win32::Media::Audio::AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED;
+use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 use windows::{
     core::PCSTR,
     Win32::{
@@ -67,7 +75,8 @@ pub enum ShareMode {
 }
 
 pub struct AudioClient {
-    pub inner_client: IAudioClient,
+    inner_client: IAudioClient,
+    period: Option<i64>,
     wave_format: Option<WaveFormat>,
     sharemode: Option<ShareMode>,
 }
@@ -78,6 +87,10 @@ impl AudioClient {
             ShareMode::Exclusive => self.is_supported_exclusive(format),
             ShareMode::Shared => self.is_supported_shared(format),
         }
+    }
+
+    pub fn get_period(&self) -> i64 {
+        self.period.unwrap_or(0)
     }
 
     fn is_supported_exclusive(&self, format: WaveFormat) -> Result<WaveFormat> {
@@ -164,18 +177,20 @@ impl AudioClient {
         Ok(aligned_period)
     }
 
-    pub(crate) fn initialize(
-        &mut self,
-        format: &WaveFormat,
-        desired_period: i64,
-        sharemode: &ShareMode,
-    ) -> Result<()> {
+    pub(crate) fn initialize(&mut self, format: &WaveFormat, sharemode: &ShareMode) -> Result<()> {
         self.sharemode = Some(sharemode.clone());
         self.wave_format = Some(format.clone());
         let mode = match sharemode {
             ShareMode::Exclusive => AUDCLNT_SHAREMODE_EXCLUSIVE,
             ShareMode::Shared => AUDCLNT_SHAREMODE_SHARED,
         };
+
+        let (_, min_device_period) = self.get_default_and_min_periods()?;
+
+        // Calculate desired period for better device compatibility.
+        let mut desired_period =
+            self.calculate_aligned_period_near(3 * min_device_period / 2, Some(128), &format)?;
+
         let device_period = match sharemode {
             ShareMode::Exclusive => desired_period,
             ShareMode::Shared => 0,
@@ -184,16 +199,80 @@ impl AudioClient {
             ShareMode::Exclusive => AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
             ShareMode::Shared => AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
         };
+
         unsafe {
-            self.inner_client.Initialize(
+            let result = self.inner_client.Initialize(
                 mode,
                 flags,
                 desired_period,
                 device_period,
                 format.get_format(),
                 None,
-            )?;
-        }
+            );
+            match result {
+                Ok(()) => debug!("IAudioClient::Initialize ok"),
+                Err(e) => {
+                    // Some of the possible errors. See the documentation for the full list and descriptions.
+                    // https://docs.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize
+                    match e.code() {
+                        E_INVALIDARG => error!("IAudioClient::Initialize: Invalid argument"),
+                        AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED => {
+                            debug!("IAudioClient::Initialize: Unaligned buffer, trying to adjust the period.");
+                            // Try to recover following the example in the docs.
+                            // https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize#examples
+                            // Just panic on errors to keep it short and simple.
+                            // 1. Call IAudioClient::GetBufferSize and receive the next-highest-aligned buffer size (in frames).
+                            let buffersize = self.get_buffer_size()?;
+                            debug!(
+                                "Client next-highest-aligned buffer size: {} frames",
+                                buffersize
+                            );
+                            // 2. Call IAudioClient::Release, skipped since this will happen automatically when we drop the client.
+                            // 3. Calculate the aligned buffer size in 100-nanosecond units.
+                            desired_period = calculate_period_100ns(
+                                buffersize as i64,
+                                format.get_samples_per_sec() as i64,
+                            );
+                            debug!("Aligned period in 100ns units: {}", desired_period);
+                            // 4. Get a new IAudioClient
+                            //client = device.get_client()?;
+                            // 5. Call Initialize again on the created audio client.
+                            self.initialize(&format, &sharemode)?;
+                            self.inner_client.Initialize(
+                                mode,
+                                flags,
+                                desired_period,
+                                device_period,
+                                format.get_format(),
+                                None,
+                            )?;
+                            debug!("IAudioClient::Initialize ok");
+                        }
+                        AUDCLNT_E_DEVICE_IN_USE => {
+                            error!("IAudioClient::Initialize: The device is already in use");
+                            panic!("IAudioClient::Initialize: The device is already in use");
+                        }
+                        AUDCLNT_E_UNSUPPORTED_FORMAT => {
+                            error!("IAudioClient::Initialize The device does not support the audio format");
+                            panic!("IAudioClient::Initialize The device does not support the audio format");
+                        }
+                        AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED => {
+                            error!("IAudioClient::Initialize: Exclusive mode is not allowed");
+                            panic!("IAudioClient::Initialize: Exclusive mode is not allowed");
+                        }
+                        AUDCLNT_E_ENDPOINT_CREATE_FAILED => {
+                            error!("IAudioClient::Initialize: Failed to create endpoint");
+                            panic!("IAudioClient::Initialize: Failed to create endpoint");
+                        }
+                        _ => {
+                            error!("IAudioClient::Initialize: Other error, HRESULT: {:#010x}, info: {:?}", e.code().0, e.message());
+                            panic!("IAudioClient::Initialize: Other error, HRESULT: {:#010x}, info: {:?}", e.code().0, e.message());
+                        }
+                    };
+                }
+            };
+        };
+
         Ok(())
     }
 
@@ -233,10 +312,11 @@ impl AudioClient {
         Ok((frames, size))
     }
 
-    pub(crate) fn new(none: IAudioClient) -> Result<AudioClient> {
+    pub(crate) fn new(client: IAudioClient) -> Result<AudioClient> {
         Ok(AudioClient {
-            inner_client: none,
+            inner_client: client,
             wave_format: None,
+            period: None,
             sharemode: None,
         })
     }
