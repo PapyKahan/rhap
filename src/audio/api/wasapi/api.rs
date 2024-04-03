@@ -3,12 +3,25 @@ use log::debug;
 use log::error;
 use num_integer::Integer;
 use std::cmp;
+use windows::core::w;
 use windows::Win32::Foundation::E_INVALIDARG;
 use windows::Win32::Media::Audio::AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED;
 use windows::Win32::Media::Audio::AUDCLNT_E_DEVICE_IN_USE;
 use windows::Win32::Media::Audio::AUDCLNT_E_ENDPOINT_CREATE_FAILED;
 use windows::Win32::Media::Audio::AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED;
 use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
+use windows::Win32::System::Threading::AvRevertMmThreadCharacteristics;
+use windows::Win32::System::Threading::AvSetMmThreadCharacteristicsW;
+use windows::Win32::System::Threading::GetCurrentProcess;
+use windows::Win32::System::Threading::GetCurrentThread;
+use windows::Win32::System::Threading::GetPriorityClass;
+use windows::Win32::System::Threading::GetThreadPriority;
+use windows::Win32::System::Threading::SetPriorityClass;
+use windows::Win32::System::Threading::SetThreadPriority;
+use windows::Win32::System::Threading::HIGH_PRIORITY_CLASS;
+use windows::Win32::System::Threading::PROCESS_CREATION_FLAGS;
+use windows::Win32::System::Threading::THREAD_PRIORITY;
+use windows::Win32::System::Threading::THREAD_PRIORITY_HIGHEST;
 use windows::{
     core::PCSTR,
     Win32::{
@@ -76,8 +89,8 @@ pub enum ShareMode {
 
 pub struct AudioClient {
     inner_client: IAudioClient,
+    renderer: Option<AudioRenderClient>,
     period: Option<i64>,
-    wave_format: Option<WaveFormat>,
     sharemode: Option<ShareMode>,
 }
 
@@ -87,6 +100,19 @@ impl AudioClient {
             ShareMode::Exclusive => self.is_supported_exclusive(format),
             ShareMode::Shared => self.is_supported_shared(format),
         }
+    }
+
+    pub fn write(
+        &self,
+        available_frames: usize,
+        n_block_align: usize,
+        data: &[u8],
+        buffer_flags: Option<u32>,
+    ) -> Result<()> {
+        if let Some(renderer) = &self.renderer {
+            renderer.write(available_frames, n_block_align, data, buffer_flags)?;
+        }
+        Ok(())
     }
 
     pub fn get_period(&self) -> i64 {
@@ -179,7 +205,6 @@ impl AudioClient {
 
     pub(crate) fn initialize(&mut self, format: &WaveFormat, sharemode: &ShareMode) -> Result<()> {
         self.sharemode = Some(sharemode.clone());
-        self.wave_format = Some(format.clone());
         let mode = match sharemode {
             ShareMode::Exclusive => AUDCLNT_SHAREMODE_EXCLUSIVE,
             ShareMode::Shared => AUDCLNT_SHAREMODE_SHARED,
@@ -273,6 +298,8 @@ impl AudioClient {
             };
         };
 
+        self.renderer = Some(self.get_renderer()?);
+
         Ok(())
     }
 
@@ -290,7 +317,7 @@ impl AudioClient {
         Ok(unsafe { self.inner_client.Stop()? })
     }
 
-    pub(crate) fn get_available_buffer_size(&self) -> Result<(usize, usize)> {
+    pub(crate) fn get_available_buffer_size(&self, format: &WaveFormat) -> Result<(usize, usize)> {
         let frames = match self.sharemode {
             Some(ShareMode::Exclusive) => {
                 let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
@@ -303,20 +330,15 @@ impl AudioClient {
             }
             _ => return Err(anyhow!("Client has not been initialized")),
         };
-
-        let size = if let Some(ref format) = self.wave_format {
-            frames * format.get_block_align() as usize
-        } else {
-            return Err(anyhow!("Client has not been initialized"));
-        };
+        let size = frames * format.get_block_align() as usize;
         Ok((frames, size))
     }
 
     pub(crate) fn new(client: IAudioClient) -> Result<AudioClient> {
         Ok(AudioClient {
             inner_client: client,
-            wave_format: None,
             period: None,
+            renderer: None,
             sharemode: None,
         })
     }
@@ -427,7 +449,7 @@ impl WaveFormat {
     }
 
     /// convert from [WAVEFORMATEX](https://docs.microsoft.com/en-us/previous-versions/dd757713(v=vs.85)) structure
-    pub fn from_waveformatex(wavefmt: WAVEFORMATEX) -> Result<Self> {
+    fn from_waveformatex(wavefmt: WAVEFORMATEX) -> Result<Self> {
         let bits_per_sample = BitsPerSample::from(wavefmt.wBitsPerSample as usize);
         let samplerate = wavefmt.nSamplesPerSec as usize;
         let channels = wavefmt.nChannels as usize;
@@ -458,5 +480,45 @@ impl From<&StreamParams> for WaveFormat {
             value.samplerate as usize,
             value.channels as usize,
         )
+    }
+}
+
+pub struct ThreadPriority {
+    previous_process_priority: PROCESS_CREATION_FLAGS,
+    previous_thread_priority: THREAD_PRIORITY,
+    taskhandle: HANDLE,
+}
+
+impl ThreadPriority {
+    pub fn new() -> Result<ThreadPriority> {
+        let previous_process_priority =
+            unsafe { PROCESS_CREATION_FLAGS(GetPriorityClass(GetCurrentProcess())) };
+        unsafe { SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)? }
+        println!("Thread priority set to high");
+        let previous_thread_priority =
+            unsafe { THREAD_PRIORITY(GetThreadPriority(GetCurrentThread())) };
+        unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST)? };
+        let taskhandle = unsafe { AvSetMmThreadCharacteristicsW(w!("Pro Audio"), &mut 0)? };
+        Ok(ThreadPriority {
+            previous_process_priority,
+            previous_thread_priority,
+            taskhandle,
+        })
+    }
+
+    fn revert_thread_priority(&mut self) -> Result<()> {
+        println!("Reverting thread priority");
+        unsafe {
+            SetPriorityClass(GetCurrentProcess(), self.previous_process_priority)?;
+            SetThreadPriority(GetCurrentThread(), self.previous_thread_priority)?;
+            AvRevertMmThreadCharacteristics(self.taskhandle)?;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for ThreadPriority {
+    fn drop(&mut self) {
+        let _ = self.revert_thread_priority();
     }
 }

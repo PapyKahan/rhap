@@ -27,6 +27,7 @@ impl Device {
     }
 
     pub fn get_client(&self) -> Result<AudioClient> {
+        com_initialize();
         AudioClient::new(unsafe {self.inner_device.Activate::<IAudioClient>(CLSCTX_ALL, None)? })
     }
 
