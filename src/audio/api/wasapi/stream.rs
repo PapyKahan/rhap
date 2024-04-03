@@ -3,7 +3,7 @@ use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
 
 use super::api::AudioClient;
-use super::api::EventHandle;
+//use super::api::EventHandle;
 use super::api::ShareMode;
 use super::api::ThreadPriority;
 use super::api::WaveFormat;
@@ -12,10 +12,11 @@ use crate::audio::StreamParams;
 use crate::audio::StreamingData;
 
 const REFTIMES_PER_MILLISEC: i64 = 10000;
+const REFTIMES_PER_SEC: i64 = 10000000;
 
 pub struct Streamer {
     client: AudioClient,
-    eventhandle: EventHandle,
+    //eventhandle: EventHandle,
     format: WaveFormat,
     receiver: Receiver<StreamingData>,
 }
@@ -37,11 +38,11 @@ impl Streamer {
         };
 
         client.initialize(&format, &sharemode)?;
-        let eventhandle = client.set_get_eventhandle()?;
+        //let eventhandle = client.set_get_eventhandle()?;
 
         Ok(Streamer {
             client,
-            eventhandle,
+            //eventhandle,
             format,
             receiver,
         })
@@ -81,10 +82,16 @@ impl Streamer {
                     stream_started = !stream_started;
                 }
 
-                self.eventhandle.wait_for_event(1000)?;
+                //self.eventhandle.wait_for_event(1000)?;
                 buffer.clear();
-                (available_buffer_in_frames, available_buffer_size) =
-                    self.client.get_available_buffer_size(&self.format)?;
+                loop {
+                    (available_buffer_in_frames, available_buffer_size) =
+                        self.client.get_available_buffer_size(&self.format)?;
+                    if available_buffer_in_frames > 0 {
+                        break;
+                    }
+                    tokio::time::sleep(Duration::from_millis(2)).await;
+                }
             } else {
                 let bytes_per_frames = self.format.get_block_align() as usize;
                 let frames = buffer.len() / bytes_per_frames;

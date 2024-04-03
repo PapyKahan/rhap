@@ -221,7 +221,7 @@ impl AudioClient {
             ShareMode::Shared => 0,
         };
         let flags = match sharemode {
-            ShareMode::Exclusive => AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+            ShareMode::Exclusive => 0,
             ShareMode::Shared => AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
         };
 
@@ -318,18 +318,22 @@ impl AudioClient {
     }
 
     pub(crate) fn get_available_buffer_size(&self, format: &WaveFormat) -> Result<(usize, usize)> {
-        let frames = match self.sharemode {
-            Some(ShareMode::Exclusive) => {
-                let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
-                buffer_frame_count
-            }
-            Some(ShareMode::Shared) => {
-                let padding_count = unsafe { self.inner_client.GetCurrentPadding()? as usize };
-                let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
-                buffer_frame_count - padding_count
-            }
-            _ => return Err(anyhow!("Client has not been initialized")),
-        };
+        //let frames = match self.sharemode {
+        //    Some(ShareMode::Exclusive) => {
+        //        let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
+        //        buffer_frame_count
+        //    }
+        //    Some(ShareMode::Shared) => {
+        //        let padding_count = unsafe { self.inner_client.GetCurrentPadding()? as usize };
+        //        let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
+        //        buffer_frame_count - padding_count
+        //    }
+        //    _ => return Err(anyhow!("Client has not been initialized")),
+        //};
+
+        let padding_count = unsafe { self.inner_client.GetCurrentPadding()? as usize };
+        let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
+        let frames = buffer_frame_count - padding_count;
         let size = frames * format.get_block_align() as usize;
         Ok((frames, size))
     }
@@ -494,7 +498,6 @@ impl ThreadPriority {
         let previous_process_priority =
             unsafe { PROCESS_CREATION_FLAGS(GetPriorityClass(GetCurrentProcess())) };
         unsafe { SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)? }
-        println!("Thread priority set to high");
         let previous_thread_priority =
             unsafe { THREAD_PRIORITY(GetThreadPriority(GetCurrentThread())) };
         unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST)? };
@@ -507,7 +510,6 @@ impl ThreadPriority {
     }
 
     fn revert_thread_priority(&mut self) -> Result<()> {
-        println!("Reverting thread priority");
         unsafe {
             SetPriorityClass(GetCurrentProcess(), self.previous_process_priority)?;
             SetThreadPriority(GetCurrentThread(), self.previous_thread_priority)?;
