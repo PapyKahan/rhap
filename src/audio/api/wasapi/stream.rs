@@ -55,7 +55,7 @@ impl Streamer {
         let _thread_priority = ThreadPriority::new()?;
         let mut buffer = vec![];
         let mut stream_started = false;
-        let (mut available_buffer_in_frames, mut available_buffer_size) =
+        let (available_buffer_in_frames, available_buffer_size) =
             self.client.get_available_buffer_size(&self.format)?;
 
         loop {
