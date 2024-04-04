@@ -97,6 +97,15 @@ pub struct AudioClient {
     sharemode: Option<ShareMode>,
 }
 
+impl Drop for AudioClient {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = self.inner_client.Stop();
+            let _ = self.inner_client.Reset();
+        }
+    }
+}
+
 impl AudioClient {
     pub fn is_supported(&self, format: WaveFormat, share_mode: &ShareMode) -> Result<WaveFormat> {
         match share_mode {
@@ -315,7 +324,10 @@ impl AudioClient {
     }
 
     pub(crate) fn stop(&self) -> Result<()> {
-        Ok(unsafe { self.inner_client.Stop()? })
+        Ok(unsafe {
+            self.inner_client.Stop()?;
+            self.inner_client.Reset()?
+        })
     }
 
     pub(crate) fn get_available_buffer_size(&self, format: &WaveFormat) -> Result<(usize, usize)> {

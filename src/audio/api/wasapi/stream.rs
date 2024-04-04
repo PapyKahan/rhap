@@ -89,16 +89,14 @@ impl Streamer {
                     tokio::time::sleep(Duration::from_millis(2)).await;
                 }
             } else {
-                let bytes_per_frames = self.format.get_block_align() as usize;
-                let frames = buffer.len() / bytes_per_frames;
-                self.client.write(buffer.as_slice())?;
-                tokio::time::sleep(Duration::from_millis(
-                    self.client.get_period() as u64 / REFTIMES_PER_MILLISEC as u64,
-                ))
-                .await;
                 break;
             }
         }
+        self.client.write(buffer.as_slice())?;
+        tokio::time::sleep(Duration::from_millis(
+            self.client.get_period() as u64 / REFTIMES_PER_MILLISEC as u64,
+        ))
+        .await;
         self.stop()
     }
 }
