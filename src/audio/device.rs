@@ -6,7 +6,7 @@ pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> Result<bool>;
     fn name(&self) -> Result<String>;
     fn get_capabilities(&self) -> Result<Capabilities>;
-    fn start(&mut self, params: StreamParams) -> Result<Sender<StreamingData>>;
+    fn start(&mut self, params: &StreamParams) -> Result<Sender<StreamingData>>;
     fn pause(&mut self) -> Result<()>;
     fn resume(&mut self) -> Result<()>;
     fn stop(&mut self) -> Result<()>;
@@ -18,7 +18,7 @@ pub enum Device {
 }
 
 impl Device {
-    pub fn adjust_stream_params(&self, params: StreamParams) -> Result<StreamParams> {
+    pub fn adjust_stream_params(&self, params: &StreamParams) -> Result<StreamParams> {
         let capabilities = self.get_capabilities()?;
         let contains_sample_rates = capabilities.sample_rates.contains(&params.samplerate);
         let contains_bits_per_samples = capabilities.bits_per_samples.contains(&params.bits_per_sample);
@@ -36,10 +36,12 @@ impl Device {
             return Ok(StreamParams {
                 samplerate,
                 bits_per_sample,
-                ..params
+                ..*params
             });
         } else {
-            Ok(params)
+            Ok(StreamParams {
+                ..*params
+            })
         }
     }
 }
@@ -69,7 +71,7 @@ impl DeviceTrait for Device {
         device.get_capabilities()
     }
 
-    fn start(&mut self, params: StreamParams) -> Result<Sender<StreamingData>> {
+    fn start(&mut self, params: &StreamParams) -> Result<Sender<StreamingData>> {
         let device = match self {
             Self::Wasapi(device) => device,
             Self::None => return Err(anyhow!("No host selected")),

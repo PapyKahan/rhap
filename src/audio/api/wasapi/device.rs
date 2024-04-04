@@ -102,7 +102,7 @@ impl DeviceTrait for Device {
         self.capabilities()
     }
 
-    fn start(&mut self, params: StreamParams) -> Result<Sender<StreamingData>> {
+    fn start(&mut self, params: &StreamParams) -> Result<Sender<StreamingData>> {
         self.stop()?;
         let (command_tx, _) = channel::<StreamingCommand>(32);
         self.command = Some(command_tx);

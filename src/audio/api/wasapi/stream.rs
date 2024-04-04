@@ -28,10 +28,10 @@ impl Streamer {
     pub(super) fn new(
         device: &Device,
         receiver: Receiver<StreamingData>,
-        params: StreamParams,
+        params: &StreamParams,
     ) -> Result<Self> {
         let mut client = device.get_client()?;
-        let format = WaveFormat::from(&params);
+        let format = WaveFormat::from(params);
         let sharemode = match params.exclusive {
             true => ShareMode::Exclusive,
             false => ShareMode::Shared,

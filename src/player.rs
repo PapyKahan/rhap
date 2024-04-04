@@ -82,8 +82,8 @@ impl Player {
             exclusive: true,
         };
         let mut device = self.host.create_device(self.device_id)?;
-        let streamparams = device.adjust_stream_params(streamparams)?;
-        let data_sender = device.start(streamparams)?;
+        let streamparams = device.adjust_stream_params(&streamparams)?;
+        let data_sender = device.start(&streamparams)?;
         self.current_device = Some(device);
         self.previous_stream = Some(data_sender);
         let stream = self.previous_stream.clone();
