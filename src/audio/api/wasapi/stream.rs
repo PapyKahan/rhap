@@ -30,12 +30,13 @@ impl Streamer {
         receiver: Receiver<StreamingData>,
         params: &StreamParams,
     ) -> Result<Self> {
-        let mut client = device.get_client()?;
         let format = WaveFormat::from(params);
         let sharemode = match params.exclusive {
             true => ShareMode::Exclusive,
             false => ShareMode::Shared,
         };
+
+        let mut client = device.get_client(&params)?;
 
         client.initialize(&format, &sharemode)?;
         //let eventhandle = client.set_get_eventhandle()?;
@@ -70,12 +71,7 @@ impl Streamer {
                     continue;
                 }
 
-                self.client.write(
-                    available_buffer_in_frames,
-                    self.format.get_block_align() as usize,
-                    buffer.as_slice(),
-                    None,
-                )?;
+                self.client.write(buffer.as_slice())?;
 
                 if !stream_started {
                     self.client.start()?;
@@ -95,8 +91,7 @@ impl Streamer {
             } else {
                 let bytes_per_frames = self.format.get_block_align() as usize;
                 let frames = buffer.len() / bytes_per_frames;
-                self.client
-                    .write(frames as usize, bytes_per_frames, buffer.as_slice(), None)?;
+                self.client.write(buffer.as_slice())?;
                 tokio::time::sleep(Duration::from_millis(
                     self.client.get_period() as u64 / REFTIMES_PER_MILLISEC as u64,
                 ))

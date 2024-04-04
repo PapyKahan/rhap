@@ -1,8 +1,15 @@
 use anyhow::Result;
-use tokio::sync::mpsc::{Sender, channel};
-use windows::Win32::{Media::Audio::{IMMDevice, IAudioClient}, System::Com::{STGM_READ, StructuredStorage::PropVariantToStringAlloc, CLSCTX_ALL}, Devices::FunctionDiscovery::PKEY_DeviceInterface_FriendlyName};
+use tokio::sync::mpsc::{channel, Sender};
+use windows::Win32::{
+    Devices::FunctionDiscovery::PKEY_DeviceInterface_FriendlyName,
+    Media::Audio::IMMDevice,
+    System::Com::{StructuredStorage::PropVariantToStringAlloc, STGM_READ},
+};
 
-use super::{api::{com_initialize, ShareMode, AudioClient, WaveFormat}, stream::Streamer};
+use super::{
+    api::{com_initialize, AudioClient, ShareMode, WaveFormat},
+    stream::Streamer,
+};
 use crate::audio::{Capabilities, DeviceTrait, StreamParams, StreamingCommand, StreamingData};
 
 pub struct Device {
@@ -26,9 +33,8 @@ impl Device {
         Ok(unsafe { self.inner_device.GetId()?.to_string()? })
     }
 
-    pub fn get_client(&self) -> Result<AudioClient> {
-        com_initialize();
-        AudioClient::new(unsafe {self.inner_device.Activate::<IAudioClient>(CLSCTX_ALL, None)? })
+    pub fn get_client(&self, params: &StreamParams) -> Result<AudioClient> {
+        AudioClient::new(&self.inner_device, params)
     }
 
     fn capabilities(&self) -> Result<Capabilities> {
@@ -41,13 +47,15 @@ impl Device {
         for bits_per_sample in default_capabilities.bits_per_samples {
             let default_capabilities = Capabilities::default();
             for samplerate in default_capabilities.sample_rates {
-                let client = self.get_client()?;
-                let wave_format = WaveFormat::new(
+                let params = StreamParams {
+                    samplerate,
                     bits_per_sample,
-                    samplerate as usize,
-                    2
-                );
-                let sharemode = match true {
+                    channels: 2,
+                    exclusive: true,
+                };
+                let client = self.get_client(&params)?;
+                let wave_format = WaveFormat::new(bits_per_sample, samplerate as usize, 2);
+                let sharemode = match params.exclusive {
                     true => ShareMode::Exclusive,
                     false => ShareMode::Shared,
                 };
@@ -106,7 +114,8 @@ impl DeviceTrait for Device {
         self.stop()?;
         let (command_tx, _) = channel::<StreamingCommand>(32);
         self.command = Some(command_tx);
-        let buffer = params.channels as usize * ((params.bits_per_sample as usize * params.samplerate as usize) / 8 as usize);
+        let buffer = params.channels as usize
+            * ((params.bits_per_sample as usize * params.samplerate as usize) / 8 as usize);
         let (data_tx, data_rx) = channel::<StreamingData>(buffer);
         let mut streamer = Streamer::new(&self, data_rx, params)?;
         self.stream_thread_handle = Some(tokio::spawn(async move {

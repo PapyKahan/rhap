@@ -2,6 +2,8 @@ use anyhow::{anyhow, Result};
 use log::debug;
 use log::error;
 use num_integer::Integer;
+use windows::Win32::Media::Audio::IMMDevice;
+use windows::Win32::System::Com::CLSCTX_ALL;
 use std::cmp;
 use windows::core::w;
 use windows::Win32::Foundation::E_INVALIDARG;
@@ -89,6 +91,7 @@ pub enum ShareMode {
 
 pub struct AudioClient {
     inner_client: IAudioClient,
+    format: WaveFormat,
     renderer: Option<AudioRenderClient>,
     period: Option<i64>,
     sharemode: Option<ShareMode>,
@@ -104,13 +107,11 @@ impl AudioClient {
 
     pub fn write(
         &self,
-        available_frames: usize,
-        n_block_align: usize,
         data: &[u8],
-        buffer_flags: Option<u32>,
     ) -> Result<()> {
         if let Some(renderer) = &self.renderer {
-            renderer.write(available_frames, n_block_align, data, buffer_flags)?;
+            let frames = data.len() / self.format.get_block_align() as usize;
+            renderer.write(frames, self.format.get_block_align() as usize, data, None)?;
         }
         Ok(())
     }
@@ -338,9 +339,12 @@ impl AudioClient {
         Ok((frames, size))
     }
 
-    pub(crate) fn new(client: IAudioClient) -> Result<AudioClient> {
+    pub(crate) fn new(device: &IMMDevice, params: &StreamParams) -> Result<AudioClient> {
+        com_initialize();
+        let inner_client = unsafe {device.Activate::<IAudioClient>(CLSCTX_ALL, None)? };
         Ok(AudioClient {
-            inner_client: client,
+            inner_client,
+            format: WaveFormat::from(params),
             period: None,
             renderer: None,
             sharemode: None,
