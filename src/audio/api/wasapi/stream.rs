@@ -9,8 +9,8 @@ use super::device::Device;
 use crate::audio::StreamParams;
 use crate::audio::StreamingData;
 
-const REFTIMES_PER_MILLISEC: i64 = 10000;
-//const REFTIMES_PER_SEC: i64 = 10000000;
+const REFTIMES_PER_MILLISEC: u64 = 10000;
+const REFTIMES_PER_SEC: u64 = 10000000;
 
 pub struct Streamer {
     client: AudioClient,
@@ -45,9 +45,12 @@ impl Streamer {
     pub(crate) async fn start(&mut self) -> Result<()> {
         let _thread_priority = ThreadPriority::new()?;
         let mut buffer = vec![];
-        let mut stream_started = false;
-        let mut available_buffer_size = self.client.get_available_buffer_size()?;
 
+        self.client.start()?;
+
+        let mut available_buffer_size = self.client.get_available_buffer_size()?;
+        let max_buffer_size = self.client.get_max_buffer_frames() as u64;
+        let sample_rate = self.client.get_samples_per_sec() as u64;
         loop {
             if let Some(streaming_data) = self.receiver.recv().await {
                 let data = match streaming_data {
@@ -59,22 +62,28 @@ impl Streamer {
                     continue;
                 }
 
+                //tokio::time::sleep(Duration::from_millis(
+                //    (((REFTIMES_PER_SEC * max_buffer_size as u64) / sample_rate as u64)
+                //        / REFTIMES_PER_MILLISEC) / 2,
+                //)).await;
+
                 self.client.write(buffer.as_slice())?;
 
-                if !stream_started {
-                    self.client.start()?;
-                    stream_started = !stream_started;
-                }
-
                 //self.eventhandle.wait_for_event(1000)?;
+
+                //tokio::time::sleep(Duration::from_millis(
+                //    ((REFTIMES_PER_SEC * available_frames as u64) / self.client.get_samples_per_sec() as u64)
+                //        / REFTIMES_PER_MILLISEC,
+                //) / 4)
+                //.await;
+                //(available_frames, available_buffer_size) =
+                //    self.client.get_available_buffer_size()?;
+                tokio::time::sleep(Duration::from_millis(
+                    (((REFTIMES_PER_SEC * max_buffer_size as u64) / sample_rate as u64)
+                        / REFTIMES_PER_MILLISEC) / 4,
+                )).await;
+                available_buffer_size = self.client.get_available_buffer_size()?;
                 buffer.clear();
-                loop {
-                    available_buffer_size = self.client.get_available_buffer_size()?;
-                    if available_buffer_size > 0 {
-                        break;
-                    }
-                    tokio::time::sleep(Duration::from_millis(2)).await;
-                }
             } else {
                 break;
             }

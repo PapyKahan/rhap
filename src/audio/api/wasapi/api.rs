@@ -94,6 +94,7 @@ pub struct AudioClient {
     format: WaveFormat,
     renderer: Option<AudioRenderClient>,
     period: Option<i64>,
+    max_buffer_frames: usize,
     sharemode: ShareMode,
 }
 
@@ -237,6 +238,7 @@ impl AudioClient {
                 self.format.get_format(),
                 None,
             );
+            self.max_buffer_frames = self.inner_client.GetBufferSize()? as usize;
             match result {
                 Ok(()) => debug!("IAudioClient::Initialize ok"),
                 Err(e) => {
@@ -250,22 +252,21 @@ impl AudioClient {
                             // https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize#examples
                             // Just panic on errors to keep it short and simple.
                             // 1. Call IAudioClient::GetBufferSize and receive the next-highest-aligned buffer size (in frames).
-                            let buffersize = self.get_buffer_size()?;
                             debug!(
                                 "Client next-highest-aligned buffer size: {} frames",
-                                buffersize
+                                self.max_buffer_frames
                             );
                             // 2. Call IAudioClient::Release, skipped since this will happen automatically when we drop the client.
                             // 3. Calculate the aligned buffer size in 100-nanosecond units.
                             desired_period = calculate_period_100ns(
-                                buffersize as i64,
+                                self.max_buffer_frames as i64,
                                 self.format.get_samples_per_sec() as i64,
                             );
                             debug!("Aligned period in 100ns units: {}", desired_period);
                             // 4. Get a new IAudioClient
-                            //client = device.get_client()?;
+                            //self.inner_client = self.inner_client.Cast()?;
                             // 5. Call Initialize again on the created audio client.
-                            self.initialize()?;
+                            //self.initialize()?;
                             self.inner_client.Initialize(
                                 mode,
                                 flags,
@@ -306,10 +307,6 @@ impl AudioClient {
         Ok(())
     }
 
-    pub(crate) fn get_buffer_size(&self) -> Result<usize> {
-        Ok(unsafe { self.inner_client.GetBufferSize()? as usize })
-    }
-
     pub(crate) fn get_renderer(&self) -> Result<AudioRenderClient> {
         Ok(AudioRenderClient(unsafe {
             self.inner_client.GetService::<IAudioRenderClient>()?
@@ -321,6 +318,10 @@ impl AudioClient {
             self.inner_client.Stop()?;
             self.inner_client.Reset()?
         })
+    }
+
+    pub(crate) fn get_max_buffer_frames(&self) -> usize {
+        self.max_buffer_frames
     }
 
     pub(crate) fn get_available_buffer_size(&self) -> Result<usize> {
@@ -338,11 +339,16 @@ impl AudioClient {
         //};
 
         let padding_count = unsafe { self.inner_client.GetCurrentPadding()? as usize };
-        let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
-        let frames = buffer_frame_count - padding_count;
+        //let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
+        let frames = self.max_buffer_frames - padding_count;
         let size = frames * self.format.get_block_align() as usize;
         Ok(size)
     }
+
+    pub(crate) fn get_samples_per_sec(&self) -> u32 {
+        self.format.get_samples_per_sec()
+    }
+
 
     pub(crate) fn new(device: &IMMDevice, params: &StreamParams) -> Result<AudioClient> {
         com_initialize();
@@ -357,6 +363,7 @@ impl AudioClient {
             period: None,
             renderer: None,
             sharemode,
+            max_buffer_frames: 0,
         })
     }
 
