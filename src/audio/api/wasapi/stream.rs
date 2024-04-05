@@ -4,9 +4,7 @@ use tokio::sync::mpsc::Receiver;
 
 use super::api::AudioClient;
 //use super::api::EventHandle;
-use super::api::ShareMode;
 use super::api::ThreadPriority;
-use super::api::WaveFormat;
 use super::device::Device;
 use crate::audio::StreamParams;
 use crate::audio::StreamingData;
@@ -17,7 +15,6 @@ const REFTIMES_PER_MILLISEC: i64 = 10000;
 pub struct Streamer {
     client: AudioClient,
     //eventhandle: EventHandle,
-    format: WaveFormat,
     receiver: Receiver<StreamingData>,
 }
 
@@ -30,21 +27,13 @@ impl Streamer {
         receiver: Receiver<StreamingData>,
         params: &StreamParams,
     ) -> Result<Self> {
-        let format = WaveFormat::from(params);
-        let sharemode = match params.exclusive {
-            true => ShareMode::Exclusive,
-            false => ShareMode::Shared,
-        };
-
-        let mut client = device.get_client(&params)?;
-
-        client.initialize(&format, &sharemode)?;
+        let mut client = device.get_client(params)?;
+        client.initialize()?;
         //let eventhandle = client.set_get_eventhandle()?;
 
         Ok(Streamer {
             client,
             //eventhandle,
-            format,
             receiver,
         })
     }
@@ -57,8 +46,8 @@ impl Streamer {
         let _thread_priority = ThreadPriority::new()?;
         let mut buffer = vec![];
         let mut stream_started = false;
-        let (mut available_buffer_in_frames, mut available_buffer_size) =
-            self.client.get_available_buffer_size(&self.format)?;
+        let (_, mut available_buffer_size) =
+            self.client.get_available_buffer_size()?;
 
         loop {
             if let Some(streaming_data) = self.receiver.recv().await {
@@ -81,9 +70,9 @@ impl Streamer {
                 //self.eventhandle.wait_for_event(1000)?;
                 buffer.clear();
                 loop {
-                    (available_buffer_in_frames, available_buffer_size) =
-                        self.client.get_available_buffer_size(&self.format)?;
-                    if available_buffer_in_frames > 0 {
+                    (_, available_buffer_size) =
+                        self.client.get_available_buffer_size()?;
+                    if available_buffer_size > 0 {
                         break;
                     }
                     tokio::time::sleep(Duration::from_millis(2)).await;
