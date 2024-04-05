@@ -323,7 +323,7 @@ impl AudioClient {
         })
     }
 
-    pub(crate) fn get_available_buffer_size(&self) -> Result<(usize, usize)> {
+    pub(crate) fn get_available_buffer_size(&self) -> Result<usize> {
         //let frames = match self.sharemode {
         //    Some(ShareMode::Exclusive) => {
         //        let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
@@ -341,7 +341,7 @@ impl AudioClient {
         let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
         let frames = buffer_frame_count - padding_count;
         let size = frames * self.format.get_block_align() as usize;
-        Ok((frames, size))
+        Ok(size)
     }
 
     pub(crate) fn new(device: &IMMDevice, params: &StreamParams) -> Result<AudioClient> {
