@@ -324,24 +324,18 @@ impl AudioClient {
         self.max_buffer_frames
     }
 
-    pub(crate) fn get_available_buffer_size(&self) -> Result<usize> {
-        //let frames = match self.sharemode {
-        //    Some(ShareMode::Exclusive) => {
-        //        let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
-        //        buffer_frame_count
-        //    }
-        //    Some(ShareMode::Shared) => {
-        //        let padding_count = unsafe { self.inner_client.GetCurrentPadding()? as usize };
-        //        let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
-        //        buffer_frame_count - padding_count
-        //    }
-        //    _ => return Err(anyhow!("Client has not been initialized")),
-        //};
+    pub(crate) fn get_max_buffer_size(&self) -> usize {
+        self.max_buffer_frames * self.format.get_block_align() as usize
+    }
 
+    pub(crate) fn get_available_buffer_frames(&self) -> Result<usize> {
         let padding_count = unsafe { self.inner_client.GetCurrentPadding()? as usize };
-        //let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
         let frames = self.max_buffer_frames - padding_count;
-        let size = frames * self.format.get_block_align() as usize;
+        Ok(frames)
+    }
+
+    pub(crate) fn get_available_buffer_size(&self) -> Result<usize> {
+        let size = self.get_available_buffer_frames()? * self.format.get_block_align() as usize;
         Ok(size)
     }
 

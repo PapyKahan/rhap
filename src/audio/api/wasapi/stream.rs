@@ -45,12 +45,13 @@ impl Streamer {
     pub(crate) async fn start(&mut self) -> Result<()> {
         let _thread_priority = ThreadPriority::new()?;
         let mut buffer = vec![];
-
-        self.client.start()?;
+        let mut client_started = false;
 
         let mut available_buffer_size = self.client.get_available_buffer_size()?;
-        let max_buffer_size = self.client.get_max_buffer_frames() as u64;
-        let sample_rate = self.client.get_samples_per_sec() as u64;
+        let samples_per_sec = self.client.get_samples_per_sec();
+        let max_buffer_size = self.client.get_max_buffer_size();
+        let actual_duration =
+            REFTIMES_PER_SEC * self.client.get_max_buffer_frames() as u64 / samples_per_sec as u64;
         loop {
             if let Some(streaming_data) = self.receiver.recv().await {
                 let data = match streaming_data {
@@ -62,37 +63,35 @@ impl Streamer {
                     continue;
                 }
 
-                //tokio::time::sleep(Duration::from_millis(
-                //    (((REFTIMES_PER_SEC * max_buffer_size as u64) / sample_rate as u64)
-                //        / REFTIMES_PER_MILLISEC) / 2,
-                //)).await;
-
                 self.client.write(buffer.as_slice())?;
+                buffer.clear();
 
                 //self.eventhandle.wait_for_event(1000)?;
 
-                //tokio::time::sleep(Duration::from_millis(
-                //    ((REFTIMES_PER_SEC * available_frames as u64) / self.client.get_samples_per_sec() as u64)
-                //        / REFTIMES_PER_MILLISEC,
-                //) / 4)
-                //.await;
-                //(available_frames, available_buffer_size) =
-                //    self.client.get_available_buffer_size()?;
-                tokio::time::sleep(Duration::from_millis(
-                    (((REFTIMES_PER_SEC * max_buffer_size as u64) / sample_rate as u64)
-                        / REFTIMES_PER_MILLISEC) / 4,
-                )).await;
-                available_buffer_size = self.client.get_available_buffer_size()?;
-                buffer.clear();
+                if !client_started {
+                    self.client.start()?;
+                    client_started = true;
+                }
+
+                loop {
+                    available_buffer_size = self.client.get_available_buffer_size()?;
+                    if available_buffer_size >= (max_buffer_size / 2) as usize {
+                        break;
+                    }
+                    tokio::time::sleep(Duration::from_millis(3)).await;
+                }
             } else {
                 break;
             }
         }
         self.client.write(buffer.as_slice())?;
-        tokio::time::sleep(Duration::from_millis(
-            self.client.get_period() as u64 / REFTIMES_PER_MILLISEC as u64,
-        ))
-        .await;
+        loop {
+            available_buffer_size = self.client.get_available_buffer_size()?;
+            if available_buffer_size >= max_buffer_size {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(3)).await;
+        }
         self.stop()
     }
 }
