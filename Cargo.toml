@@ -1,18 +1,18 @@
 [package]
 name = "rhap"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0.81"
 arrayvec = "0.7.4"
-clap = { version = "4.5.3", features = ["derive"] }
+clap = { version = "4.5.4", features = ["derive"] }
 crossterm = "0.27.0"
 log = "0.4.21"
 rand = "0.8.5"
 rubato = { version = "0.15.0", features = ["fft_resampler", "realfft"] }
 symphonia = { version = "0.5.4", features = ["all-formats", "all-codecs"] }
-tokio = { version = "1.36.0", features = ["full"] }
+tokio = { version = "1.37.0", features = ["full"] }
 walkdir = "2.5.0"
 num-integer = "0.1.46"
 

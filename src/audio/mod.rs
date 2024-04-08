@@ -82,12 +82,7 @@ pub struct StreamParams {
     pub samplerate: SampleRate,
     pub bits_per_sample: BitsPerSample,
     pub exclusive: bool,
-}
-
-#[derive(Copy, Clone)]
-pub enum StreamingCommand {
-    Pause,
-    Resume,
+    pub pollmode: bool,
 }
 
 #[derive(Copy, Clone)]

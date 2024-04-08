@@ -112,7 +112,7 @@ impl Playlist {
     }
 
     async fn play(&mut self) -> Result<()> {
-        self.stop()?;
+        self.stop().await?;
         if let Some(song) = self.songs.get(self.playing_track_list_index) {
             let current_track_info = self.player.play(song.clone()).await?;
             self.playing_track = Some(current_track_info);
@@ -120,9 +120,9 @@ impl Playlist {
         Ok(())
     }
 
-    pub fn stop(&mut self) -> Result<()> {
+    pub async fn stop(&mut self) -> Result<()> {
         self.playing_track = None;
-        self.player.stop()
+        self.player.stop().await
     }
 
     async fn pause(&mut self) -> Result<()> {
@@ -143,7 +143,7 @@ impl Playlist {
                     self.play().await?;
                 }
                 KeyCode::Char('s') => {
-                    self.stop()?;
+                    self.stop().await?;
                 }
                 KeyCode::Char('n') => {
                     self.next().await?;

@@ -50,12 +50,13 @@ impl Player {
         })
     }
 
-    pub fn stop(&mut self) -> Result<()> {
+    pub async fn stop(&mut self) -> Result<()> {
         self.is_playing.store(false, Ordering::Relaxed);
         if let Some(device) = &mut self.current_device {
             device.stop()?;
         }
         if let Some(stream) = self.previous_stream.take() {
+            stream.closed().await;
             drop(stream);
         }
         if let Some(handle) = self.streaming_handle.take() {
@@ -80,10 +81,11 @@ impl Player {
             channels: song.channels as u8,
             bits_per_sample: song.bits_per_sample,
             exclusive: true,
+            pollmode: true
         };
         let mut device = self.host.create_device(self.device_id)?;
-        let streamparams = device.adjust_stream_params(streamparams)?;
-        let data_sender = device.start(streamparams)?;
+        let streamparams = device.adjust_stream_params(&streamparams)?;
+        let data_sender = device.start(&streamparams)?;
         self.current_device = Some(device);
         self.previous_stream = Some(data_sender);
         let stream = self.previous_stream.clone();

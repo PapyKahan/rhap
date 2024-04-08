@@ -3,13 +3,16 @@ use log::debug;
 use log::error;
 use num_integer::Integer;
 use std::cmp;
+use std::time::Duration;
 use windows::core::w;
 use windows::Win32::Foundation::E_INVALIDARG;
+use windows::Win32::Media::Audio::IMMDevice;
 use windows::Win32::Media::Audio::AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED;
 use windows::Win32::Media::Audio::AUDCLNT_E_DEVICE_IN_USE;
 use windows::Win32::Media::Audio::AUDCLNT_E_ENDPOINT_CREATE_FAILED;
 use windows::Win32::Media::Audio::AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED;
 use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
+use windows::Win32::System::Com::CLSCTX_ALL;
 use windows::Win32::System::Threading::AvRevertMmThreadCharacteristics;
 use windows::Win32::System::Threading::AvSetMmThreadCharacteristicsW;
 use windows::Win32::System::Threading::GetCurrentProcess;
@@ -43,6 +46,9 @@ use windows::{
 };
 
 use crate::audio::{BitsPerSample, StreamParams};
+
+//const REFTIMES_PER_MILLISEC: u64 = 10000;
+//const REFTIMES_PER_SEC: u64 = 10000000;
 
 thread_local! {
     static WASAPI_COM_INIT: ComWasapi = {
@@ -89,9 +95,21 @@ pub enum ShareMode {
 
 pub struct AudioClient {
     inner_client: IAudioClient,
+    format: WaveFormat,
     renderer: Option<AudioRenderClient>,
-    period: Option<i64>,
-    sharemode: Option<ShareMode>,
+    max_buffer_frames: usize,
+    sharemode: ShareMode,
+    pollmode: bool,
+    eventhandle: Option<EventHandle>,
+}
+
+impl Drop for AudioClient {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = self.inner_client.Stop();
+            //let _ = self.inner_client.Reset();
+        }
+    }
 }
 
 impl AudioClient {
@@ -102,21 +120,12 @@ impl AudioClient {
         }
     }
 
-    pub fn write(
-        &self,
-        available_frames: usize,
-        n_block_align: usize,
-        data: &[u8],
-        buffer_flags: Option<u32>,
-    ) -> Result<()> {
+    pub fn write(&self, data: &[u8]) -> Result<()> {
         if let Some(renderer) = &self.renderer {
-            renderer.write(available_frames, n_block_align, data, buffer_flags)?;
+            let frames = data.len() / self.format.get_block_align() as usize;
+            renderer.write(frames, self.format.get_block_align() as usize, data, None)?;
         }
         Ok(())
-    }
-
-    pub fn get_period(&self) -> i64 {
-        self.period.unwrap_or(0)
     }
 
     fn is_supported_exclusive(&self, format: WaveFormat) -> Result<WaveFormat> {
@@ -174,11 +183,10 @@ impl AudioClient {
         &self,
         desired_period: i64,
         align_bytes: Option<u32>,
-        wave_fmt: &WaveFormat,
     ) -> Result<i64> {
         let (_, min_period) = self.get_default_and_min_periods()?;
         let adjusted_period = cmp::max(desired_period, min_period);
-        let frame_bytes = wave_fmt.get_block_align() as u32;
+        let frame_bytes = self.format.get_block_align() as u32;
         let period_alignment_bytes = match align_bytes {
             Some(0) => frame_bytes,
             Some(bytes) => frame_bytes.lcm(&bytes),
@@ -186,9 +194,9 @@ impl AudioClient {
         };
         let period_alignment_frames = period_alignment_bytes as i64 / frame_bytes as i64;
         let desired_period_frames =
-            (adjusted_period as f64 * wave_fmt.0.Format.nSamplesPerSec as f64 / 10000000.0).round()
-                as i64;
-        let min_period_frames = (min_period as f64 * wave_fmt.0.Format.nSamplesPerSec as f64
+            (adjusted_period as f64 * self.format.0.Format.nSamplesPerSec as f64 / 10000000.0)
+                .round() as i64;
+        let min_period_frames = (min_period as f64 * self.format.0.Format.nSamplesPerSec as f64
             / 10000000.0)
             .ceil() as i64;
         let mut nbr_segments = desired_period_frames / period_alignment_frames;
@@ -198,31 +206,29 @@ impl AudioClient {
         }
         let aligned_period = calculate_period_100ns(
             period_alignment_frames * nbr_segments,
-            wave_fmt.0.Format.nSamplesPerSec as i64,
+            self.format.0.Format.nSamplesPerSec as i64,
         );
         Ok(aligned_period)
     }
 
-    pub(crate) fn initialize(&mut self, format: &WaveFormat, sharemode: &ShareMode) -> Result<()> {
-        self.sharemode = Some(sharemode.clone());
-        let mode = match sharemode {
+    pub(crate) fn initialize(&mut self) -> Result<()> {
+        let mode = match self.sharemode {
             ShareMode::Exclusive => AUDCLNT_SHAREMODE_EXCLUSIVE,
             ShareMode::Shared => AUDCLNT_SHAREMODE_SHARED,
         };
 
         let (_, min_device_period) = self.get_default_and_min_periods()?;
-
         // Calculate desired period for better device compatibility.
         let mut desired_period =
-            self.calculate_aligned_period_near(3 * min_device_period / 2, Some(128), &format)?;
-
-        let device_period = match sharemode {
+            self.calculate_aligned_period_near(3 * min_device_period / 2, Some(128))?;
+        let device_period = match self.sharemode {
             ShareMode::Exclusive => desired_period,
             ShareMode::Shared => 0,
         };
-        let flags = match sharemode {
-            ShareMode::Exclusive => AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-            ShareMode::Shared => AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+
+        let flags = match self.sharemode {
+            ShareMode::Exclusive => if self.pollmode { 0 } else { AUDCLNT_STREAMFLAGS_EVENTCALLBACK },
+            ShareMode::Shared => if self.pollmode { 0 } else { AUDCLNT_STREAMFLAGS_EVENTCALLBACK },
         };
 
         unsafe {
@@ -231,9 +237,10 @@ impl AudioClient {
                 flags,
                 desired_period,
                 device_period,
-                format.get_format(),
+                self.format.get_format(),
                 None,
             );
+            self.max_buffer_frames = self.inner_client.GetBufferSize()? as usize;
             match result {
                 Ok(()) => debug!("IAudioClient::Initialize ok"),
                 Err(e) => {
@@ -247,28 +254,27 @@ impl AudioClient {
                             // https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize#examples
                             // Just panic on errors to keep it short and simple.
                             // 1. Call IAudioClient::GetBufferSize and receive the next-highest-aligned buffer size (in frames).
-                            let buffersize = self.get_buffer_size()?;
                             debug!(
                                 "Client next-highest-aligned buffer size: {} frames",
-                                buffersize
+                                self.max_buffer_frames
                             );
                             // 2. Call IAudioClient::Release, skipped since this will happen automatically when we drop the client.
                             // 3. Calculate the aligned buffer size in 100-nanosecond units.
                             desired_period = calculate_period_100ns(
-                                buffersize as i64,
-                                format.get_samples_per_sec() as i64,
+                                self.max_buffer_frames as i64,
+                                self.format.get_samples_per_sec() as i64,
                             );
                             debug!("Aligned period in 100ns units: {}", desired_period);
                             // 4. Get a new IAudioClient
-                            //client = device.get_client()?;
+                            //self.inner_client = self.inner_client.Cast()?;
                             // 5. Call Initialize again on the created audio client.
-                            self.initialize(&format, &sharemode)?;
+                            //self.initialize()?;
                             self.inner_client.Initialize(
                                 mode,
                                 flags,
                                 desired_period,
                                 device_period,
-                                format.get_format(),
+                                self.format.get_format(),
                                 None,
                             )?;
                             debug!("IAudioClient::Initialize ok");
@@ -299,12 +305,11 @@ impl AudioClient {
         };
 
         self.renderer = Some(self.get_renderer()?);
+        if !self.pollmode {
+            self.eventhandle = Some(self.set_get_eventhandle()?);
+        }
 
         Ok(())
-    }
-
-    pub(crate) fn get_buffer_size(&self) -> Result<usize> {
-        Ok(unsafe { self.inner_client.GetBufferSize()? as usize })
     }
 
     pub(crate) fn get_renderer(&self) -> Result<AudioRenderClient> {
@@ -314,32 +319,57 @@ impl AudioClient {
     }
 
     pub(crate) fn stop(&self) -> Result<()> {
-        Ok(unsafe { self.inner_client.Stop()? })
+        Ok(unsafe {
+            self.inner_client.Stop()?;
+            self.inner_client.Reset()?
+        })
     }
 
-    pub(crate) fn get_available_buffer_size(&self, format: &WaveFormat) -> Result<(usize, usize)> {
-        let frames = match self.sharemode {
-            Some(ShareMode::Exclusive) => {
-                let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
-                buffer_frame_count
+    fn get_available_buffer_frames(&self) -> Result<usize> {
+        let padding_count = unsafe { self.inner_client.GetCurrentPadding()? as usize };
+        let frames = self.max_buffer_frames - padding_count;
+        Ok(frames)
+    }
+
+    pub(crate) fn get_buffer_size(&self) -> usize {
+        self.max_buffer_frames * self.format.get_block_align() as usize
+    }
+
+    pub(crate) fn get_available_buffer_size(&self) -> Result<usize> {
+        if !self.pollmode {
+            if let Some(event) = &self.eventhandle {
+                event.wait_for_event(1000)?;
             }
-            Some(ShareMode::Shared) => {
-                let padding_count = unsafe { self.inner_client.GetCurrentPadding()? as usize };
-                let buffer_frame_count = unsafe { self.inner_client.GetBufferSize()? as usize };
-                buffer_frame_count - padding_count
+            return Ok(self.get_buffer_size());
+        } else {
+            loop {
+                let available_buffer_size =
+                    self.get_available_buffer_frames()? * self.format.get_block_align() as usize;
+                if available_buffer_size
+                    >= (self.max_buffer_frames * self.format.get_block_align() as usize) / 4
+                {
+                    return Ok(available_buffer_size);
+                }
+                std::thread::sleep(Duration::from_millis(1));
             }
-            _ => return Err(anyhow!("Client has not been initialized")),
+        }
+    }
+
+    pub(crate) fn new(device: &IMMDevice, params: &StreamParams) -> Result<AudioClient> {
+        com_initialize();
+        let sharemode = match params.exclusive {
+            true => ShareMode::Exclusive,
+            false => ShareMode::Shared,
         };
-        let size = frames * format.get_block_align() as usize;
-        Ok((frames, size))
-    }
-
-    pub(crate) fn new(client: IAudioClient) -> Result<AudioClient> {
+        let inner_client = unsafe { device.Activate::<IAudioClient>(CLSCTX_ALL, None)? };
         Ok(AudioClient {
-            inner_client: client,
-            period: None,
+            inner_client,
+            format: WaveFormat::from(params),
             renderer: None,
-            sharemode: None,
+            sharemode,
+            max_buffer_frames: 0,
+            pollmode: params.pollmode,
+            eventhandle: None,
         })
     }
 
