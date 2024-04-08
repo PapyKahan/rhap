@@ -75,10 +75,10 @@ impl Streamer {
 
                 loop {
                     available_buffer_size = self.client.get_available_buffer_size()?;
-                    if available_buffer_size >= (max_buffer_size / 2) as usize {
+                    if available_buffer_size >= (max_buffer_size / 4) as usize {
                         break;
                     }
-                    tokio::time::sleep(Duration::from_millis(3)).await;
+                    tokio::time::sleep(Duration::from_millis(1)).await;
                 }
             } else {
                 break;
@@ -90,7 +90,7 @@ impl Streamer {
             if available_buffer_size >= max_buffer_size {
                 break;
             }
-            tokio::time::sleep(Duration::from_millis(3)).await;
+            tokio::time::sleep(Duration::from_millis(1)).await;
         }
         self.stop()
     }
