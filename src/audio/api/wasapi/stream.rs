@@ -10,7 +10,6 @@ use crate::audio::StreamingData;
 
 pub struct Streamer {
     client: AudioClient,
-    //eventhandle: EventHandle,
     receiver: Receiver<StreamingData>,
 }
 
@@ -25,11 +24,9 @@ impl Streamer {
     ) -> Result<Self> {
         let mut client = device.get_client(params)?;
         client.initialize()?;
-        //let eventhandle = client.set_get_eventhandle()?;
 
         Ok(Streamer {
             client,
-            //eventhandle,
             receiver,
         })
     }
@@ -58,14 +55,12 @@ impl Streamer {
                 self.client.write(buffer.as_slice())?;
                 buffer.clear();
 
-                //self.eventhandle.wait_for_event(1000)?;
 
                 if !client_started {
                     self.client.start()?;
                     client_started = true;
                 }
 
-                //tokio::time::sleep(Duration::from_millis(actual_duration / REFTIMES_PER_MILLISEC / 4)).await;
                 available_buffer_size = self.client.get_available_buffer_size()?;
             } else {
                 break;

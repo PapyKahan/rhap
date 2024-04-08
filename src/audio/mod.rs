@@ -82,6 +82,7 @@ pub struct StreamParams {
     pub samplerate: SampleRate,
     pub bits_per_sample: BitsPerSample,
     pub exclusive: bool,
+    pub pollmode: bool,
 }
 
 #[derive(Copy, Clone)]

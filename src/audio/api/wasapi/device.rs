@@ -52,6 +52,7 @@ impl Device {
                     bits_per_sample,
                     channels: 2,
                     exclusive: true,
+                    pollmode: false
                 };
                 let client = self.get_client(&params)?;
                 let wave_format = WaveFormat::new(bits_per_sample, samplerate as usize, 2);

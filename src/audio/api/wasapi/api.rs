@@ -47,8 +47,8 @@ use windows::{
 
 use crate::audio::{BitsPerSample, StreamParams};
 
-const REFTIMES_PER_MILLISEC: u64 = 10000;
-const REFTIMES_PER_SEC: u64 = 10000000;
+//const REFTIMES_PER_MILLISEC: u64 = 10000;
+//const REFTIMES_PER_SEC: u64 = 10000000;
 
 thread_local! {
     static WASAPI_COM_INIT: ComWasapi = {
@@ -99,13 +99,15 @@ pub struct AudioClient {
     renderer: Option<AudioRenderClient>,
     max_buffer_frames: usize,
     sharemode: ShareMode,
+    pollmode: bool,
+    eventhandle: Option<EventHandle>,
 }
 
 impl Drop for AudioClient {
     fn drop(&mut self) {
         unsafe {
             let _ = self.inner_client.Stop();
-            let _ = self.inner_client.Reset();
+            //let _ = self.inner_client.Reset();
         }
     }
 }
@@ -302,6 +304,9 @@ impl AudioClient {
         };
 
         self.renderer = Some(self.get_renderer()?);
+        if !self.pollmode {
+            self.eventhandle = Some(self.set_get_eventhandle()?);
+        }
 
         Ok(())
     }
@@ -319,20 +324,29 @@ impl AudioClient {
         })
     }
 
-    pub(crate) fn get_available_buffer_frames(&self) -> Result<usize> {
+    fn get_available_buffer_frames(&self) -> Result<usize> {
         let padding_count = unsafe { self.inner_client.GetCurrentPadding()? as usize };
         let frames = self.max_buffer_frames - padding_count;
         Ok(frames)
     }
 
     pub(crate) fn get_available_buffer_size(&self) -> Result<usize> {
-        loop {
-            let available_buffer_size = self.get_available_buffer_frames()? * self.format.get_block_align() as usize;
-            if available_buffer_size >= (self.max_buffer_frames * self.format.get_block_align() as usize) / 4
-            {
-                return Ok(available_buffer_size);
+        if !self.pollmode {
+            if let Some(event) = &self.eventhandle {
+                event.wait_for_event(1000)?;
             }
-            std::thread::sleep(Duration::from_millis(1));
+            return Ok(self.get_available_buffer_frames()? * self.format.get_block_align() as usize);
+        } else {
+            loop {
+                let available_buffer_size =
+                    self.get_available_buffer_frames()? * self.format.get_block_align() as usize;
+                if available_buffer_size
+                    >= (self.max_buffer_frames * self.format.get_block_align() as usize) / 4
+                {
+                    return Ok(available_buffer_size);
+                }
+                std::thread::sleep(Duration::from_millis(1));
+            }
         }
     }
 
@@ -349,6 +363,8 @@ impl AudioClient {
             renderer: None,
             sharemode,
             max_buffer_frames: 0,
+            pollmode: params.pollmode,
+            eventhandle: None,
         })
     }
 
