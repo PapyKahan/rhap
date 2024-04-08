@@ -341,7 +341,7 @@ impl AudioClient {
                 let available_buffer_size =
                     self.get_available_buffer_frames()? * self.format.get_block_align() as usize;
                 if available_buffer_size
-                    >= (self.max_buffer_frames * self.format.get_block_align() as usize) / 8
+                    >= (self.max_buffer_frames * self.format.get_block_align() as usize) / 4
                 {
                     return Ok(available_buffer_size);
                 }
