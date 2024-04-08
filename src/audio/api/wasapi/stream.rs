@@ -40,7 +40,7 @@ impl Streamer {
         let mut buffer = vec![];
         let mut client_started = false;
 
-        let mut available_buffer_size = self.client.get_available_buffer_size()?;
+        let mut available_buffer_size = self.client.get_buffer_size();
         loop {
             if let Some(streaming_data) = self.receiver.recv().await {
                 let data = match streaming_data {
@@ -54,7 +54,6 @@ impl Streamer {
 
                 self.client.write(buffer.as_slice())?;
                 buffer.clear();
-
 
                 if !client_started {
                     self.client.start()?;

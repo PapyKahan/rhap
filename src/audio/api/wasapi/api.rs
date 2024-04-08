@@ -225,9 +225,10 @@ impl AudioClient {
             ShareMode::Exclusive => desired_period,
             ShareMode::Shared => 0,
         };
+
         let flags = match self.sharemode {
-            ShareMode::Exclusive => 0,
-            ShareMode::Shared => AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+            ShareMode::Exclusive => if self.pollmode { 0 } else { AUDCLNT_STREAMFLAGS_EVENTCALLBACK },
+            ShareMode::Shared => if self.pollmode { 0 } else { AUDCLNT_STREAMFLAGS_EVENTCALLBACK },
         };
 
         unsafe {
@@ -330,12 +331,16 @@ impl AudioClient {
         Ok(frames)
     }
 
+    pub(crate) fn get_buffer_size(&self) -> usize {
+        self.max_buffer_frames * self.format.get_block_align() as usize
+    }
+
     pub(crate) fn get_available_buffer_size(&self) -> Result<usize> {
         if !self.pollmode {
             if let Some(event) = &self.eventhandle {
                 event.wait_for_event(1000)?;
             }
-            return Ok(self.get_available_buffer_frames()? * self.format.get_block_align() as usize);
+            return Ok(self.get_buffer_size());
         } else {
             loop {
                 let available_buffer_size =

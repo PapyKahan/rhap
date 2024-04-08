@@ -81,7 +81,7 @@ impl Player {
             channels: song.channels as u8,
             bits_per_sample: song.bits_per_sample,
             exclusive: true,
-            pollmode: true
+            pollmode: false
         };
         let mut device = self.host.create_device(self.device_id)?;
         let streamparams = device.adjust_stream_params(&streamparams)?;
