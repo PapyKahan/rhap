@@ -50,12 +50,13 @@ impl Player {
         })
     }
 
-    pub fn stop(&mut self) -> Result<()> {
+    pub async fn stop(&mut self) -> Result<()> {
         self.is_playing.store(false, Ordering::Relaxed);
         if let Some(device) = &mut self.current_device {
             device.stop()?;
         }
         if let Some(stream) = self.previous_stream.take() {
+            stream.closed().await;
             drop(stream);
         }
         if let Some(handle) = self.streaming_handle.take() {

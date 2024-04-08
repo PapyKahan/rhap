@@ -10,13 +10,12 @@ use super::{
     api::{com_initialize, AudioClient, ShareMode, WaveFormat},
     stream::Streamer,
 };
-use crate::audio::{Capabilities, DeviceTrait, StreamParams, StreamingCommand, StreamingData};
+use crate::audio::{Capabilities, DeviceTrait, StreamParams, StreamingData};
 
 pub struct Device {
     default_device_id: String,
     inner_device: IMMDevice,
-    stream_thread_handle: Option<tokio::task::JoinHandle<Result<()>>>,
-    command: Option<Sender<StreamingCommand>>,
+    stream_thread_handle: Option<tokio::task::JoinHandle<Result<()>>>
 }
 
 impl Device {
@@ -25,7 +24,6 @@ impl Device {
             inner_device,
             default_device_id,
             stream_thread_handle: Option::None,
-            command: Option::None,
         })
     }
 
@@ -113,8 +111,6 @@ impl DeviceTrait for Device {
 
     fn start(&mut self, params: &StreamParams) -> Result<Sender<StreamingData>> {
         self.stop()?;
-        let (command_tx, _) = channel::<StreamingCommand>(32);
-        self.command = Some(command_tx);
         let buffer = params.channels as usize
             * ((params.bits_per_sample as usize * params.samplerate as usize) / 8 as usize);
         let (data_tx, data_rx) = channel::<StreamingData>(buffer);
@@ -130,23 +126,14 @@ impl DeviceTrait for Device {
     }
 
     fn pause(&mut self) -> Result<()> {
-        if let Some(command) = self.command.take() {
-            command.blocking_send(StreamingCommand::Pause)?;
-        }
         Ok(())
     }
 
     fn resume(&mut self) -> Result<()> {
-        if let Some(command) = self.command.take() {
-            command.blocking_send(StreamingCommand::Resume)?;
-        }
         Ok(())
     }
 
     fn stop(&mut self) -> Result<()> {
-        if let Some(command) = self.command.take() {
-            drop(command);
-        }
         if let Some(handle) = self.stream_thread_handle.take() {
             handle.abort_handle().abort();
         }

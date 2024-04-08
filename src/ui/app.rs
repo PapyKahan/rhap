@@ -75,7 +75,7 @@ impl App {
                             if key.kind == event::KeyEventKind::Press {
                                 match key.code {
                                     KeyCode::Char('q') => {
-                                        playlist.borrow_mut().stop()?;
+                                        playlist.borrow_mut().stop().await?;
                                         return Ok(());},
                                     KeyCode::Char('o') => {
                                         self.output_selector.borrow_mut().refresh_device_list()?;
