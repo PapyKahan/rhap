@@ -39,7 +39,6 @@ impl Streamer {
         let _thread_priority = ThreadPriority::new()?;
         let mut buffer = vec![];
         let mut client_started = false;
-
         let mut available_buffer_size = self.client.get_buffer_size();
         loop {
             if let Some(streaming_data) = self.receiver.recv().await {
