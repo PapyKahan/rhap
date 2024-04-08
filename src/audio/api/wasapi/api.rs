@@ -3,6 +3,7 @@ use log::debug;
 use log::error;
 use num_integer::Integer;
 use std::cmp;
+use std::time::Duration;
 use windows::core::w;
 use windows::Win32::Foundation::E_INVALIDARG;
 use windows::Win32::Media::Audio::IMMDevice;
@@ -45,6 +46,9 @@ use windows::{
 };
 
 use crate::audio::{BitsPerSample, StreamParams};
+
+const REFTIMES_PER_MILLISEC: u64 = 10000;
+const REFTIMES_PER_SEC: u64 = 10000000;
 
 thread_local! {
     static WASAPI_COM_INIT: ComWasapi = {
@@ -93,7 +97,6 @@ pub struct AudioClient {
     inner_client: IAudioClient,
     format: WaveFormat,
     renderer: Option<AudioRenderClient>,
-    period: Option<i64>,
     max_buffer_frames: usize,
     sharemode: ShareMode,
 }
@@ -123,8 +126,15 @@ impl AudioClient {
         Ok(())
     }
 
-    pub fn get_period(&self) -> i64 {
-        self.period.unwrap_or(0)
+    pub fn wait_for_buffer(&self) -> Result<()> {
+        loop {
+            *available_buffer_size = self.get_available_buffer_size()?;
+            if *available_buffer_size >= (self.max_buffer_frames * self.format.get_block_align() as usize) / 4 {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        Ok(())
     }
 
     fn is_supported_exclusive(&self, format: WaveFormat) -> Result<WaveFormat> {
@@ -193,8 +203,8 @@ impl AudioClient {
         };
         let period_alignment_frames = period_alignment_bytes as i64 / frame_bytes as i64;
         let desired_period_frames =
-            (adjusted_period as f64 * self.format.0.Format.nSamplesPerSec as f64 / 10000000.0).round()
-                as i64;
+            (adjusted_period as f64 * self.format.0.Format.nSamplesPerSec as f64 / 10000000.0)
+                .round() as i64;
         let min_period_frames = (min_period as f64 * self.format.0.Format.nSamplesPerSec as f64
             / 10000000.0)
             .ceil() as i64;
@@ -339,11 +349,6 @@ impl AudioClient {
         Ok(size)
     }
 
-    pub(crate) fn get_samples_per_sec(&self) -> u32 {
-        self.format.get_samples_per_sec()
-    }
-
-
     pub(crate) fn new(device: &IMMDevice, params: &StreamParams) -> Result<AudioClient> {
         com_initialize();
         let sharemode = match params.exclusive {
@@ -354,7 +359,6 @@ impl AudioClient {
         Ok(AudioClient {
             inner_client,
             format: WaveFormat::from(params),
-            period: None,
             renderer: None,
             sharemode,
             max_buffer_frames: 0,
