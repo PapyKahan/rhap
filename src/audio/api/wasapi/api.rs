@@ -126,17 +126,6 @@ impl AudioClient {
         Ok(())
     }
 
-    pub fn wait_for_buffer(&self) -> Result<()> {
-        loop {
-            *available_buffer_size = self.get_available_buffer_size()?;
-            if *available_buffer_size >= (self.max_buffer_frames * self.format.get_block_align() as usize) / 4 {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(1));
-        }
-        Ok(())
-    }
-
     fn is_supported_exclusive(&self, format: WaveFormat) -> Result<WaveFormat> {
         let first_test = unsafe {
             self.inner_client
@@ -330,14 +319,6 @@ impl AudioClient {
         })
     }
 
-    pub(crate) fn get_max_buffer_frames(&self) -> usize {
-        self.max_buffer_frames
-    }
-
-    pub(crate) fn get_max_buffer_size(&self) -> usize {
-        self.max_buffer_frames * self.format.get_block_align() as usize
-    }
-
     pub(crate) fn get_available_buffer_frames(&self) -> Result<usize> {
         let padding_count = unsafe { self.inner_client.GetCurrentPadding()? as usize };
         let frames = self.max_buffer_frames - padding_count;
@@ -345,8 +326,14 @@ impl AudioClient {
     }
 
     pub(crate) fn get_available_buffer_size(&self) -> Result<usize> {
-        let size = self.get_available_buffer_frames()? * self.format.get_block_align() as usize;
-        Ok(size)
+        loop {
+            let available_buffer_size = self.get_available_buffer_frames()? * self.format.get_block_align() as usize;
+            if available_buffer_size >= (self.max_buffer_frames * self.format.get_block_align() as usize) / 4
+            {
+                return Ok(available_buffer_size);
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
     }
 
     pub(crate) fn new(device: &IMMDevice, params: &StreamParams) -> Result<AudioClient> {

@@ -44,10 +44,6 @@ impl Streamer {
         let mut client_started = false;
 
         let mut available_buffer_size = self.client.get_available_buffer_size()?;
-        //let samples_per_sec = self.client.get_samples_per_sec();
-        //let max_buffer_size = self.client.get_max_buffer_size();
-        //let actual_duration =
-        //    REFTIMES_PER_SEC * self.client.get_max_buffer_frames() as u64 / samples_per_sec as u64;
         loop {
             if let Some(streaming_data) = self.receiver.recv().await {
                 let data = match streaming_data {
@@ -76,7 +72,6 @@ impl Streamer {
             }
         }
         self.client.write(buffer.as_slice())?;
-        self.client.wait_for_buffer()?;
         self.stop()
     }
 }
