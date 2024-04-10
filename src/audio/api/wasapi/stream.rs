@@ -53,18 +53,15 @@ impl Streamer {
 
                 self.client.write(buffer.as_slice())?;
                 buffer.clear();
-
                 if !client_started {
                     self.client.start()?;
                     client_started = true;
                 }
-
-                available_buffer_size = self.client.get_available_buffer_size()?;
+                self.client.wait_for_buffer(&mut available_buffer_size)?;
             } else {
                 break;
             }
         }
-        self.client.write(buffer.as_slice())?;
         self.stop()
     }
 }

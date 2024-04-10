@@ -107,7 +107,7 @@ impl Drop for AudioClient {
     fn drop(&mut self) {
         unsafe {
             let _ = self.inner_client.Stop();
-            //let _ = self.inner_client.Reset();
+            let _ = self.inner_client.Reset();
         }
     }
 }
@@ -335,20 +335,20 @@ impl AudioClient {
         self.max_buffer_frames * self.format.get_block_align() as usize
     }
 
-    pub(crate) fn get_available_buffer_size(&self) -> Result<usize> {
+    pub(crate) fn wait_for_buffer(&self, available_buffer_size: &mut usize) -> Result<()> {
         if !self.pollmode {
             if let Some(event) = &self.eventhandle {
                 event.wait_for_event(1000)?;
             }
-            return Ok(self.get_buffer_size());
+            return Ok(());
         } else {
             loop {
-                let available_buffer_size =
+                *available_buffer_size =
                     self.get_available_buffer_frames()? * self.format.get_block_align() as usize;
-                if available_buffer_size
+                if *available_buffer_size
                     >= (self.max_buffer_frames * self.format.get_block_align() as usize) / 4
                 {
-                    return Ok(available_buffer_size);
+                    return Ok(());
                 }
                 std::thread::sleep(Duration::from_millis(1));
             }
