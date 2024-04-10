@@ -113,14 +113,14 @@ impl Drop for AudioClient {
 }
 
 impl AudioClient {
-    pub fn is_supported(&self, format: WaveFormat, share_mode: &ShareMode) -> Result<WaveFormat> {
+    pub(crate) fn is_supported(&self, format: WaveFormat, share_mode: &ShareMode) -> Result<WaveFormat> {
         match share_mode {
             ShareMode::Exclusive => self.is_supported_exclusive(format),
             ShareMode::Shared => self.is_supported_shared(format),
         }
     }
 
-    pub fn write(&self, data: &[u8]) -> Result<()> {
+    pub(crate) fn write(&self, data: &[u8]) -> Result<()> {
         if let Some(renderer) = &self.renderer {
             let frames = data.len() / self.format.get_block_align() as usize;
             renderer.write(frames, self.format.get_block_align() as usize, data, None)?;
@@ -312,7 +312,7 @@ impl AudioClient {
         Ok(())
     }
 
-    pub(crate) fn get_renderer(&self) -> Result<AudioRenderClient> {
+    fn get_renderer(&self) -> Result<AudioRenderClient> {
         Ok(AudioRenderClient(unsafe {
             self.inner_client.GetService::<IAudioRenderClient>()?
         }))
@@ -326,9 +326,7 @@ impl AudioClient {
     }
 
     fn get_available_buffer_frames(&self) -> Result<usize> {
-        let padding_count = unsafe { self.inner_client.GetCurrentPadding()? as usize };
-        let frames = self.max_buffer_frames - padding_count;
-        Ok(frames)
+        Ok(self.max_buffer_frames - unsafe { self.inner_client.GetCurrentPadding()? as usize })
     }
 
     pub(crate) fn get_buffer_size(&self) -> usize {
@@ -378,7 +376,7 @@ impl AudioClient {
         Ok(())
     }
 
-    pub(crate) fn set_get_eventhandle(&self) -> Result<EventHandle> {
+    fn set_get_eventhandle(&self) -> Result<EventHandle> {
         let handle = unsafe { CreateEventA(None, false, false, PCSTR::null())? };
         unsafe { self.inner_client.SetEventHandle(handle)? };
         Ok(EventHandle(handle))
@@ -387,7 +385,7 @@ impl AudioClient {
 
 pub struct EventHandle(HANDLE);
 impl EventHandle {
-    pub(crate) fn wait_for_event(&self, timeout: u32) -> Result<()> {
+    fn wait_for_event(&self, timeout: u32) -> Result<()> {
         let retval = unsafe { WaitForSingleObject(self.0, timeout) };
         if retval.0 != WAIT_OBJECT_0.0 {
             return Err(anyhow!("Wait timed out"));
@@ -399,14 +397,14 @@ impl EventHandle {
 pub struct AudioRenderClient(IAudioRenderClient);
 impl AudioRenderClient {
     #[inline(always)]
-    pub(crate) fn write(
+    fn write(
         &self,
-        available_frames: usize,
+        frames: usize,
         n_block_align: usize,
         data: &[u8],
         buffer_flags: Option<u32>,
     ) -> Result<()> {
-        let nbr_bytes = available_frames * n_block_align;
+        let nbr_bytes = frames * n_block_align;
         if nbr_bytes > data.len() {
             return Err(anyhow!(
                 "Wrong length of data, got {}, expected {}",
@@ -419,9 +417,9 @@ impl AudioRenderClient {
             None => 0,
         };
         unsafe {
-            let buffer_ptr = self.0.GetBuffer(available_frames as u32)?;
+            let buffer_ptr = self.0.GetBuffer(frames as u32)?;
             std::ptr::copy_nonoverlapping(data.as_ptr(), buffer_ptr, nbr_bytes);
-            self.0.ReleaseBuffer(available_frames as u32, flags)?;
+            self.0.ReleaseBuffer(frames as u32, flags)?;
         }
         Ok(())
     }
@@ -432,7 +430,8 @@ impl AudioRenderClient {
 pub struct WaveFormat(WAVEFORMATEXTENSIBLE);
 
 impl WaveFormat {
-    pub fn new(bits_per_sample: BitsPerSample, samplerate: usize, channels: usize) -> Self {
+    #[inline(always)]
+    pub(crate) fn new(bits_per_sample: BitsPerSample, samplerate: usize, channels: usize) -> Self {
         let blockalign = channels * bits_per_sample as usize / 8;
         let byterate = samplerate * blockalign;
 
@@ -479,6 +478,7 @@ impl WaveFormat {
     }
 
     /// convert from [WAVEFORMATEX](https://docs.microsoft.com/en-us/previous-versions/dd757713(v=vs.85)) structure
+    #[inline(always)]
     fn from_waveformatex(wavefmt: WAVEFORMATEX) -> Result<Self> {
         let bits_per_sample = BitsPerSample::from(wavefmt.wBitsPerSample as usize);
         let samplerate = wavefmt.nSamplesPerSec as usize;
@@ -486,16 +486,18 @@ impl WaveFormat {
         Ok(WaveFormat::new(bits_per_sample, samplerate, channels))
     }
 
-    pub(crate) fn get_samples_per_sec(&self) -> u32 {
+    #[inline(always)]
+    fn get_samples_per_sec(&self) -> u32 {
         self.0.Format.nSamplesPerSec
     }
 
     #[inline(always)]
-    pub(crate) fn get_block_align(&self) -> u16 {
+    fn get_block_align(&self) -> u16 {
         self.0.Format.nBlockAlign
     }
 
-    pub(crate) fn get_format(&self) -> &WAVEFORMATEX {
+    #[inline(always)]
+    fn get_format(&self) -> &WAVEFORMATEX {
         &self.0.Format
     }
 }
