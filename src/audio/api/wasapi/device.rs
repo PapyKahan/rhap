@@ -18,8 +18,14 @@ pub struct Device {
     stream_thread_handle: Option<tokio::task::JoinHandle<Result<()>>>
 }
 
+impl StreamParams {
+    fn create_wave_format(&self) -> WaveFormat {
+        WaveFormat::new(self.bits_per_sample, self.samplerate as usize, self.channels as usize)
+    }
+}
+
 impl Device {
-    pub(super) fn new(inner_device: IMMDevice, default_device_id: String) -> Result<Self> {
+    pub(crate) fn new(inner_device: IMMDevice, default_device_id: String) -> Result<Self> {
         Ok(Self {
             inner_device,
             default_device_id,
@@ -27,7 +33,7 @@ impl Device {
         })
     }
 
-    pub(super) fn get_id(&self) -> Result<String> {
+    pub(crate) fn get_id(&self) -> Result<String> {
         Ok(unsafe { self.inner_device.GetId()?.to_string()? })
     }
 
@@ -53,7 +59,7 @@ impl Device {
                     pollmode: false
                 };
                 let client = self.get_client(&params)?;
-                let wave_format = WaveFormat::new(bits_per_sample, samplerate as usize, 2);
+                let wave_format = params.create_wave_format();
                 let sharemode = match params.exclusive {
                     true => ShareMode::Exclusive,
                     false => ShareMode::Shared,

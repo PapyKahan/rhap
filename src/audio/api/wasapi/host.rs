@@ -1,7 +1,12 @@
 use super::{api::com_initialize, device::Device};
 use crate::audio::HostTrait;
-use anyhow::{anyhow, Result};
-use windows::Win32::{Media::Audio::{eRender, eMultimedia, MMDeviceEnumerator, IMMDeviceEnumerator, DEVICE_STATE_ACTIVE}, System::Com::{CLSCTX_ALL, CoCreateInstance}};
+use anyhow::Result;
+use windows::Win32::{
+    Media::Audio::{
+        eMultimedia, eRender, IMMDeviceEnumerator, MMDeviceEnumerator, DEVICE_STATE_ACTIVE,
+    },
+    System::Com::{CoCreateInstance, CLSCTX_ALL},
+};
 
 #[derive(Clone, Copy)]
 pub struct Host {}
@@ -27,18 +32,16 @@ impl HostTrait for Host {
         let enumerator: IMMDeviceEnumerator =
             unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
 
-        let devices_collection = unsafe { enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)? };
-        
+        let devices_collection =
+            unsafe { enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)? };
+
         let default_device = Self::get_default_device()?;
-        let default_device_id = default_device
-            .get_id()
-            .map_err(|e| anyhow!("Device::get_id failed: {}", e))?;
+        let default_device_id = default_device.get_id()?;
         let device = match id {
-            Some(index) => {
-                Device::new(unsafe {
-                    devices_collection.Item(index)?
-                }, default_device_id)?
-        },
+            Some(index) => Device::new(
+                unsafe { devices_collection.Item(index)? },
+                default_device_id,
+            )?,
             _ => default_device,
         };
         Ok(crate::audio::Device::Wasapi(device))
@@ -46,17 +49,18 @@ impl HostTrait for Host {
 
     fn get_devices(&self) -> Result<Vec<crate::audio::Device>> {
         com_initialize();
-        let enumerator : IMMDeviceEnumerator = unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
-        let devices_collection = unsafe { enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)? };
+        let enumerator: IMMDeviceEnumerator =
+            unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
+        let devices_collection =
+            unsafe { enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)? };
         let default_device = Self::get_default_device()?;
         let default_device_id = default_device.get_id()?;
 
         let mut enumerated_devices: Vec<crate::audio::Device> = vec![];
-        
-        for i in 0..unsafe { devices_collection.GetCount()? }
-        {
+
+        for i in 0..unsafe { devices_collection.GetCount()? } {
             let inner_device = unsafe { devices_collection.Item(i)? };
-            let device = Device::new( inner_device, default_device_id.clone())?;
+            let device = Device::new(inner_device, default_device_id.clone())?;
             enumerated_devices.push(crate::audio::Device::Wasapi(device));
         }
         Ok(enumerated_devices)
@@ -66,3 +70,4 @@ impl HostTrait for Host {
         Ok(crate::audio::Device::Wasapi(Self::get_default_device()?))
     }
 }
+
