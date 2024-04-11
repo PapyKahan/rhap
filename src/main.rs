@@ -31,6 +31,8 @@ struct Cli {
     path: Option<PathBuf>,
     #[clap(short, long)]
     device: Option<u32>,
+    #[clap(long, default_value_t = false)]
+    pollmode: bool,
 }
 
 #[tokio::main]
@@ -67,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let host = Host::new("wasapi");
-    let player = Player::new(host, cli.device)?;
+    let player = Player::new(host, cli.device, cli.pollmode)?;
     tokio::spawn(async move {
         tokio::signal::ctrl_c()
             .await

@@ -20,6 +20,7 @@ pub struct Player {
     current_device: Option<Device>,
     host: Host,
     device_id: Option<u32>,
+    pollmode: bool,
     previous_stream: Option<Sender<StreamingData>>,
     streaming_handle: Option<JoinHandle<Result<()>>>,
     is_playing: Arc<AtomicBool>,
@@ -39,11 +40,12 @@ impl CurrentTrackInfo {
 }
 
 impl Player {
-    pub fn new(host: Host, device_id: Option<u32>) -> Result<Self> {
+    pub fn new(host: Host, device_id: Option<u32>, pollmode: bool) -> Result<Self> {
         Ok(Player {
             current_device: None,
             host,
             device_id,
+            pollmode,
             previous_stream: None,
             streaming_handle: None,
             is_playing: Arc::new(AtomicBool::new(false)),
@@ -81,7 +83,7 @@ impl Player {
             channels: song.channels as u8,
             bits_per_sample: song.bits_per_sample,
             exclusive: true,
-            pollmode: true
+            pollmode: self.pollmode,
         };
         let mut device = self.host.create_device(self.device_id)?;
         let streamparams = device.adjust_stream_params(&streamparams)?;
