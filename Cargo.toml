@@ -17,12 +17,12 @@ walkdir = "2.5.0"
 num-integer = "0.1.46"
 
 [dependencies.ratatui]
-version = "0.26.1"
+version = "0.26.2"
 default-features = false
 features = ["crossterm", "all-widgets", "macros"]
 
 [dependencies.windows]
-version = "0.54.0"
+version = "0.56.0"
 features = [
     "Win32_Foundation",
     "Win32_Security",
