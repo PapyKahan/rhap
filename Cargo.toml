@@ -11,7 +11,7 @@ crossterm = "0.27.0"
 log = "0.4.21"
 rand = "0.8.5"
 rubato = { version = "0.15.0", features = ["fft_resampler", "realfft", "num-complex"] }
-symphonia = { version = "0.5.4", features = ["all-formats", "all-codecs"] }
+symphonia = { version = "0.5.4", features = ["all-formats", "all-codecs", "opt-simd-avx"] }
 tokio = { version = "1.37.0", features = ["full"] }
 walkdir = "2.5.0"
 num-integer = "0.1.46"

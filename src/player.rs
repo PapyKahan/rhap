@@ -2,7 +2,7 @@ use anyhow::Result;
 use log::error;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use symphonia::core::audio::RawSampleBuffer;
+use symphonia::core::audio::{AudioBufferRef, RawSampleBuffer, SignalSpec};
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{SeekMode, SeekTo};
 use symphonia::core::sample::i24;
@@ -36,6 +36,164 @@ pub struct CurrentTrackInfo {
 impl CurrentTrackInfo {
     pub fn is_streaming(&self) -> bool {
         self.is_streaming.load(Ordering::Relaxed)
+    }
+}
+
+enum StreamBuffer {
+    I8(RawSampleBuffer<i8>),
+    I16(RawSampleBuffer<i16>),
+    I24(RawSampleBuffer<i24>),
+    F32(RawSampleBuffer<f32>),
+}
+
+impl StreamBuffer {
+    pub fn new(bits_per_sample: BitsPerSample, duration: u64, spec: SignalSpec) -> Self {
+        match bits_per_sample {
+            BitsPerSample::Bits8 => StreamBuffer::I8(RawSampleBuffer::<i8>::new(duration, spec)),
+            BitsPerSample::Bits16 => StreamBuffer::I16(RawSampleBuffer::<i16>::new(duration, spec)),
+            BitsPerSample::Bits24 => StreamBuffer::I24(RawSampleBuffer::<i24>::new(duration, spec)),
+            BitsPerSample::Bits32 => StreamBuffer::F32(RawSampleBuffer::<f32>::new(duration, spec)),
+        }
+    }
+
+    pub fn copy_interleaved_ref(&mut self, decoded: AudioBufferRef<'_>) {
+        match self {
+            StreamBuffer::I8(buffer) => buffer.copy_interleaved_ref(decoded),
+            StreamBuffer::I16(buffer) => buffer.copy_interleaved_ref(decoded),
+            StreamBuffer::I24(buffer) => buffer.copy_interleaved_ref(decoded),
+            StreamBuffer::F32(buffer) => buffer.copy_interleaved_ref(decoded),
+        }
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        match self {
+            StreamBuffer::I8(buffer) => buffer.as_bytes(),
+            StreamBuffer::I16(buffer) => buffer.as_bytes(),
+            StreamBuffer::I24(buffer) => buffer.as_bytes(),
+            StreamBuffer::F32(buffer) => buffer.as_bytes(),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        match self {
+            StreamBuffer::I8(buffer) => buffer.clear(),
+            StreamBuffer::I16(buffer) => buffer.clear(),
+            StreamBuffer::I24(buffer) => buffer.clear(),
+            StreamBuffer::F32(buffer) => buffer.clear(),
+        }
+    }
+}
+
+enum Resampler {
+    I8(ResamplerUtil<i8>),
+    I16(ResamplerUtil<i16>),
+    I24(ResamplerUtil<i24>),
+    F32(ResamplerUtil<f32>),
+}
+
+impl Resampler {
+    pub fn new(
+        bits_per_sample: BitsPerSample,
+        spec: &SignalSpec,
+        samplerate: usize,
+        duration: u64,
+    ) -> Self {
+        match bits_per_sample {
+            BitsPerSample::Bits8 => {
+                Resampler::I8(ResamplerUtil::<i8>::new(spec, samplerate, duration))
+            }
+            BitsPerSample::Bits16 => {
+                Resampler::I16(ResamplerUtil::<i16>::new(spec, samplerate, duration))
+            }
+            BitsPerSample::Bits24 => {
+                Resampler::I24(ResamplerUtil::<i24>::new(spec, samplerate, duration))
+            }
+            BitsPerSample::Bits32 => {
+                Resampler::F32(ResamplerUtil::<f32>::new(spec, samplerate, duration))
+            }
+        }
+    }
+
+    pub async fn send_resampled_data(
+        &mut self,
+        decoded: AudioBufferRef<'_>,
+        streamer: &Sender<StreamingData>,
+    ) -> Result<()> {
+        match self {
+            Resampler::I8(resampler) => {
+                if let Some(buffer) = resampler.resample(decoded) {
+                    for i in buffer.iter() {
+                        for j in i.to_ne_bytes().iter() {
+                            streamer.send(StreamingData::Data(*j)).await?
+                        }
+                    }
+                }
+                if let Some(buffer) = resampler.flush() {
+                    for i in buffer.iter() {
+                        for j in i.to_ne_bytes().iter() {
+                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            Resampler::I16(resampler) => {
+                if let Some(buffer) = resampler.resample(decoded) {
+                    for i in buffer.iter() {
+                        for j in i.to_ne_bytes().iter() {
+                            streamer.send(StreamingData::Data(*j)).await?
+                        }
+                    }
+                }
+                if let Some(buffer) = resampler.flush() {
+                    for i in buffer.iter() {
+                        for j in i.to_ne_bytes().iter() {
+                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            Resampler::I24(resampler) => {
+                if let Some(buffer) = resampler.resample(decoded) {
+                    for i in buffer.iter() {
+                        for j in i.to_ne_bytes().iter() {
+                            streamer.send(StreamingData::Data(*j)).await?
+                        }
+                    }
+                }
+                if let Some(buffer) = resampler.flush() {
+                    for i in buffer.iter() {
+                        for j in i.to_ne_bytes().iter() {
+                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            Resampler::F32(resampler) => {
+                if let Some(buffer) = resampler.resample(decoded) {
+                    for i in buffer.iter() {
+                        for j in i.to_ne_bytes().iter() {
+                            streamer.send(StreamingData::Data(*j)).await?
+                        }
+                    }
+                }
+                if let Some(buffer) = resampler.flush() {
+                    for i in buffer.iter() {
+                        for j in i.to_ne_bytes().iter() {
+                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -108,9 +266,9 @@ impl Player {
             let mut decoder = song.decoder.lock().await;
             decoder.reset();
             is_playing.store(true, Ordering::Relaxed);
-
-            let mut previous_duration = u64::default();
             if let Some(streamer) = stream {
+                let mut buffer: Option<StreamBuffer> = None;
+                let mut resampler: Option<Resampler> = None;
                 loop {
                     if !is_playing.load(Ordering::Relaxed) {
                         break;
@@ -137,183 +295,29 @@ impl Player {
                             break;
                         }
                     };
-                    progress.store(
-                        progress.load(Ordering::Relaxed) + packet.dur,
-                        Ordering::Relaxed,
-                    );
-
+                    progress.store(progress.load(Ordering::Relaxed) + packet.dur, Ordering::Relaxed);
                     let decoded = decoder.decode(&packet)?;
                     let spec = decoded.spec();
                     let duration = decoded.capacity() as u64;
-                    match streamparams.bits_per_sample {
-                        BitsPerSample::Bits8 => {
-                            let mut resampler: Option<ResamplerUtil<i8>> = None;
-                            if previous_duration != duration {
-                                previous_duration = duration;
-                                resampler = None;
-                            }
-                            if song.sample != streamparams.samplerate {
-                                let r = resampler.get_or_insert_with(|| {
-                                    crate::tools::ResamplerUtil::<i8>::new(
-                                        spec,
-                                        streamparams.samplerate as usize,
-                                        duration,
-                                    )
-                                });
-                                if let Some(buffer) = r.resample(decoded) {
-                                    for i in buffer.iter() {
-                                        for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
-                                            {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                                if let Some(buffer) = r.flush() {
-                                    for i in buffer.iter() {
-                                        for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
-                                            {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                let mut sample_buffer = RawSampleBuffer::<i8>::new(duration, *spec);
-                                sample_buffer.copy_interleaved_ref(decoded);
-                                for i in sample_buffer.as_bytes().iter() {
-                                    if streamer.send(StreamingData::Data(*i)).await.is_err() {
-                                        break;
-                                    }
-                                }
+                    let sample_buffer = buffer.get_or_insert_with(|| {
+                        StreamBuffer::new(streamparams.bits_per_sample, duration, *spec)
+                    });
+                    let resampled_sender = resampler.get_or_insert_with(|| {
+                        Resampler::new(streamparams.bits_per_sample, spec, streamparams.samplerate as usize, duration)
+                    });
+                    sample_buffer.clear();
+                    if song.sample != streamparams.samplerate {
+                        if resampled_sender.send_resampled_data(decoded, &streamer).await.is_err() {
+                            break;
+                        }
+                    } else {
+                        sample_buffer.copy_interleaved_ref(decoded);
+                        for i in sample_buffer.as_bytes().iter() {
+                            if streamer.send(StreamingData::Data(*i)).await.is_err() {
+                                break;
                             }
                         }
-                        BitsPerSample::Bits16 => {
-                            let mut resampler: Option<ResamplerUtil<i16>> = None;
-                            if song.sample != streamparams.samplerate {
-                                let r = resampler.get_or_insert_with(|| {
-                                    crate::tools::ResamplerUtil::<i16>::new(
-                                        spec,
-                                        streamparams.samplerate as usize,
-                                        duration,
-                                    )
-                                });
-                                if let Some(buffer) = r.resample(decoded) {
-                                    for i in buffer.iter() {
-                                        for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
-                                            {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                                if let Some(buffer) = r.flush() {
-                                    for i in buffer.iter() {
-                                        for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
-                                            {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                let mut sample_buffer =
-                                    RawSampleBuffer::<i16>::new(duration, *spec);
-                                sample_buffer.copy_interleaved_ref(decoded);
-                                for i in sample_buffer.as_bytes().iter() {
-                                    if streamer.send(StreamingData::Data(*i)).await.is_err() {
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        BitsPerSample::Bits24 => {
-                            let mut resampler: Option<ResamplerUtil<i24>> = None;
-                            if song.sample != streamparams.samplerate {
-                                let r = resampler.get_or_insert_with(|| {
-                                    crate::tools::ResamplerUtil::<i24>::new(
-                                        spec,
-                                        streamparams.samplerate as usize,
-                                        duration,
-                                    )
-                                });
-                                if let Some(buffer) = r.resample(decoded) {
-                                    for i in buffer.iter() {
-                                        for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
-                                            {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                                if let Some(buffer) = r.flush() {
-                                    for i in buffer.iter() {
-                                        for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
-                                            {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                let mut sample_buffer =
-                                    RawSampleBuffer::<i24>::new(duration, *spec);
-                                sample_buffer.copy_interleaved_ref(decoded);
-                                for i in sample_buffer.as_bytes().iter() {
-                                    if streamer.send(StreamingData::Data(*i)).await.is_err() {
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        BitsPerSample::Bits32 => {
-                            let mut resampler: Option<ResamplerUtil<f32>> = None;
-                            if song.sample != streamparams.samplerate {
-                                let r = resampler.get_or_insert_with(|| {
-                                    crate::tools::ResamplerUtil::<f32>::new(
-                                        spec,
-                                        streamparams.samplerate as usize,
-                                        duration,
-                                    )
-                                });
-                                if let Some(buffer) = r.resample(decoded) {
-                                    for i in buffer.iter() {
-                                        for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
-                                            {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                                if let Some(buffer) = r.flush() {
-                                    for i in buffer.iter() {
-                                        for j in i.to_ne_bytes().iter() {
-                                            if streamer.send(StreamingData::Data(*j)).await.is_err()
-                                            {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                let mut sample_buffer =
-                                    RawSampleBuffer::<f32>::new(duration, *spec);
-                                sample_buffer.copy_interleaved_ref(decoded);
-                                for i in sample_buffer.as_bytes().iter() {
-                                    if streamer.send(StreamingData::Data(*i)).await.is_err() {
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    };
+                    }
                 }
                 streamer.send(StreamingData::EndOfStream).await?;
                 streamer.closed().await;
