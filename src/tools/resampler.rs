@@ -6,12 +6,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //
 
-use rubato::{calculate_cutoff, Resampler, SincInterpolationParameters, SincInterpolationType, WindowFunction};
+use rubato::Resampler;
 use symphonia::core::audio::{AudioBuffer, AudioBufferRef, Signal, SignalSpec};
 use symphonia::core::conv::{FromSample, IntoSample};
 use symphonia::core::sample::Sample;
-
-use rubato::sinc_interpolator::sinc_interpolator_avx::AvxInterpolator;
+use anyhow::Result;
 
 pub struct ResamplerUtil<T> {
     resampler: rubato::FftFixedIn<f32>,
@@ -40,9 +39,9 @@ where
         }
 
         // Remove consumed samples from the input buffer.
-        for channel in self.input.iter_mut() {
+        self.input.iter_mut().for_each(|channel| {
             channel.drain(0..self.duration);
-        }
+        });
 
         // Interleave the planar samples from Rubato.
         let num_channels = self.output.len();
@@ -64,7 +63,7 @@ impl<T> ResamplerUtil<T>
 where
     T: Sample + FromSample<f32> + IntoSample<f32>,
 {
-    pub fn new(spec: &SignalSpec, to_sample_rate: usize, duration: u64) -> Self {
+    pub fn new(spec: &SignalSpec, to_sample_rate: usize, duration: u64) -> Result<Self> {
         let duration = duration as usize;
         let num_channels = 2;
 
@@ -91,7 +90,7 @@ where
         } else {
             duration / (to_sample_rate / spec.rate as usize)
         };
-        
+
         //let resampler = rubato::SincFixedIn::<f32>::new(ratio, 1.0, params, duration, num_channels).unwrap();
         //let avx = AvxInterpolator::new(sinc_len, oversampling_factor, f_cutoff, window).unwrap();
         //let interpolator = Box::new(avx);
@@ -103,19 +102,18 @@ where
             duration,
             subchunk_size,
             num_channels,
-        )
-        .unwrap();
+        )?;
 
         let output_buffer = resampler.output_buffer_allocate(true);
         let input_buffer = vec![Vec::with_capacity(duration); num_channels];
 
-        Self {
+        Ok(Self {
             resampler,
             input: input_buffer,
             output: output_buffer,
             duration,
             interleaved: Default::default(),
-        }
+        })
     }
 
     /// Resamples a planar/non-interleaved input.

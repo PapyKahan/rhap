@@ -97,19 +97,19 @@ impl Resampler {
         spec: &SignalSpec,
         samplerate: usize,
         duration: u64,
-    ) -> Self {
+    ) -> Result<Self> {
         match bits_per_sample {
             BitsPerSample::Bits8 => {
-                Resampler::I8(ResamplerUtil::<i8>::new(spec, samplerate, duration))
+                Ok(Resampler::I8(ResamplerUtil::<i8>::new(spec, samplerate, duration)?))
             }
             BitsPerSample::Bits16 => {
-                Resampler::I16(ResamplerUtil::<i16>::new(spec, samplerate, duration))
+                Ok(Resampler::I16(ResamplerUtil::<i16>::new(spec, samplerate, duration)?))
             }
             BitsPerSample::Bits24 => {
-                Resampler::I24(ResamplerUtil::<i24>::new(spec, samplerate, duration))
+                Ok(Resampler::I24(ResamplerUtil::<i24>::new(spec, samplerate, duration)?))
             }
             BitsPerSample::Bits32 => {
-                Resampler::F32(ResamplerUtil::<f32>::new(spec, samplerate, duration))
+                Ok(Resampler::F32(ResamplerUtil::<f32>::new(spec, samplerate, duration)?))
             }
         }
     }
@@ -303,7 +303,7 @@ impl Player {
                         StreamBuffer::new(streamparams.bits_per_sample, duration, *spec)
                     });
                     let resampled_sender = resampler.get_or_insert_with(|| {
-                        Resampler::new(streamparams.bits_per_sample, spec, streamparams.samplerate as usize, duration)
+                        Resampler::new(streamparams.bits_per_sample, spec, streamparams.samplerate as usize, duration).unwrap()
                     });
                     sample_buffer.clear();
                     if song.sample != streamparams.samplerate {
