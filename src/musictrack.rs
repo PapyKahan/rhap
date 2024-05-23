@@ -3,16 +3,17 @@ use std::sync::Arc;
 use symphonia::core::{
     audio::Layout,
     codecs::{Decoder, DecoderOptions},
-    formats::{FormatReader, Track},
+    formats::FormatReader,
     io::MediaSourceStream,
     meta::{MetadataRevision, StandardTagKey},
     probe::Hint,
+    units::Time,
 };
 use tokio::sync::Mutex;
 
 use crate::audio::{BitsPerSample, SampleRate};
 
-pub struct Song {
+pub struct MusicTrack {
     pub format: Arc<Mutex<Box<dyn FormatReader>>>,
     pub decoder: Arc<Mutex<Box<dyn Decoder>>>,
     pub sample: SampleRate,
@@ -20,11 +21,10 @@ pub struct Song {
     pub bits_per_sample: BitsPerSample,
     pub title: String,
     pub artist: String,
-    pub duration: u64,
-    track: Track,
+    pub duration: Time,
 }
 
-impl Song {
+impl MusicTrack {
     pub fn new(path: String) -> Result<Self> {
         let source = std::fs::File::open(path.clone())?;
         let mss = MediaSourceStream::new(Box::new(source), Default::default());
@@ -63,7 +63,10 @@ impl Song {
             .value
             .to_string();
         let duration = track
-            .codec_params.time_base.unwrap_or(Default::default()).calc_time(track.codec_params.n_frames.unwrap_or(0)).seconds;
+            .codec_params
+            .time_base
+            .unwrap_or(Default::default())
+            .calc_time(track.codec_params.n_frames.unwrap_or(0));
 
         // Create a decoder for the track.
         let decoder = symphonia::default::get_codecs()
@@ -78,7 +81,6 @@ impl Song {
             title,
             artist,
             duration,
-            track,
         })
     }
 
@@ -91,26 +93,21 @@ impl Song {
     }
 
     pub fn formated_duration(&self) -> String {
-        if let Some(tb) = self.track.codec_params.time_base {
-            let d = tb.calc_time(self.duration);
-            let hours = d.seconds / (60 * 60);
-            let mins = (d.seconds % (60 * 60)) / 60;
-            let secs = (d.seconds % 60) + d.frac as u64;
-            match hours {
-                0 => match mins {
-                    0 => {
-                        format!("00:{:0>2}", secs)
-                    }
-                    _ => {
-                        format!("{:0>2}:{:0>2}", mins, secs)
-                    }
-                },
-                _ => {
-                    format!("{}:{:0>2}:{:0>2}", hours, mins, secs)
+        let hours = self.duration.seconds / (60 * 60);
+        let mins = (self.duration.seconds % (60 * 60)) / 60;
+        let secs = (self.duration.seconds % 60) + self.duration.frac as u64;
+        match hours {
+            0 => match mins {
+                0 => {
+                    format!("00:{:0>2}", secs)
                 }
+                _ => {
+                    format!("{:0>2}:{:0>2}", mins, secs)
+                }
+            },
+            _ => {
+                format!("{}:{:0>2}:{:0>2}", hours, mins, secs)
             }
-        } else {
-            String::default()
         }
     }
 }

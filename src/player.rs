@@ -13,7 +13,7 @@ use tokio::task::JoinHandle;
 use crate::audio::{
     BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamingData,
 };
-use crate::song::Song;
+use crate::musictrack::MusicTrack;
 use crate::tools::ResamplerUtil;
 
 pub struct Player {
@@ -235,7 +235,7 @@ impl Player {
     /// Plays a FLAC file
     /// - params:
     ///    - song: song struct
-    pub async fn play(&mut self, song: Arc<Song>) -> Result<CurrentTrackInfo> {
+    pub async fn play(&mut self, song: Arc<MusicTrack>) -> Result<CurrentTrackInfo> {
         let streamparams = StreamParams {
             samplerate: song.sample,
             channels: song.channels as u8,

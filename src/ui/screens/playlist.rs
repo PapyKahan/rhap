@@ -13,13 +13,13 @@ use walkdir::WalkDir;
 
 use crate::{
     player::{CurrentTrackInfo, Player},
-    song::Song,
+    musictrack::MusicTrack,
     ui::{HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_ALTERNATE_COLOR_COL, ROW_COLOR, ROW_COLOR_COL},
 };
 
 pub struct Playlist {
     state: TableState,
-    songs: Vec<Arc<Song>>,
+    songs: Vec<Arc<MusicTrack>>,
     player: Player,
     playing_track: Option<CurrentTrackInfo>,
     playing_track_list_index: usize,
@@ -45,10 +45,10 @@ impl Playlist {
                 .collect::<Vec<String>>();
             files.shuffle(&mut thread_rng());
             for f in files {
-                songs.push(Arc::new(Song::new(f)?));
+                songs.push(Arc::new(MusicTrack::new(f)?));
             }
         } else if path.is_file() {
-            songs.push(Arc::new(Song::new(
+            songs.push(Arc::new(MusicTrack::new(
                 path.into_os_string().into_string().unwrap(),
             )?));
         }

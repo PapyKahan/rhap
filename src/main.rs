@@ -17,7 +17,7 @@ use std::path::PathBuf;
 
 mod audio;
 mod player;
-mod song;
+mod musictrack;
 mod ui;
 mod tools;
 
