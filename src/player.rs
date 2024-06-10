@@ -121,73 +121,37 @@ impl Resampler {
     ) -> Result<()> {
         match self {
             Resampler::I8(resampler) => {
-                if let Some(buffer) = resampler.resample(decoded) {
+                if let Some(buffer) = resampler.resample::<i8, f32>(decoded) {
                     for i in buffer.iter() {
                         for j in i.to_ne_bytes().iter() {
                             streamer.send(StreamingData::Data(*j)).await?
-                        }
-                    }
-                }
-                if let Some(buffer) = resampler.flush() {
-                    for i in buffer.iter() {
-                        for j in i.to_ne_bytes().iter() {
-                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
-                                break;
-                            }
                         }
                     }
                 }
             }
             Resampler::I16(resampler) => {
-                if let Some(buffer) = resampler.resample(decoded) {
+                if let Some(buffer) = resampler.resample::<i16, f32>(decoded) {
                     for i in buffer.iter() {
                         for j in i.to_ne_bytes().iter() {
                             streamer.send(StreamingData::Data(*j)).await?
-                        }
-                    }
-                }
-                if let Some(buffer) = resampler.flush() {
-                    for i in buffer.iter() {
-                        for j in i.to_ne_bytes().iter() {
-                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
-                                break;
-                            }
                         }
                     }
                 }
             }
             Resampler::I24(resampler) => {
-                if let Some(buffer) = resampler.resample(decoded) {
+                if let Some(buffer) = resampler.resample::<i24, f32>(decoded) {
                     for i in buffer.iter() {
                         for j in i.to_ne_bytes().iter() {
                             streamer.send(StreamingData::Data(*j)).await?
-                        }
-                    }
-                }
-                if let Some(buffer) = resampler.flush() {
-                    for i in buffer.iter() {
-                        for j in i.to_ne_bytes().iter() {
-                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
-                                break;
-                            }
                         }
                     }
                 }
             }
             Resampler::F32(resampler) => {
-                if let Some(buffer) = resampler.resample(decoded) {
+                if let Some(buffer) = resampler.resample::<f32, f32>(decoded) {
                     for i in buffer.iter() {
                         for j in i.to_ne_bytes().iter() {
                             streamer.send(StreamingData::Data(*j)).await?
-                        }
-                    }
-                }
-                if let Some(buffer) = resampler.flush() {
-                    for i in buffer.iter() {
-                        for j in i.to_ne_bytes().iter() {
-                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
-                                break;
-                            }
                         }
                     }
                 }
