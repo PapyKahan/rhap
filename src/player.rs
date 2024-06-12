@@ -62,6 +62,14 @@ impl StreamBuffer {
         }
     }
 
+    pub fn copy_planar_ref(&mut self, decoded: AudioBufferRef<'_>) {
+        match self {
+            StreamBuffer::I16(buffer) => buffer.copy_planar_ref(decoded),
+            StreamBuffer::I24(buffer) => buffer.copy_planar_ref(decoded),
+            StreamBuffer::F32(buffer) => buffer.copy_planar_ref(decoded),
+        }
+    }
+
     pub fn as_bytes(&self) -> Vec<u8> {
         match self {
             StreamBuffer::I16(buffer) => buffer
@@ -159,6 +167,16 @@ impl Resampler {
                             streamer.send(StreamingData::Data(*j)).await?
                         }
                     }
+                    //for i in 0..output.len() / 2 {
+                    //    let left = output[i].to_ne_bytes();
+                    //    for j in left.iter() {
+                    //        streamer.send(StreamingData::Data(*j)).await?
+                    //    }
+                    //    let right = output[(output.len()/2) + i].to_ne_bytes();
+                    //    for j in right.iter() {
+                    //        streamer.send(StreamingData::Data(*j)).await?
+                    //    }
+                    //}
                 }
             }
             Resampler::I24(resampler) => {
@@ -168,6 +186,16 @@ impl Resampler {
                             streamer.send(StreamingData::Data(*j)).await?
                         }
                     }
+                    //for i in 0..output.len() / 2 {
+                    //    let left = output[i].to_ne_bytes();
+                    //    for j in left.iter() {
+                    //        streamer.send(StreamingData::Data(*j)).await?
+                    //    }
+                    //    let right = output[(output.len()/2) + i].to_ne_bytes();
+                    //    for j in right.iter() {
+                    //        streamer.send(StreamingData::Data(*j)).await?
+                    //    }
+                    //}
                 }
             }
             Resampler::F32(resampler) => {
@@ -177,6 +205,16 @@ impl Resampler {
                             streamer.send(StreamingData::Data(*j)).await?
                         }
                     }
+                    //for i in 0..output.len() / 2 {
+                    //    let left = output[i].to_ne_bytes();
+                    //    for j in left.iter() {
+                    //        streamer.send(StreamingData::Data(*j)).await?
+                    //    }
+                    //    let right = output[(output.len()/2) + i].to_ne_bytes();
+                    //    for j in right.iter() {
+                    //        streamer.send(StreamingData::Data(*j)).await?
+                    //    }
+                    //}
                 }
             }
         }
@@ -304,8 +342,8 @@ impl Player {
                         .unwrap()
                     });
                     sample_buffer.clear();
-                    sample_buffer.copy_interleaved_ref(decoded);
                     if song.sample != params.samplerate {
+                        sample_buffer.copy_planar_ref(decoded);
                         if resampled_sender
                             .send_resampled_data(sample_buffer, &streamer)
                             .await
@@ -314,6 +352,7 @@ impl Player {
                             break;
                         }
                     } else {
+                        sample_buffer.copy_interleaved_ref(decoded);
                         for i in sample_buffer.as_bytes().iter() {
                             if streamer.send(StreamingData::Data(*i)).await.is_err() {
                                 break;

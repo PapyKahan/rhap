@@ -67,8 +67,8 @@ where
             BitsPerSample::Bits32 => Datatype::Float32I,
         };
         let io_spec = IOSpec::new(input_type, output_type);
-        let runtime_spec = RuntimeSpec::new(4);
-        let quality_spec = QualitySpec::new(&QualityRecipe::Quick, QualityFlags::ROLLOFF_NONE);
+        let runtime_spec = RuntimeSpec::new(num_channels as u32);
+        let quality_spec = QualitySpec::new(&QualityRecipe::High, QualityFlags::ROLLOFF_NONE);
         let resampler = InternalSoxrResampler::create(
             from_samplerate as f64,
             to_samplerate as f64,
