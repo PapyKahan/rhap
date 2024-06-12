@@ -436,7 +436,6 @@ impl WaveFormat {
         let byterate = samplerate * blockalign;
 
         let valid_bits_per_sample = match bits_per_sample {
-            BitsPerSample::Bits8 => 8,
             BitsPerSample::Bits16 => 16,
             BitsPerSample::Bits24 => 24,
             BitsPerSample::Bits32 => 32,
@@ -455,7 +454,6 @@ impl WaveFormat {
             wValidBitsPerSample: valid_bits_per_sample,
         };
         let subformat = match bits_per_sample {
-            BitsPerSample::Bits8 => KSDATAFORMAT_SUBTYPE_PCM,
             BitsPerSample::Bits16 => KSDATAFORMAT_SUBTYPE_PCM,
             BitsPerSample::Bits24 => KSDATAFORMAT_SUBTYPE_PCM,
             BitsPerSample::Bits32 => KSDATAFORMAT_SUBTYPE_IEEE_FLOAT,

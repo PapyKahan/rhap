@@ -2,7 +2,7 @@ use anyhow::Result;
 use log::error;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use symphonia::core::audio::{AudioBufferRef, RawSampleBuffer, SignalSpec};
+use symphonia::core::audio::{AudioBufferRef, SampleBuffer, SignalSpec};
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{SeekMode, SeekTo};
 use symphonia::core::sample::i24;
@@ -14,7 +14,7 @@ use crate::audio::{
     BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamingData,
 };
 use crate::musictrack::MusicTrack;
-use crate::tools::ResamplerUtil;
+use crate::tools::SoxrResampler;
 
 pub struct Player {
     current_device: Option<Device>,
@@ -39,44 +39,54 @@ impl CurrentTrackInfo {
     }
 }
 
-enum StreamBuffer {
-    I8(RawSampleBuffer<i8>),
-    I16(RawSampleBuffer<i16>),
-    I24(RawSampleBuffer<i24>),
-    F32(RawSampleBuffer<f32>),
+pub enum StreamBuffer {
+    I16(SampleBuffer<i16>),
+    I24(SampleBuffer<i24>),
+    F32(SampleBuffer<f32>),
 }
 
 impl StreamBuffer {
     pub fn new(bits_per_sample: BitsPerSample, duration: u64, spec: SignalSpec) -> Self {
         match bits_per_sample {
-            BitsPerSample::Bits8 => StreamBuffer::I8(RawSampleBuffer::<i8>::new(duration, spec)),
-            BitsPerSample::Bits16 => StreamBuffer::I16(RawSampleBuffer::<i16>::new(duration, spec)),
-            BitsPerSample::Bits24 => StreamBuffer::I24(RawSampleBuffer::<i24>::new(duration, spec)),
-            BitsPerSample::Bits32 => StreamBuffer::F32(RawSampleBuffer::<f32>::new(duration, spec)),
+            BitsPerSample::Bits16 => StreamBuffer::I16(SampleBuffer::<i16>::new(duration, spec)),
+            BitsPerSample::Bits24 => StreamBuffer::I24(SampleBuffer::<i24>::new(duration, spec)),
+            BitsPerSample::Bits32 => StreamBuffer::F32(SampleBuffer::<f32>::new(duration, spec)),
         }
     }
 
     pub fn copy_interleaved_ref(&mut self, decoded: AudioBufferRef<'_>) {
         match self {
-            StreamBuffer::I8(buffer) => buffer.copy_interleaved_ref(decoded),
             StreamBuffer::I16(buffer) => buffer.copy_interleaved_ref(decoded),
             StreamBuffer::I24(buffer) => buffer.copy_interleaved_ref(decoded),
             StreamBuffer::F32(buffer) => buffer.copy_interleaved_ref(decoded),
         }
     }
 
-    pub fn as_bytes(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> Vec<u8> {
         match self {
-            StreamBuffer::I8(buffer) => buffer.as_bytes(),
-            StreamBuffer::I16(buffer) => buffer.as_bytes(),
-            StreamBuffer::I24(buffer) => buffer.as_bytes(),
-            StreamBuffer::F32(buffer) => buffer.as_bytes(),
+            StreamBuffer::I16(buffer) => buffer
+                .samples()
+                .iter()
+                .enumerate()
+                .flat_map(|(_, s)| s.to_ne_bytes())
+                .collect::<Vec<u8>>(),
+            StreamBuffer::I24(buffer) => buffer
+                .samples()
+                .iter()
+                .enumerate()
+                .flat_map(|(_, s)| s.to_ne_bytes())
+                .collect::<Vec<u8>>(),
+            StreamBuffer::F32(buffer) => buffer
+                .samples()
+                .iter()
+                .enumerate()
+                .flat_map(|(_, s)| s.to_ne_bytes())
+                .collect::<Vec<u8>>(),
         }
     }
 
     pub fn clear(&mut self) {
         match self {
-            StreamBuffer::I8(buffer) => buffer.clear(),
             StreamBuffer::I16(buffer) => buffer.clear(),
             StreamBuffer::I24(buffer) => buffer.clear(),
             StreamBuffer::F32(buffer) => buffer.clear(),
@@ -85,53 +95,66 @@ impl StreamBuffer {
 }
 
 enum Resampler {
-    I8(ResamplerUtil<i8>),
-    I16(ResamplerUtil<i16>),
-    I24(ResamplerUtil<i24>),
-    F32(ResamplerUtil<f32>),
+    I16(SoxrResampler<i16>),
+    I24(SoxrResampler<i24>),
+    F32(SoxrResampler<f32>),
 }
 
 impl Resampler {
     pub fn new(
-        bits_per_sample: BitsPerSample,
-        spec: &SignalSpec,
-        samplerate: usize,
+        input_bits_per_sample: BitsPerSample,
+        output_bits_per_sample: BitsPerSample,
+        input_sample_rate: usize,
+        output_samplerate: usize,
         duration: u64,
+        channels: usize,
     ) -> Result<Self> {
-        match bits_per_sample {
-            BitsPerSample::Bits8 => {
-                Ok(Resampler::I8(ResamplerUtil::<i8>::new(spec, samplerate, duration)?))
-            }
-            BitsPerSample::Bits16 => {
-                Ok(Resampler::I16(ResamplerUtil::<i16>::new(spec, samplerate, duration)?))
-            }
-            BitsPerSample::Bits24 => {
-                Ok(Resampler::I24(ResamplerUtil::<i24>::new(spec, samplerate, duration)?))
-            }
-            BitsPerSample::Bits32 => {
-                Ok(Resampler::F32(ResamplerUtil::<f32>::new(spec, samplerate, duration)?))
-            }
+        println!(
+            "input_bits_per_sample: {:?}, output_bits_per_sample: {:?}",
+            input_bits_per_sample, output_bits_per_sample
+        );
+        println!(
+            "input_sample_rate: {:?}, output_samplerate: {:?}",
+            input_sample_rate, output_samplerate
+        );
+        println!("duration: {:?}, channels: {:?}", duration, channels);
+        match output_bits_per_sample {
+            BitsPerSample::Bits16 => Ok(Resampler::I16(SoxrResampler::<i16>::new(
+                input_sample_rate,
+                output_samplerate,
+                input_bits_per_sample,
+                output_bits_per_sample,
+                duration,
+                channels,
+            )?)),
+            BitsPerSample::Bits24 => Ok(Resampler::I24(SoxrResampler::<i24>::new(
+                input_sample_rate,
+                output_samplerate,
+                input_bits_per_sample,
+                output_bits_per_sample,
+                duration,
+                channels,
+            )?)),
+            BitsPerSample::Bits32 => Ok(Resampler::F32(SoxrResampler::<f32>::new(
+                input_sample_rate,
+                output_samplerate,
+                input_bits_per_sample,
+                output_bits_per_sample,
+                duration,
+                channels,
+            )?)),
         }
     }
 
     pub async fn send_resampled_data(
         &mut self,
-        decoded: AudioBufferRef<'_>,
+        streambuffer: &StreamBuffer,
         streamer: &Sender<StreamingData>,
     ) -> Result<()> {
         match self {
-            Resampler::I8(resampler) => {
-                if let Some(buffer) = resampler.resample::<i8, f32>(decoded) {
-                    for i in buffer.iter() {
-                        for j in i.to_ne_bytes().iter() {
-                            streamer.send(StreamingData::Data(*j)).await?
-                        }
-                    }
-                }
-            }
             Resampler::I16(resampler) => {
-                if let Some(buffer) = resampler.resample::<i16, f32>(decoded) {
-                    for i in buffer.iter() {
+                if let Some(output) = resampler.resample(streambuffer) {
+                    for i in output.iter() {
                         for j in i.to_ne_bytes().iter() {
                             streamer.send(StreamingData::Data(*j)).await?
                         }
@@ -139,8 +162,8 @@ impl Resampler {
                 }
             }
             Resampler::I24(resampler) => {
-                if let Some(buffer) = resampler.resample::<i24, f32>(decoded) {
-                    for i in buffer.iter() {
+                if let Some(output) = resampler.resample(streambuffer) {
+                    for i in output.iter() {
                         for j in i.to_ne_bytes().iter() {
                             streamer.send(StreamingData::Data(*j)).await?
                         }
@@ -148,8 +171,8 @@ impl Resampler {
                 }
             }
             Resampler::F32(resampler) => {
-                if let Some(buffer) = resampler.resample::<f32, f32>(decoded) {
-                    for i in buffer.iter() {
+                if let Some(output) = resampler.resample(streambuffer) {
+                    for i in output.iter() {
                         for j in i.to_ne_bytes().iter() {
                             streamer.send(StreamingData::Data(*j)).await?
                         }
@@ -208,8 +231,8 @@ impl Player {
             pollmode: self.pollmode,
         };
         let mut device = self.host.create_device(self.device_id)?;
-        let streamparams = device.adjust_stream_params(&streamparams)?;
-        let data_sender = device.start(&streamparams)?;
+        let params = device.adjust_stream_params(&streamparams)?;
+        let data_sender = device.start(&params)?;
         self.current_device = Some(device);
         self.previous_stream = Some(data_sender);
         let stream = self.previous_stream.clone();
@@ -259,23 +282,38 @@ impl Player {
                             break;
                         }
                     };
-                    progress.store(progress.load(Ordering::Relaxed) + packet.dur, Ordering::Relaxed);
+                    progress.store(
+                        progress.load(Ordering::Relaxed) + packet.dur,
+                        Ordering::Relaxed,
+                    );
                     let decoded = decoder.decode(&packet)?;
                     let spec = decoded.spec();
                     let duration = decoded.capacity() as u64;
                     let sample_buffer = buffer.get_or_insert_with(|| {
-                        StreamBuffer::new(streamparams.bits_per_sample, duration, *spec)
+                        StreamBuffer::new(params.bits_per_sample, duration, *spec)
                     });
                     let resampled_sender = resampler.get_or_insert_with(|| {
-                        Resampler::new(streamparams.bits_per_sample, spec, streamparams.samplerate as usize, duration).unwrap()
+                        Resampler::new(
+                            streamparams.bits_per_sample,
+                            params.bits_per_sample,
+                            streamparams.samplerate as usize,
+                            params.samplerate as usize,
+                            duration,
+                            params.channels as usize,
+                        )
+                        .unwrap()
                     });
                     sample_buffer.clear();
-                    if song.sample != streamparams.samplerate {
-                        if resampled_sender.send_resampled_data(decoded, &streamer).await.is_err() {
+                    sample_buffer.copy_interleaved_ref(decoded);
+                    if song.sample != params.samplerate {
+                        if resampled_sender
+                            .send_resampled_data(sample_buffer, &streamer)
+                            .await
+                            .is_err()
+                        {
                             break;
                         }
                     } else {
-                        sample_buffer.copy_interleaved_ref(decoded);
                         for i in sample_buffer.as_bytes().iter() {
                             if streamer.send(StreamingData::Data(*i)).await.is_err() {
                                 break;
