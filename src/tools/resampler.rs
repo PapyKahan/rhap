@@ -1,5 +1,8 @@
 use anyhow::Result;
 use libsoxr::{Datatype, IOSpec, QualityFlags, QualityRecipe, QualitySpec, RuntimeSpec, Soxr};
+use rubato::{
+    calculate_cutoff, Resampler, Sample, SincInterpolationParameters, SincInterpolationType, WindowFunction
+};
 
 use crate::{audio::BitsPerSample, player::StreamBuffer};
 
@@ -34,8 +37,7 @@ impl InternalSoxrResampler {
 unsafe impl Send for InternalSoxrResampler {}
 unsafe impl Sync for InternalSoxrResampler {}
 
-pub struct SoxrResampler<O>
-{
+pub struct SoxrResampler<O> {
     resampler: InternalSoxrResampler,
     output: Vec<O>,
 }
@@ -101,6 +103,75 @@ where
                 self.output.fill(O::default());
                 self.resampler
                     .process(Some(buffer.samples()), &mut self.output)
+                    .unwrap();
+                Some(&self.output)
+            }
+        }
+    }
+}
+
+struct RubatoResampler<O> {
+    resampler: rubato::SincFixedIn<f32>,
+    output: Vec<O>,
+}
+
+impl<O> RubatoResampler<O>
+where
+    O: Default + Clone,
+{
+    pub fn new(
+        from_samplerate: usize,
+        to_samplerate: usize,
+        num_channels: usize,
+        duration: u64,
+    ) -> Self {
+        let duration = duration as usize;
+        let mut output = Vec::<O>::with_capacity(duration * num_channels);
+        output.resize(duration * num_channels, O::default());
+
+        let ratio = to_samplerate as f32 / from_samplerate as f32;
+        let sinc_len = 256;
+        let oversampling_factor = sinc_len;
+        let interpolation = SincInterpolationType::Nearest;
+        let window = WindowFunction::BlackmanHarris2;
+
+        let f_cutoff = calculate_cutoff(sinc_len, window);
+        let params = SincInterpolationParameters {
+            sinc_len,
+            f_cutoff,
+            interpolation,
+            oversampling_factor,
+            window,
+        };
+
+        let resampler =
+            rubato::SincFixedIn::<f32>::new(ratio as f64, 1.0, params, duration, num_channels)
+                .unwrap();
+        let output_buffer = resampler.output_buffer_allocate(true);
+
+        Self { resampler, output }
+    }
+
+    pub fn resample(&mut self, input: &StreamBuffer) -> Option<&[O]> {
+        match input {
+            StreamBuffer::I16(buffer) => {
+                self.output.fill(O::default());
+                self.resampler
+                    .process(buffer.samples(), &mut self.output)
+                    .unwrap();
+                Some(&self.output)
+            }
+            StreamBuffer::I24(buffer) => {
+                self.output.fill(O::default());
+                self.resampler
+                    .process(buffer.samples(), &mut self.output)
+                    .unwrap();
+                Some(&self.output)
+            }
+            StreamBuffer::F32(buffer) => {
+                self.output.fill(O::default());
+                self.resampler
+                    .process(buffer.samples(), &mut self.output)
                     .unwrap();
                 Some(&self.output)
             }
