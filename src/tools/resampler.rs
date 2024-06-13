@@ -68,7 +68,7 @@ where
         };
         let io_spec = IOSpec::new(input_type, output_type);
         let runtime_spec = RuntimeSpec::new(num_channels as u32);
-        let quality_spec = QualitySpec::new(&QualityRecipe::High, QualityFlags::ROLLOFF_NONE);
+        let quality_spec = QualitySpec::new(&QualityRecipe::Quick, QualityFlags::VR);
         let resampler = InternalSoxrResampler::create(
             from_samplerate as f64,
             to_samplerate as f64,
@@ -84,18 +84,21 @@ where
     pub fn resample(&mut self, input: &StreamBuffer) -> Option<&[O]> {
         match input {
             StreamBuffer::I16(buffer) => {
+                self.output.fill(O::default());
                 self.resampler
                     .process(Some(buffer.samples()), &mut self.output)
                     .unwrap();
                 Some(&self.output)
             }
             StreamBuffer::I24(buffer) => {
+                self.output.fill(O::default());
                 self.resampler
                     .process(Some(buffer.samples()), &mut self.output)
                     .unwrap();
                 Some(&self.output)
             }
             StreamBuffer::F32(buffer) => {
+                self.output.fill(O::default());
                 self.resampler
                     .process(Some(buffer.samples()), &mut self.output)
                     .unwrap();

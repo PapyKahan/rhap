@@ -62,14 +62,6 @@ impl StreamBuffer {
         }
     }
 
-    pub fn copy_planar_ref(&mut self, decoded: AudioBufferRef<'_>) {
-        match self {
-            StreamBuffer::I16(buffer) => buffer.copy_planar_ref(decoded),
-            StreamBuffer::I24(buffer) => buffer.copy_planar_ref(decoded),
-            StreamBuffer::F32(buffer) => buffer.copy_planar_ref(decoded),
-        }
-    }
-
     pub fn as_bytes(&self) -> Vec<u8> {
         match self {
             StreamBuffer::I16(buffer) => buffer
@@ -117,15 +109,15 @@ impl Resampler {
         duration: u64,
         channels: usize,
     ) -> Result<Self> {
-        println!(
-            "input_bits_per_sample: {:?}, output_bits_per_sample: {:?}",
-            input_bits_per_sample, output_bits_per_sample
-        );
-        println!(
-            "input_sample_rate: {:?}, output_samplerate: {:?}",
-            input_sample_rate, output_samplerate
-        );
-        println!("duration: {:?}, channels: {:?}", duration, channels);
+        //println!(
+        //    "input_bits_per_sample: {:?}, output_bits_per_sample: {:?}",
+        //    input_bits_per_sample, output_bits_per_sample
+        //);
+        //println!(
+        //    "input_sample_rate: {:?}, output_samplerate: {:?}",
+        //    input_sample_rate, output_samplerate
+        //);
+        //println!("duration: {:?}, channels: {:?}", duration, channels);
         match output_bits_per_sample {
             BitsPerSample::Bits16 => Ok(Resampler::I16(SoxrResampler::<i16>::new(
                 input_sample_rate,
@@ -167,16 +159,6 @@ impl Resampler {
                             streamer.send(StreamingData::Data(*j)).await?
                         }
                     }
-                    //for i in 0..output.len() / 2 {
-                    //    let left = output[i].to_ne_bytes();
-                    //    for j in left.iter() {
-                    //        streamer.send(StreamingData::Data(*j)).await?
-                    //    }
-                    //    let right = output[(output.len()/2) + i].to_ne_bytes();
-                    //    for j in right.iter() {
-                    //        streamer.send(StreamingData::Data(*j)).await?
-                    //    }
-                    //}
                 }
             }
             Resampler::I24(resampler) => {
@@ -186,16 +168,6 @@ impl Resampler {
                             streamer.send(StreamingData::Data(*j)).await?
                         }
                     }
-                    //for i in 0..output.len() / 2 {
-                    //    let left = output[i].to_ne_bytes();
-                    //    for j in left.iter() {
-                    //        streamer.send(StreamingData::Data(*j)).await?
-                    //    }
-                    //    let right = output[(output.len()/2) + i].to_ne_bytes();
-                    //    for j in right.iter() {
-                    //        streamer.send(StreamingData::Data(*j)).await?
-                    //    }
-                    //}
                 }
             }
             Resampler::F32(resampler) => {
@@ -205,16 +177,6 @@ impl Resampler {
                             streamer.send(StreamingData::Data(*j)).await?
                         }
                     }
-                    //for i in 0..output.len() / 2 {
-                    //    let left = output[i].to_ne_bytes();
-                    //    for j in left.iter() {
-                    //        streamer.send(StreamingData::Data(*j)).await?
-                    //    }
-                    //    let right = output[(output.len()/2) + i].to_ne_bytes();
-                    //    for j in right.iter() {
-                    //        streamer.send(StreamingData::Data(*j)).await?
-                    //    }
-                    //}
                 }
             }
         }
@@ -257,9 +219,6 @@ impl Player {
         Ok(())
     }
 
-    /// Plays a FLAC file
-    /// - params:
-    ///    - song: song struct
     pub async fn play(&mut self, song: Arc<MusicTrack>) -> Result<CurrentTrackInfo> {
         let streamparams = StreamParams {
             samplerate: song.sample,
@@ -330,20 +289,20 @@ impl Player {
                     let sample_buffer = buffer.get_or_insert_with(|| {
                         StreamBuffer::new(params.bits_per_sample, duration, *spec)
                     });
-                    let resampled_sender = resampler.get_or_insert_with(|| {
-                        Resampler::new(
-                            streamparams.bits_per_sample,
-                            params.bits_per_sample,
-                            streamparams.samplerate as usize,
-                            params.samplerate as usize,
-                            duration,
-                            params.channels as usize,
-                        )
-                        .unwrap()
-                    });
                     sample_buffer.clear();
+                    sample_buffer.copy_interleaved_ref(decoded);
                     if song.sample != params.samplerate {
-                        sample_buffer.copy_planar_ref(decoded);
+                        let resampled_sender = resampler.get_or_insert_with(|| {
+                            Resampler::new(
+                                streamparams.bits_per_sample,
+                                params.bits_per_sample,
+                                streamparams.samplerate as usize,
+                                params.samplerate as usize,
+                                duration,
+                                params.channels as usize,
+                            )
+                            .unwrap()
+                        });
                         if resampled_sender
                             .send_resampled_data(sample_buffer, &streamer)
                             .await
@@ -352,7 +311,6 @@ impl Player {
                             break;
                         }
                     } else {
-                        sample_buffer.copy_interleaved_ref(decoded);
                         for i in sample_buffer.as_bytes().iter() {
                             if streamer.send(StreamingData::Data(*i)).await.is_err() {
                                 break;

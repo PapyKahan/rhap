@@ -1,0 +1,3 @@
+[env]
+RUSTFLAGS = "-C target-cpu=native"
+PKG_CONFIG_PATH = { value = "build/generators", relative = true }

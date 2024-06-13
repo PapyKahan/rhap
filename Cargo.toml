@@ -40,9 +40,6 @@ features = [
     "Win32_System_Variant",
 ]
 
-[build]
-rustflags = ["-C", "target-cpu=native"]
-
 [profile.release]
 opt-level = 3
 lto = "fat"
