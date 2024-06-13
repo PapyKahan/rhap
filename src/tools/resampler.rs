@@ -1,8 +1,11 @@
 use anyhow::Result;
 use libsoxr::{Datatype, IOSpec, QualityFlags, QualityRecipe, QualitySpec, RuntimeSpec, Soxr};
 use rubato::{
-    calculate_cutoff, Resampler, Sample, SincInterpolationParameters, SincInterpolationType, WindowFunction
+    calculate_cutoff, Resampler, Sample, SincInterpolationParameters, SincInterpolationType,
+    WindowFunction,
 };
+use symphonia::core::conv::FromSample;
+use symphonia::core::sample::i24;
 
 use crate::{audio::BitsPerSample, player::StreamBuffer};
 
@@ -111,13 +114,15 @@ where
 }
 
 pub struct RubatoResampler<O> {
-    resampler: rubato::SincFixedIn<O>,
-    output: Vec<O>,
+    resampler: rubato::SincFixedIn<f32>,
+    output: Vec<Vec<f32>>,
+    interleaved_output: Vec<O>,
+    duration: usize,
 }
 
 impl<O> RubatoResampler<O>
 where
-    O: Sample + Default + Clone,
+    O: Sample + FromSample<f32> + Default + Clone,
 {
     pub fn new(
         from_samplerate: usize,
@@ -126,8 +131,8 @@ where
         duration: u64,
     ) -> Self {
         let duration = duration as usize;
-        let mut output = Vec::<O>::with_capacity(duration * num_channels);
-        output.resize(duration * num_channels, O::default());
+        let mut interleaved_output = Vec::<O>::with_capacity(duration * num_channels);
+        interleaved_output.resize(duration * num_channels, O::default());
 
         let ratio = to_samplerate as f32 / from_samplerate as f32;
         let sinc_len = 256;
@@ -145,34 +150,53 @@ where
         };
 
         let resampler =
-            rubato::SincFixedIn::<O>::new(ratio as f64, 1.0, params, duration, num_channels)
+            rubato::SincFixedIn::<f32>::new(ratio as f64, 1.0, params, duration, num_channels)
                 .unwrap();
+        let output = resampler.output_buffer_allocate(true);
 
-        Self { resampler, output }
+        Self { resampler, duration, output, interleaved_output }
     }
 
     pub fn resample(&mut self, input: &StreamBuffer) -> Option<&[O]> {
         match input {
             StreamBuffer::I16(buffer) => {
-                self.output.fill(O::default());
+                self.interleaved_output.fill(O::default());
+
+                let mut inputbuffer : arrayvec::ArrayVec<&[f32], 32> = Default::default();
+                inputbuffer.push(&buffer.samples()[..buffer.samples().len()].iter().map(|&x| i16::from_sample(x) as f32).collect::<Vec<f32>>());
+                inputbuffer.push(&buffer.samples()[buffer.samples().len() / 2..buffer.samples().len()].iter().map(|&x| i16::from_sample(x) as f32).collect::<Vec<f32>>());
+
                 self.resampler
-                    .process_into_buffer(buffer.samples(), &mut self.output, None)
+                    .process_into_buffer(&inputbuffer, &mut self.output, None)
                     .unwrap();
-                Some(&self.output)
+
+                Some(&self.interleaved_output)
             }
             StreamBuffer::I24(buffer) => {
-                self.output.fill(O::default());
+                self.interleaved_output.fill(O::default());
+
+                let mut inputbuffer : arrayvec::ArrayVec<&[f32], 32> = Default::default();
+                inputbuffer.push(&buffer.samples()[..buffer.samples().len() / 2].iter().map(|&x| i24::from_sample(x).into() as f32).collect::<Vec<f32>>());
+                inputbuffer.push(&buffer.samples()[buffer.samples().len() / 2..buffer.samples().len()].iter().map(|&x| i24::from_sample(x).into() as f32).collect::<Vec<f32>>());
+
                 self.resampler
-                    .process_into_buffer(buffer.samples(), &mut self.output, None)
+                    .process_into_buffer(&inputbuffer, &mut self.output, None)
                     .unwrap();
-                Some(&self.output)
+
+                Some(&self.interleaved_output)
             }
             StreamBuffer::F32(buffer) => {
-                self.output.fill(O::default());
+                self.interleaved_output.fill(O::default());
+
+                let mut inputbuffer : arrayvec::ArrayVec<&[f32], 32> = Default::default();
+                inputbuffer.push(&buffer.samples()[..buffer.samples().len() / 2].iter().map(|&x| f32::from_sample(x)).collect::<Vec<f32>>());
+                inputbuffer.push(&buffer.samples()[buffer.samples().len() / 2..buffer.samples().len()].iter().map(|&x| f32::from_sample(x)).collect::<Vec<f32>>());
+
                 self.resampler
-                    .process_into_buffer(buffer.samples(), &mut self.output, None)
+                    .process_into_buffer(&inputbuffer, &mut self.output, None)
                     .unwrap();
-                Some(&self.output)
+
+                Some(&self.interleaved_output)
             }
         }
     }

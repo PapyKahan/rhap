@@ -111,7 +111,7 @@ impl Resampler {
         channels: usize,
     ) -> Result<Self> {
         match output_bits_per_sample {
-            BitsPerSample::Bits16 => Ok(Resampler::I16(SoxrResampler::<i16>::new(
+            BitsPerSample::Bits16 => Ok(Resampler::I16(RubatoResampler::<i16>::new(
                 input_sample_rate,
                 output_samplerate,
                 input_bits_per_sample,
@@ -119,7 +119,7 @@ impl Resampler {
                 duration,
                 channels,
             )?)),
-            BitsPerSample::Bits24 => Ok(Resampler::I24(SoxrResampler::<i24>::new(
+            BitsPerSample::Bits24 => Ok(Resampler::I24(RubatoResampler::<i24>::new(
                 input_sample_rate,
                 output_samplerate,
                 input_bits_per_sample,
@@ -127,7 +127,7 @@ impl Resampler {
                 duration,
                 channels,
             )?)),
-            BitsPerSample::Bits32 => Ok(Resampler::F32(SoxrResampler::<f32>::new(
+            BitsPerSample::Bits32 => Ok(Resampler::F32(RubatoResampler::<f32>::new(
                 input_sample_rate,
                 output_samplerate,
                 input_bits_per_sample,
