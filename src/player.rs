@@ -14,6 +14,7 @@ use crate::audio::{
     BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamingData,
 };
 use crate::musictrack::MusicTrack;
+use crate::tools::resampler::RubatoResampler;
 use crate::tools::SoxrResampler;
 
 pub struct Player {
@@ -95,9 +96,9 @@ impl StreamBuffer {
 }
 
 enum Resampler {
-    I16(SoxrResampler<i16>),
-    I24(SoxrResampler<i24>),
-    F32(SoxrResampler<f32>),
+    I16(RubatoResampler<i16>),
+    I24(RubatoResampler<i24>),
+    F32(RubatoResampler<f32>),
 }
 
 impl Resampler {
@@ -109,15 +110,6 @@ impl Resampler {
         duration: u64,
         channels: usize,
     ) -> Result<Self> {
-        //println!(
-        //    "input_bits_per_sample: {:?}, output_bits_per_sample: {:?}",
-        //    input_bits_per_sample, output_bits_per_sample
-        //);
-        //println!(
-        //    "input_sample_rate: {:?}, output_samplerate: {:?}",
-        //    input_sample_rate, output_samplerate
-        //);
-        //println!("duration: {:?}, channels: {:?}", duration, channels);
         match output_bits_per_sample {
             BitsPerSample::Bits16 => Ok(Resampler::I16(SoxrResampler::<i16>::new(
                 input_sample_rate,

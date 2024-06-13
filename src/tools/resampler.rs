@@ -110,14 +110,14 @@ where
     }
 }
 
-struct RubatoResampler<O> {
-    resampler: rubato::SincFixedIn<f32>,
+pub struct RubatoResampler<O> {
+    resampler: rubato::SincFixedIn<O>,
     output: Vec<O>,
 }
 
 impl<O> RubatoResampler<O>
 where
-    O: Default + Clone,
+    O: Sample + Default + Clone,
 {
     pub fn new(
         from_samplerate: usize,
@@ -145,9 +145,8 @@ where
         };
 
         let resampler =
-            rubato::SincFixedIn::<f32>::new(ratio as f64, 1.0, params, duration, num_channels)
+            rubato::SincFixedIn::<O>::new(ratio as f64, 1.0, params, duration, num_channels)
                 .unwrap();
-        let output_buffer = resampler.output_buffer_allocate(true);
 
         Self { resampler, output }
     }
@@ -157,21 +156,21 @@ where
             StreamBuffer::I16(buffer) => {
                 self.output.fill(O::default());
                 self.resampler
-                    .process(buffer.samples(), &mut self.output)
+                    .process_into_buffer(buffer.samples(), &mut self.output, None)
                     .unwrap();
                 Some(&self.output)
             }
             StreamBuffer::I24(buffer) => {
                 self.output.fill(O::default());
                 self.resampler
-                    .process(buffer.samples(), &mut self.output)
+                    .process_into_buffer(buffer.samples(), &mut self.output, None)
                     .unwrap();
                 Some(&self.output)
             }
             StreamBuffer::F32(buffer) => {
                 self.output.fill(O::default());
                 self.resampler
-                    .process(buffer.samples(), &mut self.output)
+                    .process_into_buffer(buffer.samples(), &mut self.output, None)
                     .unwrap();
                 Some(&self.output)
             }

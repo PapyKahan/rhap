@@ -34,7 +34,8 @@ impl Device {
                 *capabilities.bits_per_samples.last().unwrap()
             };
             return Ok(StreamParams {
-                samplerate,
+                //samplerate,
+                samplerate: 44000,
                 bits_per_sample,
                 ..*params
             });
