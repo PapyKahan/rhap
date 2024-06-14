@@ -2,7 +2,7 @@ use anyhow::Result;
 use log::error;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use symphonia::core::audio::{AudioBufferRef, SampleBuffer, SignalSpec};
+use symphonia::core::audio::{AudioBufferRef, RawSampleBuffer, SignalSpec};
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{SeekMode, SeekTo};
 use symphonia::core::sample::i24;
@@ -41,17 +41,25 @@ impl CurrentTrackInfo {
 }
 
 pub enum StreamBuffer {
-    I16(SampleBuffer<i16>),
-    I24(SampleBuffer<i24>),
-    F32(SampleBuffer<f32>),
+    I16(RawSampleBuffer<i16>),
+    I24(RawSampleBuffer<i24>),
+    F32(RawSampleBuffer<f32>),
 }
 
 impl StreamBuffer {
     pub fn new(bits_per_sample: BitsPerSample, duration: u64, spec: SignalSpec) -> Self {
         match bits_per_sample {
-            BitsPerSample::Bits16 => StreamBuffer::I16(SampleBuffer::<i16>::new(duration, spec)),
-            BitsPerSample::Bits24 => StreamBuffer::I24(SampleBuffer::<i24>::new(duration, spec)),
-            BitsPerSample::Bits32 => StreamBuffer::F32(SampleBuffer::<f32>::new(duration, spec)),
+            BitsPerSample::Bits16 => StreamBuffer::I16(RawSampleBuffer::<i16>::new(duration, spec)),
+            BitsPerSample::Bits24 => StreamBuffer::I24(RawSampleBuffer::<i24>::new(duration, spec)),
+            BitsPerSample::Bits32 => StreamBuffer::F32(RawSampleBuffer::<f32>::new(duration, spec)),
+        }
+    }
+
+    pub fn copy_planar_ref(&mut self, decoded: AudioBufferRef<'_>) {
+        match self {
+            StreamBuffer::I16(buffer) => buffer.copy_planar_ref(decoded),
+            StreamBuffer::I24(buffer) => buffer.copy_planar_ref(decoded),
+            StreamBuffer::F32(buffer) => buffer.copy_planar_ref(decoded),
         }
     }
 
@@ -63,26 +71,11 @@ impl StreamBuffer {
         }
     }
 
-    pub fn as_bytes(&self) -> Vec<u8> {
+    pub fn as_bytes(&self) -> &[u8] {
         match self {
-            StreamBuffer::I16(buffer) => buffer
-                .samples()
-                .iter()
-                .enumerate()
-                .flat_map(|(_, s)| s.to_ne_bytes())
-                .collect::<Vec<u8>>(),
-            StreamBuffer::I24(buffer) => buffer
-                .samples()
-                .iter()
-                .enumerate()
-                .flat_map(|(_, s)| s.to_ne_bytes())
-                .collect::<Vec<u8>>(),
-            StreamBuffer::F32(buffer) => buffer
-                .samples()
-                .iter()
-                .enumerate()
-                .flat_map(|(_, s)| s.to_ne_bytes())
-                .collect::<Vec<u8>>(),
+            StreamBuffer::I16(buffer) => buffer.as_bytes(),
+            StreamBuffer::I24(buffer) => buffer.as_bytes(),
+            StreamBuffer::F32(buffer) => buffer.as_bytes(),
         }
     }
 
@@ -140,7 +133,7 @@ impl Resampler {
 
     pub async fn send_resampled_data(
         &mut self,
-        streambuffer: &StreamBuffer,
+        streambuffer: &AudioBufferRef<'_>,
         streamer: &Sender<StreamingData>,
     ) -> Result<()> {
         match self {
@@ -152,7 +145,7 @@ impl Resampler {
                         }
                     }
                 }
-            }
+            },
             Resampler::I24(resampler) => {
                 if let Some(output) = resampler.resample(streambuffer) {
                     for i in output.iter() {
@@ -161,7 +154,7 @@ impl Resampler {
                         }
                     }
                 }
-            }
+            },
             Resampler::F32(resampler) => {
                 if let Some(output) = resampler.resample(streambuffer) {
                     for i in output.iter() {
@@ -282,7 +275,6 @@ impl Player {
                         StreamBuffer::new(params.bits_per_sample, duration, *spec)
                     });
                     sample_buffer.clear();
-                    sample_buffer.copy_interleaved_ref(decoded);
                     if song.sample != params.samplerate {
                         let resampled_sender = resampler.get_or_insert_with(|| {
                             Resampler::new(
@@ -296,13 +288,14 @@ impl Player {
                             .unwrap()
                         });
                         if resampled_sender
-                            .send_resampled_data(sample_buffer, &streamer)
+                            .send_resampled_data(&decoded, &streamer)
                             .await
                             .is_err()
                         {
                             break;
                         }
                     } else {
+                        sample_buffer.copy_interleaved_ref(decoded);
                         for i in sample_buffer.as_bytes().iter() {
                             if streamer.send(StreamingData::Data(*i)).await.is_err() {
                                 break;

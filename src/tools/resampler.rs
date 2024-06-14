@@ -1,11 +1,13 @@
 use anyhow::Result;
 use libsoxr::{Datatype, IOSpec, QualityFlags, QualityRecipe, QualitySpec, RuntimeSpec, Soxr};
 use rubato::{
-    calculate_cutoff, Resampler, Sample, SincInterpolationParameters, SincInterpolationType,
-    WindowFunction,
+    calculate_cutoff, Resampler, SincInterpolationParameters, SincInterpolationType, WindowFunction,
 };
-use symphonia::core::conv::FromSample;
-use symphonia::core::sample::i24;
+use symphonia::core::{
+    audio::{AudioBuffer, AudioBufferRef, Signal},
+    conv::{FromSample, IntoSample},
+    sample::Sample,
+};
 
 use crate::{audio::BitsPerSample, player::StreamBuffer};
 
@@ -43,6 +45,8 @@ unsafe impl Sync for InternalSoxrResampler {}
 pub struct SoxrResampler<O> {
     resampler: InternalSoxrResampler,
     output: Vec<O>,
+    duration: usize,
+    channels: usize,
 }
 
 impl<O> SoxrResampler<O>
@@ -83,53 +87,86 @@ where
             Some(&runtime_spec),
         )?;
 
-        Ok(Self { resampler, output })
+        Ok(Self {
+            resampler,
+            output,
+            duration,
+            channels: num_channels,
+        })
     }
 
-    pub fn resample(&mut self, input: &StreamBuffer) -> Option<&[O]> {
+    pub fn resample(&mut self, input: &AudioBufferRef<'_>) -> Option<&[O]> {
         match input {
-            StreamBuffer::I16(buffer) => {
+            AudioBufferRef::S16(buffer) => {
                 self.output.fill(O::default());
+                let mut inp = vec![0.0 as f32; self.duration * self.channels];
+                for i in 0..self.channels {
+                    let src = buffer.chan(i);
+                    for (j, dst) in inp.iter_mut().enumerate() {
+                        *dst = src[j].into_sample();
+                    }
+                }
                 self.resampler
-                    .process(Some(buffer.samples()), &mut self.output)
+                    .process(Some(&inp), &mut self.output)
                     .unwrap();
                 Some(&self.output)
             }
-            StreamBuffer::I24(buffer) => {
+            AudioBufferRef::S24(buffer) => {
                 self.output.fill(O::default());
+                let mut inp = vec![0.0 as f32; self.duration * self.channels];
+                for i in 0..self.channels {
+                    let src = buffer.chan(i);
+                    for (j, dst) in inp.iter_mut().enumerate() {
+                        *dst = src[j].into_sample();
+                    }
+                }
                 self.resampler
-                    .process(Some(buffer.samples()), &mut self.output)
+                    .process(Some(&inp), &mut self.output)
                     .unwrap();
                 Some(&self.output)
             }
-            StreamBuffer::F32(buffer) => {
+            AudioBufferRef::F32(buffer) => {
                 self.output.fill(O::default());
+                let mut inp = vec![0.0 as f32; self.duration * self.channels];
+                for i in 0..self.channels {
+                    let src = buffer.chan(i);
+                    for (j, dst) in inp.iter_mut().enumerate() {
+                        *dst = src[j].into_sample();
+                    }
+                }
                 self.resampler
-                    .process(Some(buffer.samples()), &mut self.output)
+                    .process(Some(&inp), &mut self.output)
                     .unwrap();
                 Some(&self.output)
             }
+            _ => None,
         }
     }
 }
 
 pub struct RubatoResampler<O> {
     resampler: rubato::SincFixedIn<f32>,
+    input: Vec<Vec<f32>>,
     output: Vec<Vec<f32>>,
     interleaved_output: Vec<O>,
     duration: usize,
+    channels: usize,
+    _from_bits_per_sample: BitsPerSample,
+    _to_bits_per_sample: BitsPerSample,
 }
 
 impl<O> RubatoResampler<O>
 where
-    O: Sample + FromSample<f32> + Default + Clone,
+    O: Sample + FromSample<f32> + IntoSample<O> + Default + Clone,
 {
     pub fn new(
         from_samplerate: usize,
         to_samplerate: usize,
-        num_channels: usize,
+        _from_bits_per_sample: BitsPerSample,
+        _to_bits_per_sample: BitsPerSample,
         duration: u64,
-    ) -> Self {
+        num_channels: usize,
+    ) -> Result<Self> {
         let duration = duration as usize;
         let mut interleaved_output = Vec::<O>::with_capacity(duration * num_channels);
         interleaved_output.resize(duration * num_channels, O::default());
@@ -153,51 +190,120 @@ where
             rubato::SincFixedIn::<f32>::new(ratio as f64, 1.0, params, duration, num_channels)
                 .unwrap();
         let output = resampler.output_buffer_allocate(true);
+        let input = vec![Vec::with_capacity(duration); num_channels];
 
-        Self { resampler, duration, output, interleaved_output }
+        Ok(Self {
+            resampler,
+            duration,
+            input,
+            output,
+            interleaved_output,
+            channels: num_channels,
+            _from_bits_per_sample,
+            _to_bits_per_sample,
+        })
     }
 
-    pub fn resample(&mut self, input: &StreamBuffer) -> Option<&[O]> {
+    pub fn resample(&mut self, input: &AudioBufferRef<'_>) -> Option<&[O]> {
+        self.interleaved_output.fill(O::default());
+
         match input {
-            StreamBuffer::I16(buffer) => {
-                self.interleaved_output.fill(O::default());
-
-                let mut inputbuffer : arrayvec::ArrayVec<&[f32], 32> = Default::default();
-                inputbuffer.push(&buffer.samples()[..buffer.samples().len()].iter().map(|&x| i16::from_sample(x) as f32).collect::<Vec<f32>>());
-                inputbuffer.push(&buffer.samples()[buffer.samples().len() / 2..buffer.samples().len()].iter().map(|&x| i16::from_sample(x) as f32).collect::<Vec<f32>>());
-
+            AudioBufferRef::S16(buffer) => {
+                convert_samples(buffer, &mut self.input);
                 self.resampler
-                    .process_into_buffer(&inputbuffer, &mut self.output, None)
+                    .process_into_buffer(&self.input, &mut self.output, None)
                     .unwrap();
-
-                Some(&self.interleaved_output)
+                for (i, frame) in self
+                    .interleaved_output
+                    .chunks_exact_mut(self.channels)
+                    .enumerate()
+                {
+                    for (ch, s) in frame.iter_mut().enumerate() {
+                        *s = self.output[ch][i].into_sample();
+                    }
+                }
             }
-            StreamBuffer::I24(buffer) => {
-                self.interleaved_output.fill(O::default());
-
-                let mut inputbuffer : arrayvec::ArrayVec<&[f32], 32> = Default::default();
-                inputbuffer.push(&buffer.samples()[..buffer.samples().len() / 2].iter().map(|&x| i24::from_sample(x).into() as f32).collect::<Vec<f32>>());
-                inputbuffer.push(&buffer.samples()[buffer.samples().len() / 2..buffer.samples().len()].iter().map(|&x| i24::from_sample(x).into() as f32).collect::<Vec<f32>>());
-
+            AudioBufferRef::U24(buffer) => {
+                convert_samples(buffer, &mut self.input);
                 self.resampler
-                    .process_into_buffer(&inputbuffer, &mut self.output, None)
+                    .process_into_buffer(&self.input, &mut self.output, None)
                     .unwrap();
-
-                Some(&self.interleaved_output)
+                for (i, frame) in self
+                    .interleaved_output
+                    .chunks_exact_mut(self.channels)
+                    .enumerate()
+                {
+                    for (ch, s) in frame.iter_mut().enumerate() {
+                        *s = self.output[ch][i].into_sample();
+                    }
+                }
             }
-            StreamBuffer::F32(buffer) => {
-                self.interleaved_output.fill(O::default());
+            AudioBufferRef::S24(buffer) => {
+                convert_samples(buffer, &mut self.input);
+                self.resampler
+                    .process_into_buffer(&self.input, &mut self.output, None)
+                    .unwrap();
+                for (i, frame) in self
+                    .interleaved_output
+                    .chunks_exact_mut(self.channels)
+                    .enumerate()
+                {
+                    for (ch, s) in frame.iter_mut().enumerate() {
+                        *s = self.output[ch][i].into_sample();
+                    }
+                }
+            }
+            AudioBufferRef::S32(buffer) => {
+                convert_samples(buffer, &mut self.input);
+                self.resampler
+                    .process_into_buffer(&self.input, &mut self.output, None)
+                    .unwrap();
+                self.interleaved_output.resize(self.channels * self.output[0].len(), O::MID);
+                for (i, frame) in self
+                    .interleaved_output
+                    .chunks_exact_mut(self.channels)
+                    .enumerate()
+                {
+                    for (ch, s) in frame.iter_mut().enumerate() {
+                        *s = self.output[ch][i].into_sample();
+                    }
+                }
 
-                let mut inputbuffer : arrayvec::ArrayVec<&[f32], 32> = Default::default();
-                inputbuffer.push(&buffer.samples()[..buffer.samples().len() / 2].iter().map(|&x| f32::from_sample(x)).collect::<Vec<f32>>());
-                inputbuffer.push(&buffer.samples()[buffer.samples().len() / 2..buffer.samples().len()].iter().map(|&x| f32::from_sample(x)).collect::<Vec<f32>>());
-
+                for pane in self.input.iter_mut() {
+                    pane.fill(0.0);
+                }
+            }
+            AudioBufferRef::F32(buffer) => {
+                let mut inputbuffer = vec![Vec::with_capacity(self.duration); self.channels];
+                convert_samples(buffer, &mut inputbuffer);
                 self.resampler
                     .process_into_buffer(&inputbuffer, &mut self.output, None)
                     .unwrap();
-
-                Some(&self.interleaved_output)
+                for (i, frame) in self
+                    .interleaved_output
+                    .chunks_exact_mut(self.channels)
+                    .enumerate()
+                {
+                    for (ch, s) in frame.iter_mut().enumerate() {
+                        *s = self.output[ch][i].into_sample();
+                    }
+                }
+            }
+            _ => {
+                println!("Unsupported sample format");
             }
         }
+
+        Some(&self.interleaved_output)
+    }
+}
+
+fn convert_samples<S>(input: &AudioBuffer<S>, output: &mut [Vec<f32>])
+where
+    S: Sample + IntoSample<f32>,
+{
+    for (c, dst) in output.iter_mut().enumerate() {
+        let src = input.chan(c);
+        dst.extend(src.iter().map(|&s| s.into_sample()));
     }
 }
