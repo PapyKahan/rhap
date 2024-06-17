@@ -47,11 +47,11 @@ pub enum StreamBuffer {
 }
 
 impl StreamBuffer {
-    pub fn new(bits_per_sample: BitsPerSample, duration: u64, spec: SignalSpec) -> Self {
+    pub fn new(bits_per_sample: BitsPerSample, duration: usize, spec: SignalSpec) -> Self {
         match bits_per_sample {
-            BitsPerSample::Bits16 => StreamBuffer::I16(RawSampleBuffer::<i16>::new(duration, spec)),
-            BitsPerSample::Bits24 => StreamBuffer::I24(RawSampleBuffer::<i24>::new(duration, spec)),
-            BitsPerSample::Bits32 => StreamBuffer::F32(RawSampleBuffer::<f32>::new(duration, spec)),
+            BitsPerSample::Bits16 => StreamBuffer::I16(RawSampleBuffer::<i16>::new(duration as u64, spec)),
+            BitsPerSample::Bits24 => StreamBuffer::I24(RawSampleBuffer::<i24>::new(duration as u64, spec)),
+            BitsPerSample::Bits32 => StreamBuffer::F32(RawSampleBuffer::<f32>::new(duration as u64, spec)),
         }
     }
 
@@ -89,9 +89,9 @@ impl StreamBuffer {
 }
 
 enum Resampler {
-    I16(RubatoResampler<i16>),
-    I24(RubatoResampler<i24>),
-    F32(RubatoResampler<f32>),
+    I16(SoxrResampler<i16>),
+    I24(SoxrResampler<i24>),
+    F32(SoxrResampler<f32>),
 }
 
 impl Resampler {
@@ -100,32 +100,32 @@ impl Resampler {
         output_bits_per_sample: BitsPerSample,
         input_sample_rate: usize,
         output_samplerate: usize,
-        duration: u64,
+        frames: usize,
         channels: usize,
     ) -> Result<Self> {
         match output_bits_per_sample {
-            BitsPerSample::Bits16 => Ok(Resampler::I16(RubatoResampler::<i16>::new(
+            BitsPerSample::Bits16 => Ok(Resampler::I16(SoxrResampler::<i16>::new(
                 input_sample_rate,
                 output_samplerate,
                 input_bits_per_sample,
                 output_bits_per_sample,
-                duration,
+                frames,
                 channels,
             )?)),
-            BitsPerSample::Bits24 => Ok(Resampler::I24(RubatoResampler::<i24>::new(
+            BitsPerSample::Bits24 => Ok(Resampler::I24(SoxrResampler::<i24>::new(
                 input_sample_rate,
                 output_samplerate,
                 input_bits_per_sample,
                 output_bits_per_sample,
-                duration,
+                frames,
                 channels,
             )?)),
-            BitsPerSample::Bits32 => Ok(Resampler::F32(RubatoResampler::<f32>::new(
+            BitsPerSample::Bits32 => Ok(Resampler::F32(SoxrResampler::<f32>::new(
                 input_sample_rate,
                 output_samplerate,
                 input_bits_per_sample,
                 output_bits_per_sample,
-                duration,
+                frames,
                 channels,
             )?)),
         }
@@ -270,9 +270,9 @@ impl Player {
                     );
                     let decoded = decoder.decode(&packet)?;
                     let spec = decoded.spec();
-                    let duration = decoded.capacity() as u64;
+                    let frames = decoded.capacity();
                     let sample_buffer = buffer.get_or_insert_with(|| {
-                        StreamBuffer::new(params.bits_per_sample, duration, *spec)
+                        StreamBuffer::new(params.bits_per_sample, frames, *spec)
                     });
                     sample_buffer.clear();
                     if song.sample != params.samplerate {
@@ -282,7 +282,7 @@ impl Player {
                                 params.bits_per_sample,
                                 streamparams.samplerate as usize,
                                 params.samplerate as usize,
-                                duration,
+                                frames,
                                 params.channels as usize,
                             )
                             .unwrap()
