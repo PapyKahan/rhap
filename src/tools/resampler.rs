@@ -48,7 +48,7 @@ pub struct SoxrResampler<O> {
     resampler: InternalSoxrResampler,
     output: Vec<O>,
     input: Vec<f32>,
-    frames: usize,
+    internal_output_buffer: Vec<f32>,
 }
 
 impl<O> SoxrResampler<O>
@@ -58,25 +58,26 @@ where
     pub fn new(
         from_samplerate: usize,
         to_samplerate: usize,
-        from_bits_per_sample: BitsPerSample,
-        to_bits_per_sample: BitsPerSample,
+        _from_bits_per_sample: BitsPerSample,
+        _to_bits_per_sample: BitsPerSample,
         frames: usize,
         channels: usize,
     ) -> Result<Self> {
-        let input_type = match from_bits_per_sample {
-            BitsPerSample::Bits16 => Datatype::Int16S,
-            BitsPerSample::Bits24 => Datatype::Int32S,
-            BitsPerSample::Bits32 => Datatype::Float32S,
-        };
-        let input_type = Datatype::Float32S;
-        let output_type = match to_bits_per_sample {
-            BitsPerSample::Bits16 => Datatype::Int16I,
-            BitsPerSample::Bits24 => Datatype::Int32I,
-            BitsPerSample::Bits32 => Datatype::Float32I,
-        };
+        //let input_type = match from_bits_per_sample {
+        //    BitsPerSample::Bits16 => Datatype::Int16S,
+        //    BitsPerSample::Bits24 => Datatype::Int32S,
+        //    BitsPerSample::Bits32 => Datatype::Float32S,
+        //};
+        let input_type = Datatype::Float32I;
+        //let output_type = match to_bits_per_sample {
+        //    BitsPerSample::Bits16 => Datatype::Int16I,
+        //    BitsPerSample::Bits24 => Datatype::Int32I,
+        //    BitsPerSample::Bits32 => Datatype::Float32I,
+        //};
+        let output_type = Datatype::Float32I;
         let io_spec = IOSpec::new(input_type, output_type);
-        let runtime_spec = RuntimeSpec::new(channels as u32);
-        let quality_spec = QualitySpec::new(&QualityRecipe::Quick, QualityFlags::VR);
+        let runtime_spec = RuntimeSpec::new(4);
+        let quality_spec = QualitySpec::new(&QualityRecipe::High, QualityFlags::ROLLOFF_SMALL);
         let resampler = InternalSoxrResampler::create(
             from_samplerate as f64,
             to_samplerate as f64,
@@ -86,16 +87,18 @@ where
             Some(&runtime_spec),
         )?;
 
-        let mut input = vec![0.0; frames * channels];
-        input.resize(frames * channels, 0.0);
+        let mut input = vec![f32::default(); frames * channels];
+        input.resize(frames * channels, f32::default());
         let mut output = vec![O::default(); frames * channels];
         output.resize(frames * channels, O::default());
+        let mut internal_output_buffer = vec![f32::default(); frames * channels];
+        internal_output_buffer.resize(frames * channels, f32::default());
 
         Ok(Self {
             resampler,
             input,
             output,
-            frames,
+            internal_output_buffer,
         })
     }
 
@@ -103,98 +106,157 @@ where
         match input {
             AudioBufferRef::S16(buffer) => {
                 self.input.fill(0.0);
-                self.input.resize(buffer.frames() * buffer.spec().channels.count(), 0.0);
+                self.input
+                    .resize(buffer.frames() * buffer.spec().channels.count(), 0.0);
                 self.output.fill(O::default());
-                self.output.resize(buffer.frames() * buffer.spec().channels.count(), O::default());
+                self.output.resize(
+                    buffer.frames() * buffer.spec().channels.count(),
+                    O::default(),
+                );
+                self.internal_output_buffer.fill(0.0);
+                self.internal_output_buffer
+                    .resize(buffer.frames() * buffer.spec().channels.count(), 0.0);
 
-                let mut index = 0;
-                for channel in 0..buffer.spec().channels.count() {
-                    let src = buffer.chan(channel);
-                    for i in 0..buffer.frames() {
-                        self.input[index] = src[i].into_sample();
-                        index += 1;
+                for (i, frame) in self
+                    .input
+                    .chunks_exact_mut(buffer.spec().channels.count())
+                    .enumerate()
+                {
+                    for (channel, sample) in frame.iter_mut().enumerate() {
+                        *sample = buffer.chan(channel)[i].into_sample();
                     }
                 }
 
                 self.resampler
-                    .process(Some(&self.input), &mut self.output)
+                    .process(Some(&self.input), &mut self.internal_output_buffer)
                     .unwrap();
-
                 self.resampler
-                    .process::<f32, O>(None, &mut self.output[0..])
+                    .process::<f32, f32>(None, &mut self.internal_output_buffer[0..])
                     .unwrap();
+                self.resampler.0.clear().unwrap();
+
+                let mut index = 0;
+                for sample in self.internal_output_buffer.iter().copied() {
+                    self.output[index] = sample.into_sample();
+                    index += 1;
+                }
 
                 Some(&self.output)
             }
             AudioBufferRef::S24(buffer) => {
                 self.input.fill(0.0);
-                self.input.resize(buffer.frames() * buffer.spec().channels.count(), 0.0);
+                self.input
+                    .resize(buffer.frames() * buffer.spec().channels.count(), 0.0);
                 self.output.fill(O::default());
-                self.output.resize(buffer.frames() * buffer.spec().channels.count(), O::default());
+                self.output.resize(
+                    buffer.frames() * buffer.spec().channels.count(),
+                    O::default(),
+                );
+                self.internal_output_buffer.fill(0.0);
+                self.internal_output_buffer
+                    .resize(buffer.frames() * buffer.spec().channels.count(), 0.0);
 
-                let mut index = 0;
-                for channel in 0..buffer.spec().channels.count() {
-                    let src = buffer.chan(channel);
-                    for i in 0..buffer.frames() {
-                        self.input[index] = src[i].into_sample();
-                        index += 1;
+                for (i, frame) in self
+                    .input
+                    .chunks_exact_mut(buffer.spec().channels.count())
+                    .enumerate()
+                {
+                    for (channel, sample) in frame.iter_mut().enumerate() {
+                        *sample = buffer.chan(channel)[i].into_sample();
                     }
                 }
 
                 self.resampler
-                    .process(Some(&self.input), &mut self.output)
+                    .process(Some(&self.input), &mut self.internal_output_buffer)
                     .unwrap();
-
                 self.resampler
-                    .process::<f32, O>(None, &mut self.output[0..])
+                    .process::<f32, f32>(None, &mut self.internal_output_buffer[0..])
                     .unwrap();
+                self.resampler.0.clear().unwrap();
+
+                let mut index = 0;
+                for sample in self.internal_output_buffer.iter().copied() {
+                    self.output[index] = sample.into_sample();
+                    index += 1;
+                }
 
                 Some(&self.output)
             }
             AudioBufferRef::S32(buffer) => {
                 self.input.fill(0.0);
-                self.input.resize(buffer.frames() * buffer.spec().channels.count(), 0.0);
+                self.input
+                    .resize(buffer.frames() * buffer.spec().channels.count(), 0.0);
                 self.output.fill(O::default());
-                self.output.resize(buffer.frames() * buffer.spec().channels.count(), O::default());
+                self.output.resize(
+                    buffer.frames() * buffer.spec().channels.count(),
+                    O::default(),
+                );
+                self.internal_output_buffer.fill(0.0);
+                self.internal_output_buffer
+                    .resize(buffer.frames() * buffer.spec().channels.count(), 0.0);
 
-                let mut index = 0;
-                for channel in 0..buffer.spec().channels.count() {
-                    let src = buffer.chan(channel);
-                    for i in 0..buffer.frames() {
-                        self.input[index] = src[i].into_sample();
-                        index += 1;
+                for (i, frame) in self
+                    .input
+                    .chunks_exact_mut(buffer.spec().channels.count())
+                    .enumerate()
+                {
+                    for (channel, sample) in frame.iter_mut().enumerate() {
+                        *sample = buffer.chan(channel)[i].into_sample();
                     }
                 }
 
                 self.resampler
-                    .process(Some(&self.input), &mut self.output)
+                    .process(Some(&self.input), &mut self.internal_output_buffer)
+                    .unwrap();
+                self.resampler
+                    .process::<f32, f32>(None, &mut self.internal_output_buffer[0..])
                     .unwrap();
                 self.resampler.0.clear().unwrap();
+
+                let mut index = 0;
+                for sample in self.internal_output_buffer.iter().copied() {
+                    self.output[index] = sample.into_sample();
+                    index += 1;
+                }
 
                 Some(&self.output)
             }
             AudioBufferRef::F32(buffer) => {
                 self.input.fill(0.0);
-                self.input.resize(buffer.frames() * buffer.spec().channels.count(), 0.0);
+                self.input
+                    .resize(buffer.frames() * buffer.spec().channels.count(), 0.0);
                 self.output.fill(O::default());
-                self.output.resize(buffer.frames() * buffer.spec().channels.count(), O::default());
+                self.output.resize(
+                    buffer.frames() * buffer.spec().channels.count(),
+                    O::default(),
+                );
+                self.internal_output_buffer.fill(0.0);
+                self.internal_output_buffer
+                    .resize(buffer.frames() * buffer.spec().channels.count(), 0.0);
 
-                let mut index = 0;
-                for channel in 0..buffer.spec().channels.count() {
-                    let src = buffer.chan(channel);
-                    for i in 0..buffer.frames() {
-                        self.input[index] = src[i].into_sample();
-                        index += 1;
+                for (i, frame) in self
+                    .input
+                    .chunks_exact_mut(buffer.spec().channels.count())
+                    .enumerate()
+                {
+                    for (channel, sample) in frame.iter_mut().enumerate() {
+                        *sample = buffer.chan(channel)[i].into_sample();
                     }
                 }
 
                 self.resampler
-                    .process(Some(&self.input), &mut self.output)
+                    .process(Some(&self.input), &mut self.internal_output_buffer)
                     .unwrap();
-
                 self.resampler
-                    .process::<f32, O>(None, &mut self.output[0..])
+                    .process::<f32, f32>(None, &mut self.internal_output_buffer[0..])
                     .unwrap();
+                self.resampler.0.clear().unwrap();
+
+                let mut index = 0;
+                for sample in self.internal_output_buffer.iter().copied() {
+                    self.output[index] = sample.into_sample();
+                    index += 1;
+                }
 
                 Some(&self.output)
             }
