@@ -213,8 +213,8 @@ impl Player {
             pollmode: self.pollmode,
         };
         let mut device = self.host.create_device(self.device_id)?;
-        let params = device.adjust_stream_params(&streamparams)?;
-        let data_sender = device.start(&params)?;
+        let adjusted_params = device.adjust_stream_params(&streamparams)?;
+        let data_sender = device.start(&adjusted_params)?;
         self.current_device = Some(device);
         self.previous_stream = Some(data_sender);
         let stream = self.previous_stream.clone();
@@ -272,18 +272,18 @@ impl Player {
                     let spec = decoded.spec();
                     let frames = decoded.capacity();
                     let sample_buffer = buffer.get_or_insert_with(|| {
-                        StreamBuffer::new(params.bits_per_sample, frames, *spec)
+                        StreamBuffer::new(adjusted_params.bits_per_sample, frames, *spec)
                     });
                     sample_buffer.clear();
-                    if song.sample != params.samplerate {
+                    if song.sample != adjusted_params.samplerate {
                         let resampled_sender = resampler.get_or_insert_with(|| {
                             Resampler::new(
                                 streamparams.bits_per_sample,
-                                params.bits_per_sample,
+                                adjusted_params.bits_per_sample,
                                 streamparams.samplerate as usize,
-                                params.samplerate as usize,
+                                adjusted_params.samplerate as usize,
                                 frames,
-                                params.channels as usize,
+                                adjusted_params.channels as usize,
                             )
                             .unwrap()
                         });

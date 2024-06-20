@@ -3,7 +3,8 @@ use std::fmt::Display;
 use anyhow::Result;
 use libsoxr::{Datatype, IOSpec, QualityFlags, QualityRecipe, QualitySpec, RuntimeSpec, Soxr};
 use rubato::{
-    calculate_cutoff, FftFixedIn, FftFixedInOut, Resampler, SincInterpolationParameters, SincInterpolationType, WindowFunction
+    calculate_cutoff, FftFixedIn, FftFixedInOut, Resampler, SincInterpolationParameters,
+    SincInterpolationType, WindowFunction,
 };
 use symphonia::core::{
     audio::{AudioBuffer, AudioBufferRef, Signal},
@@ -289,47 +290,17 @@ where
         frames: usize,
         channels: usize,
     ) -> Result<Self> {
-        //let ratio = to_samplerate as f32 / from_samplerate as f32;
-        //let sinc_len = 128;
-        //let oversampling_factor = 1024;
-        //let interpolation = SincInterpolationType::Linear;
-        //let window = WindowFunction::Blackman2;
+        let resampler = rubato::FftFixedIn::<f32>::new(
+            from_samplerate,
+            to_samplerate,
+            frames,
+            frames,
+            channels,
+        )?;
 
-        ////let f_cutoff = calculate_cutoff(sinc_len, window);
-        //let f_cutoff = 0.925;
-        //let params = SincInterpolationParameters {
-        //    sinc_len,
-        //    f_cutoff,
-        //    interpolation,
-        //    oversampling_factor,
-        //    window,
-        //};
-
-        //let resampler =
-        //    rubato::SincFixedIn::<f64>::new(ratio as f64, 1.0, params, frames as usize, channels)
-        //        .unwrap();
-
-        let subchunk_size = if from_samplerate as usize > to_samplerate {
-            frames as usize / (from_samplerate / to_samplerate)
-        } else {
-            frames as usize / (to_samplerate / from_samplerate)
-        };
-        
-
-        let resampler =
-            rubato::FftFixedIn::<f32>::new(from_samplerate, to_samplerate, frames, subchunk_size, channels)?;
-
-        let mut output = resampler.output_buffer_allocate(true);
-        let mut input = resampler.input_buffer_allocate(true);
-
-        for chan in output.iter_mut() {
-            chan.resize(frames, 0.0);
-        }
-        for chan in input.iter_mut() {
-            chan.resize(frames, 0.0);
-        }
-        let mut interleaved_output = Vec::<O>::with_capacity(frames * channels);
-        interleaved_output.resize(frames * channels, O::MID);
+        let output = resampler.output_buffer_allocate(true);
+        let input = resampler.input_buffer_allocate(true);
+        let interleaved_output = Vec::<O>::with_capacity(frames * channels);
 
         Ok(Self {
             resampler,
@@ -339,18 +310,37 @@ where
             from_samplerate,
             to_samplerate,
             frames,
-            channels
+            channels,
         })
     }
 
     pub fn resample(&mut self, input: &AudioBufferRef<'_>) -> Option<&[O]> {
-
+        if input.frames() != self.frames {
+            println!("Resampler: input frames mismatch");
+            self.resampler = rubato::FftFixedIn::<f32>::new(
+                self.from_samplerate,
+                self.to_samplerate,
+                self.frames,
+                self.frames,
+                self.channels,
+            ).unwrap();
+            self.output = self.resampler.output_buffer_allocate(true);
+            self.input = self.resampler.input_buffer_allocate(true);
+        }
         match input {
             AudioBufferRef::S32(buffer) => {
                 convert_samples(buffer, &mut self.input);
                 self.resampler
                     .process_into_buffer(&self.input, &mut self.output, None)
                     .unwrap();
+
+                self.input.iter_mut().for_each(|channel| {
+                    channel.drain(0..self.frames);
+                });
+
+                self.interleaved_output
+                    .resize(self.channels * self.output[0].len(), O::MID);
+
                 for (i, frame) in self
                     .interleaved_output
                     .chunks_exact_mut(self.channels)
@@ -376,8 +366,6 @@ where
 {
     for (c, dst) in output.iter_mut().enumerate() {
         let src = input.chan(c);
-        for (index, sample) in src.iter().map(|&s| s.into_sample()).enumerate() {
-            dst[index] = sample;
-        }
+        dst.extend(src.iter().map(|&s| s.into_sample()));
     }
 }
