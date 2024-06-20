@@ -14,7 +14,7 @@ use crate::audio::{
     BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamingData,
 };
 use crate::musictrack::MusicTrack;
-use crate::tools::resampler::RubatoResampler;
+use crate::tools::resampler::{RubatoResampler, SoxrResampler};
 
 pub struct Player {
     current_device: Option<Device>,

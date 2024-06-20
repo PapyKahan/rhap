@@ -2,7 +2,9 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use libsoxr::{Datatype, IOSpec, QualityFlags, QualityRecipe, QualitySpec, RuntimeSpec, Soxr};
-use rubato::{FftFixedIn, Resampler};
+use rubato::{
+    FftFixedIn, FftFixedInOut, VecResampler
+};
 use symphonia::core::{
     audio::{AudioBuffer, AudioBufferRef, Signal},
     conv::{FromSample, IntoSample},
@@ -46,12 +48,14 @@ pub struct SoxrResampler<O> {
     resampler: InternalSoxrResampler,
     output: Vec<O>,
     input: Vec<f32>,
-    internal_output_buffer: Vec<f32>,
+    internal_output: Vec<f32>,
+    frames: usize,
+    channels: usize,
 }
 
 impl<O> SoxrResampler<O>
 where
-    O: Default + Copy + Clone + Display + IntoSample<O> + FromSample<f32>,
+    O: Default + Copy + Clone + Display + Sample + IntoSample<f32> + FromSample<f32>,
 {
     pub fn new(
         from_samplerate: usize,
@@ -75,7 +79,7 @@ where
         let output_type = Datatype::Float32S;
         let io_spec = IOSpec::new(input_type, output_type);
         let runtime_spec = RuntimeSpec::new(4);
-        let quality_spec = QualitySpec::new(&QualityRecipe::High, QualityFlags::ROLLOFF_SMALL);
+        let quality_spec = QualitySpec::new(&QualityRecipe::Low, QualityFlags::ROLLOFF_SMALL);
         let resampler = InternalSoxrResampler::create(
             from_samplerate as f64,
             to_samplerate as f64,
@@ -86,53 +90,51 @@ where
         )?;
 
         let input = vec![f32::default(); frames * channels];
+        let internal_output = vec![f32::default(); frames * channels];
         let output = vec![O::default(); frames * channels];
-        let internal_output_buffer = vec![f32::default(); frames * channels];
 
         Ok(Self {
             resampler,
             input,
             output,
-            internal_output_buffer,
+            frames,
+            channels,
+            internal_output,
         })
     }
 
     pub fn resample(&mut self, input: &AudioBufferRef<'_>) -> Option<&[O]> {
         match input {
             AudioBufferRef::S32(buffer) => {
-                for (i, frame) in self
-                    .input
-                    .chunks_exact_mut(buffer.spec().channels.count())
-                    .enumerate()
-                {
-                    for (channel, sample) in frame.iter_mut().enumerate() {
-                        *sample = buffer.chan(channel)[i].into_sample();
-                    }
-                }
-
+                copy_samples_planar(buffer, &mut self.input);
                 self.resampler
-                    .process(Some(&self.input), &mut self.internal_output_buffer)
+                    .process(Some(&self.input), &mut self.internal_output)
                     .unwrap();
                 self.resampler
-                    .process::<f32, f32>(None, &mut self.internal_output_buffer[0..])
+                    .process::<f32, f32>(None, &mut self.internal_output[0..])
                     .unwrap();
                 self.resampler.0.clear().unwrap();
 
-                let mut index = 0;
-                for sample in self.internal_output_buffer.iter().copied() {
-                    self.output[index] = sample.into_sample();
-                    index += 1;
+                self.input.drain(..self.frames * self.channels);
+                self.output.resize(self.internal_output.len(), O::MID);
+
+                for (index, frame) in self.output.chunks_exact_mut(self.channels).enumerate() {
+                    for (channel, sample) in frame.iter_mut().enumerate() {
+                        *sample = self.internal_output[channel * self.frames + index].into_sample();
+                    }
                 }
 
                 Some(&self.output)
             }
-            _ => None,
+            _ => {
+                println!("Unsupported sample format");
+                None
+            }
         }
     }
 }
 
 pub struct RubatoResampler<O> {
-    //resampler: rubato::SincFixedIn<f64>,
     resampler: FftFixedIn<f32>,
     input: Vec<Vec<f32>>,
     output: Vec<Vec<f32>>,
@@ -155,11 +157,12 @@ where
         frames: usize,
         channels: usize,
     ) -> Result<Self> {
+
         let resampler = rubato::FftFixedIn::<f32>::new(
             from_samplerate,
             to_samplerate,
             frames,
-            frames,
+            1,
             channels,
         )?;
 
@@ -183,11 +186,12 @@ where
         if input.frames() != self.frames {
             println!("Resampler: input frames mismatch");
             self.frames = input.frames();
+
             self.resampler = rubato::FftFixedIn::<f32>::new(
                 self.from_samplerate,
                 self.to_samplerate,
                 self.frames,
-                self.frames,
+                1,
                 self.channels,
             )
             .unwrap();
@@ -196,7 +200,7 @@ where
         }
         match input {
             AudioBufferRef::S32(buffer) => {
-                copy_samples(buffer, &mut self.input);
+                copy_samples_vec(buffer, &mut self.input);
                 self.resampler
                     .process_into_buffer(&self.input, &mut self.output, None)
                     .unwrap();
@@ -227,12 +231,22 @@ where
     }
 }
 
-fn copy_samples<S>(input: &AudioBuffer<S>, output: &mut [Vec<f32>])
+fn copy_samples_vec<S>(input: &AudioBuffer<S>, output: &mut [Vec<f32>])
 where
     S: Sample + IntoSample<f32>,
 {
     for (channel, samples) in output.iter_mut().enumerate() {
         let source = input.chan(channel);
         samples.extend(source.iter().map(|&s| s.into_sample()));
+    }
+}
+
+fn copy_samples_planar<S>(input: &AudioBuffer<S>, output: &mut Vec<f32>)
+where
+    S: Sample + IntoSample<f32>,
+{
+    for channel in 0..input.spec().channels.count() {
+        let source = input.chan(channel);
+        output.extend(source.iter().map(|&s| s.into_sample()));
     }
 }
