@@ -184,9 +184,7 @@ where
 
     pub fn resample(&mut self, input: &AudioBufferRef<'_>) -> Option<&[O]> {
         if input.frames() != self.frames {
-            println!("Resampler: input frames mismatch");
             self.frames = input.frames();
-
             self.resampler = rubato::FftFixedIn::<f32>::new(
                 self.from_samplerate,
                 self.to_samplerate,
