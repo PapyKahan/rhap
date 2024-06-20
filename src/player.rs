@@ -15,7 +15,6 @@ use crate::audio::{
 };
 use crate::musictrack::MusicTrack;
 use crate::tools::resampler::RubatoResampler;
-use crate::tools::SoxrResampler;
 
 pub struct Player {
     current_device: Option<Device>,

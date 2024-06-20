@@ -2,17 +2,14 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use libsoxr::{Datatype, IOSpec, QualityFlags, QualityRecipe, QualitySpec, RuntimeSpec, Soxr};
-use rubato::{
-    calculate_cutoff, FftFixedIn, FftFixedInOut, Resampler, SincInterpolationParameters,
-    SincInterpolationType, WindowFunction,
-};
+use rubato::{FftFixedIn, Resampler};
 use symphonia::core::{
     audio::{AudioBuffer, AudioBufferRef, Signal},
     conv::{FromSample, IntoSample},
-    sample::{i24, Sample},
+    sample::Sample,
 };
 
-use crate::{audio::BitsPerSample, player::StreamBuffer};
+use crate::audio::BitsPerSample;
 
 struct InternalSoxrResampler(pub Soxr);
 impl InternalSoxrResampler {
@@ -280,7 +277,7 @@ pub struct RubatoResampler<O> {
 
 impl<O> RubatoResampler<O>
 where
-    O: Sample + FromSample<f32> + IntoSample<O> + Default + Clone,
+    O: Sample + FromSample<f32> + IntoSample<f32> + Default + Clone,
 {
     pub fn new(
         from_samplerate: usize,
@@ -317,13 +314,15 @@ where
     pub fn resample(&mut self, input: &AudioBufferRef<'_>) -> Option<&[O]> {
         if input.frames() != self.frames {
             println!("Resampler: input frames mismatch");
+            self.frames = input.frames();
             self.resampler = rubato::FftFixedIn::<f32>::new(
                 self.from_samplerate,
                 self.to_samplerate,
                 self.frames,
                 self.frames,
                 self.channels,
-            ).unwrap();
+            )
+            .unwrap();
             self.output = self.resampler.output_buffer_allocate(true);
             self.input = self.resampler.input_buffer_allocate(true);
         }
