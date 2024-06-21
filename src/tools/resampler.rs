@@ -1,14 +1,15 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
+
+use rustfft::{num_complex::Complex, Fft};
 
 use anyhow::Result;
 use libsoxr::{Datatype, IOSpec, QualityFlags, QualityRecipe, QualitySpec, RuntimeSpec, Soxr};
-use rubato::{
-    FftFixedIn, FftFixedInOut, VecResampler
-};
+use rubato::{FftFixedIn, Resampler};
+use rustfft::FftPlanner;
 use symphonia::core::{
     audio::{AudioBuffer, AudioBufferRef, Signal},
     conv::{FromSample, IntoSample},
-    sample::Sample,
+    sample::{i24, Sample},
 };
 
 use crate::audio::BitsPerSample;
@@ -157,14 +158,8 @@ where
         frames: usize,
         channels: usize,
     ) -> Result<Self> {
-
-        let resampler = rubato::FftFixedIn::<f32>::new(
-            from_samplerate,
-            to_samplerate,
-            frames,
-            1,
-            channels,
-        )?;
+        let resampler =
+            rubato::FftFixedIn::<f32>::new(from_samplerate, to_samplerate, frames, 1, channels)?;
 
         let output = resampler.output_buffer_allocate(true);
         let input = resampler.input_buffer_allocate(true);
@@ -246,5 +241,123 @@ where
     for channel in 0..input.spec().channels.count() {
         let source = input.chan(channel);
         output.extend(source.iter().map(|&s| s.into_sample()));
+    }
+}
+
+pub struct FftResampler {
+    input_sample_rate: usize,
+    output_sample_rate: usize,
+    input_bits_per_sample: BitsPerSample,
+    output_bits_per_sample: BitsPerSample,
+    num_channels: usize,
+    num_frames: usize,
+    fft_size: usize,
+    fft: Arc<dyn Fft<f32>>,
+    ifft: Arc<dyn Fft<f32>>,
+}
+
+impl FftResampler {
+    pub fn new(
+        input_sample_rate: usize,
+        output_sample_rate: usize,
+        input_bits_per_sample: BitsPerSample,
+        output_bits_per_sample: BitsPerSample,
+        num_frames: usize,
+        num_channels: usize,
+    ) -> Result<Self> {
+        let fft_size = num_frames.next_power_of_two();
+        let mut fft_planner = FftPlanner::new();
+        let fft = fft_planner.plan_fft_forward(fft_size);
+        let ifft = fft_planner.plan_fft_inverse(fft_size);
+
+        Ok(FftResampler {
+            input_sample_rate,
+            output_sample_rate,
+            input_bits_per_sample,
+            output_bits_per_sample,
+            num_channels,
+            num_frames,
+            fft_size,
+            fft,
+            ifft,
+        })
+    }
+
+    pub fn resample(&self, input: &AudioBufferRef) -> Option<Vec<u8>> {
+        let output_length =
+            self.num_channels * self.num_frames * (self.output_sample_rate as usize)
+                / (self.input_sample_rate as usize);
+        let mut output = vec![0.0; output_length];
+
+        // Iterate over each channel and perform resampling
+        for ch in 0..self.num_channels {
+            let input_channel: Vec<f32> = match input {
+                AudioBufferRef::U8(buf) => {
+                    buf.chan(ch).iter().map(|&s| f32::from_sample(s)).collect()
+                }
+                AudioBufferRef::S16(buf) => {
+                    buf.chan(ch).iter().map(|&s| f32::from_sample(s)).collect()
+                }
+                AudioBufferRef::S24(buf) => {
+                    buf.chan(ch).iter().map(|&s| f32::from_sample(s)).collect()
+                }
+                AudioBufferRef::S32(buf) => {
+                    buf.chan(ch).iter().map(|&s| f32::from_sample(s)).collect()
+                }
+                AudioBufferRef::F32(buf) => buf.chan(ch).iter().copied().collect(),
+                _ => panic!("Unsupported sample format"),
+            };
+
+            let mut complex_input: Vec<Complex<f32>> = input_channel
+                .into_iter()
+                .map(|s| Complex { re: s, im: 0.0 })
+                .collect();
+            complex_input.resize(self.fft_size, Complex { re: 0.0, im: 0.0 });
+
+            self.fft.process(&mut complex_input);
+
+            let mut complex_output = vec![Complex { re: 0.0, im: 0.0 }; self.fft_size];
+            let resample_ratio = self.output_sample_rate as f32 / self.input_sample_rate as f32;
+            for (i, sample) in complex_input.iter().enumerate().take(self.fft_size / 2) {
+                let new_index = (i as f32 * resample_ratio) as usize;
+                if new_index < self.fft_size / 2 {
+                    complex_output[new_index] = *sample;
+                }
+            }
+
+            self.ifft.process(&mut complex_output);
+
+            let output_channel: Vec<f32> = complex_output.iter().map(|c| c.re).collect();
+            for (i, &sample) in output_channel
+                .iter()
+                .enumerate()
+                .take(output_length / self.num_channels)
+            {
+                output[i * self.num_channels + ch] = sample;
+            }
+        }
+
+        Some(self.convert_output_to_bytes(output))
+    }
+
+    fn convert_output_to_bytes(&self, output: Vec<f32>) -> Vec<u8> {
+        match self.output_bits_per_sample {
+            BitsPerSample::Bits16 => output
+                .iter()
+                .flat_map(|&s| {
+                    let sample = i16::from_sample(s);
+                    sample.to_ne_bytes().to_vec()
+                })
+                .collect(),
+            BitsPerSample::Bits24 => output
+                .iter()
+                .flat_map(|&s| {
+                    let sample = i24::from_sample(s);
+                    sample.to_ne_bytes().to_vec()
+                })
+                .collect(),
+            BitsPerSample::Bits32 => output.iter().flat_map(|&s| s.to_ne_bytes()).collect(),
+            _ => panic!("Unsupported output sample format"),
+        }
     }
 }

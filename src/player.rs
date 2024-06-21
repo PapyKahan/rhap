@@ -14,7 +14,7 @@ use crate::audio::{
     BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamingData,
 };
 use crate::musictrack::MusicTrack;
-use crate::tools::resampler::{RubatoResampler, SoxrResampler};
+use crate::tools::resampler::{FftResampler, RubatoResampler, SoxrResampler};
 
 pub struct Player {
     current_device: Option<Device>,
@@ -273,7 +273,7 @@ impl Player {
                     let sample_buffer = buffer.get_or_insert_with(|| {
                         StreamBuffer::new(adjusted_params.bits_per_sample, frames, *spec)
                     });
-                    sample_buffer.clear();
+                    //sample_buffer.clear();
                     if song.sample != adjusted_params.samplerate {
                         let resampled_sender = resampler.get_or_insert_with(|| {
                             Resampler::new(
