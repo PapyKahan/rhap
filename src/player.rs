@@ -14,7 +14,7 @@ use crate::audio::{
     BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamingData,
 };
 use crate::musictrack::MusicTrack;
-use crate::tools::resampler::{FftResampler, RubatoResampler, SoxrResampler};
+use crate::tools::resampler::RubatoResampler;
 
 pub struct Player {
     current_device: Option<Device>,
@@ -29,8 +29,6 @@ pub struct Player {
 #[derive(Clone)]
 pub struct CurrentTrackInfo {
     is_streaming: Arc<AtomicBool>,
-    pub title: String,
-    pub artist: String,
 }
 
 impl CurrentTrackInfo {
@@ -54,14 +52,6 @@ impl StreamBuffer {
         }
     }
 
-    pub fn copy_planar_ref(&mut self, decoded: AudioBufferRef<'_>) {
-        match self {
-            StreamBuffer::I16(buffer) => buffer.copy_planar_ref(decoded),
-            StreamBuffer::I24(buffer) => buffer.copy_planar_ref(decoded),
-            StreamBuffer::F32(buffer) => buffer.copy_planar_ref(decoded),
-        }
-    }
-
     pub fn copy_interleaved_ref(&mut self, decoded: AudioBufferRef<'_>) {
         match self {
             StreamBuffer::I16(buffer) => buffer.copy_interleaved_ref(decoded),
@@ -75,14 +65,6 @@ impl StreamBuffer {
             StreamBuffer::I16(buffer) => buffer.as_bytes(),
             StreamBuffer::I24(buffer) => buffer.as_bytes(),
             StreamBuffer::F32(buffer) => buffer.as_bytes(),
-        }
-    }
-
-    pub fn clear(&mut self) {
-        match self {
-            StreamBuffer::I16(buffer) => buffer.clear(),
-            StreamBuffer::I24(buffer) => buffer.clear(),
-            StreamBuffer::F32(buffer) => buffer.clear(),
         }
     }
 }
@@ -221,7 +203,6 @@ impl Player {
         let is_streaming = Arc::new(AtomicBool::new(true));
         let report_streaming = Arc::clone(&is_streaming);
         let is_playing = self.is_playing.clone();
-        let report_song = song.clone();
         self.streaming_handle = Some(tokio::spawn(async move {
             let mut format = song.format.lock().await;
             format.seek(
@@ -313,8 +294,6 @@ impl Player {
 
         Ok(CurrentTrackInfo {
             is_streaming: report_streaming,
-            title: report_song.title.clone(),
-            artist: report_song.artist.clone(),
         })
     }
 }
