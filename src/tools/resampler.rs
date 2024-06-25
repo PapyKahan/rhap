@@ -136,9 +136,9 @@ where
 }
 
 pub struct RubatoResampler<O> {
-    resampler: FftFixedIn<f32>,
-    input: Vec<Vec<f32>>,
-    output: Vec<Vec<f32>>,
+    resampler: FftFixedIn<f64>,
+    input: Vec<Vec<f64>>,
+    output: Vec<Vec<f64>>,
     interleaved_output: Vec<O>,
     from_samplerate: usize,
     to_samplerate: usize,
@@ -148,7 +148,7 @@ pub struct RubatoResampler<O> {
 
 impl<O> RubatoResampler<O>
 where
-    O: Sample + FromSample<f32> + IntoSample<f32> + Default + Clone,
+    O: Sample + FromSample<f64> + IntoSample<f64> + Default + Clone,
 {
     pub fn new(
         from_samplerate: usize,
@@ -159,7 +159,7 @@ where
         channels: usize,
     ) -> Result<Self> {
         let resampler =
-            rubato::FftFixedIn::<f32>::new(from_samplerate, to_samplerate, frames, 1, channels)?;
+            rubato::FftFixedIn::<f64>::new(from_samplerate, to_samplerate, frames, 1, channels)?;
 
         let output = resampler.output_buffer_allocate(true);
         let input = resampler.input_buffer_allocate(true);
@@ -180,7 +180,7 @@ where
     pub fn resample(&mut self, input: &AudioBufferRef<'_>) -> Option<&[O]> {
         if input.frames() != self.frames {
             self.frames = input.frames();
-            self.resampler = rubato::FftFixedIn::<f32>::new(
+            self.resampler = rubato::FftFixedIn::<f64>::new(
                 self.from_samplerate,
                 self.to_samplerate,
                 self.frames,
@@ -224,9 +224,9 @@ where
     }
 }
 
-fn copy_samples_vec<S>(input: &AudioBuffer<S>, output: &mut [Vec<f32>])
+fn copy_samples_vec<S, T>(input: &AudioBuffer<S>, output: &mut [Vec<T>])
 where
-    S: Sample + IntoSample<f32>,
+    S: Sample + IntoSample<T>,
 {
     for (channel, samples) in output.iter_mut().enumerate() {
         let source = input.chan(channel);
