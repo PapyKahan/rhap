@@ -33,7 +33,6 @@ impl From<usize> for SampleRate {
 #[repr(usize)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BitsPerSample {
-    Bits8 = 8,
     Bits16 = 16,
     Bits24 = 24,
     Bits32 = 32,
@@ -42,7 +41,6 @@ pub enum BitsPerSample {
 impl From<usize> for BitsPerSample {
     fn from(value: usize) -> Self {
         match value {
-            8 => BitsPerSample::Bits8,
             16 => BitsPerSample::Bits16,
             24 => BitsPerSample::Bits24,
             32 => BitsPerSample::Bits32,

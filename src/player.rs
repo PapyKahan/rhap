@@ -14,7 +14,7 @@ use crate::audio::{
     BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamingData,
 };
 use crate::musictrack::MusicTrack;
-use crate::tools::ResamplerUtil;
+use crate::tools::resampler::RubatoResampler;
 
 pub struct Player {
     current_device: Option<Device>,
@@ -29,8 +29,6 @@ pub struct Player {
 #[derive(Clone)]
 pub struct CurrentTrackInfo {
     is_streaming: Arc<AtomicBool>,
-    pub title: String,
-    pub artist: String,
 }
 
 impl CurrentTrackInfo {
@@ -39,26 +37,23 @@ impl CurrentTrackInfo {
     }
 }
 
-enum StreamBuffer {
-    I8(RawSampleBuffer<i8>),
+pub enum StreamBuffer {
     I16(RawSampleBuffer<i16>),
     I24(RawSampleBuffer<i24>),
     F32(RawSampleBuffer<f32>),
 }
 
 impl StreamBuffer {
-    pub fn new(bits_per_sample: BitsPerSample, duration: u64, spec: SignalSpec) -> Self {
+    pub fn new(bits_per_sample: BitsPerSample, duration: usize, spec: SignalSpec) -> Self {
         match bits_per_sample {
-            BitsPerSample::Bits8 => StreamBuffer::I8(RawSampleBuffer::<i8>::new(duration, spec)),
-            BitsPerSample::Bits16 => StreamBuffer::I16(RawSampleBuffer::<i16>::new(duration, spec)),
-            BitsPerSample::Bits24 => StreamBuffer::I24(RawSampleBuffer::<i24>::new(duration, spec)),
-            BitsPerSample::Bits32 => StreamBuffer::F32(RawSampleBuffer::<f32>::new(duration, spec)),
+            BitsPerSample::Bits16 => StreamBuffer::I16(RawSampleBuffer::<i16>::new(duration as u64, spec)),
+            BitsPerSample::Bits24 => StreamBuffer::I24(RawSampleBuffer::<i24>::new(duration as u64, spec)),
+            BitsPerSample::Bits32 => StreamBuffer::F32(RawSampleBuffer::<f32>::new(duration as u64, spec)),
         }
     }
 
     pub fn copy_interleaved_ref(&mut self, decoded: AudioBufferRef<'_>) {
         match self {
-            StreamBuffer::I8(buffer) => buffer.copy_interleaved_ref(decoded),
             StreamBuffer::I16(buffer) => buffer.copy_interleaved_ref(decoded),
             StreamBuffer::I24(buffer) => buffer.copy_interleaved_ref(decoded),
             StreamBuffer::F32(buffer) => buffer.copy_interleaved_ref(decoded),
@@ -67,127 +62,85 @@ impl StreamBuffer {
 
     pub fn as_bytes(&self) -> &[u8] {
         match self {
-            StreamBuffer::I8(buffer) => buffer.as_bytes(),
             StreamBuffer::I16(buffer) => buffer.as_bytes(),
             StreamBuffer::I24(buffer) => buffer.as_bytes(),
             StreamBuffer::F32(buffer) => buffer.as_bytes(),
         }
     }
-
-    pub fn clear(&mut self) {
-        match self {
-            StreamBuffer::I8(buffer) => buffer.clear(),
-            StreamBuffer::I16(buffer) => buffer.clear(),
-            StreamBuffer::I24(buffer) => buffer.clear(),
-            StreamBuffer::F32(buffer) => buffer.clear(),
-        }
-    }
 }
 
 enum Resampler {
-    I8(ResamplerUtil<i8>),
-    I16(ResamplerUtil<i16>),
-    I24(ResamplerUtil<i24>),
-    F32(ResamplerUtil<f32>),
+    I16(RubatoResampler<i16>),
+    I24(RubatoResampler<i24>),
+    F32(RubatoResampler<f32>),
 }
 
 impl Resampler {
     pub fn new(
-        bits_per_sample: BitsPerSample,
-        spec: &SignalSpec,
-        samplerate: usize,
-        duration: u64,
+        input_bits_per_sample: BitsPerSample,
+        output_bits_per_sample: BitsPerSample,
+        input_sample_rate: usize,
+        output_samplerate: usize,
+        frames: usize,
+        channels: usize,
     ) -> Result<Self> {
-        match bits_per_sample {
-            BitsPerSample::Bits8 => {
-                Ok(Resampler::I8(ResamplerUtil::<i8>::new(spec, samplerate, duration)?))
-            }
-            BitsPerSample::Bits16 => {
-                Ok(Resampler::I16(ResamplerUtil::<i16>::new(spec, samplerate, duration)?))
-            }
-            BitsPerSample::Bits24 => {
-                Ok(Resampler::I24(ResamplerUtil::<i24>::new(spec, samplerate, duration)?))
-            }
-            BitsPerSample::Bits32 => {
-                Ok(Resampler::F32(ResamplerUtil::<f32>::new(spec, samplerate, duration)?))
-            }
+        match output_bits_per_sample {
+            BitsPerSample::Bits16 => Ok(Resampler::I16(RubatoResampler::<i16>::new(
+                input_sample_rate,
+                output_samplerate,
+                input_bits_per_sample,
+                output_bits_per_sample,
+                frames,
+                channels,
+            )?)),
+            BitsPerSample::Bits24 => Ok(Resampler::I24(RubatoResampler::<i24>::new(
+                input_sample_rate,
+                output_samplerate,
+                input_bits_per_sample,
+                output_bits_per_sample,
+                frames,
+                channels,
+            )?)),
+            BitsPerSample::Bits32 => Ok(Resampler::F32(RubatoResampler::<f32>::new(
+                input_sample_rate,
+                output_samplerate,
+                input_bits_per_sample,
+                output_bits_per_sample,
+                frames,
+                channels,
+            )?)),
         }
     }
 
     pub async fn send_resampled_data(
         &mut self,
-        decoded: AudioBufferRef<'_>,
+        streambuffer: &AudioBufferRef<'_>,
         streamer: &Sender<StreamingData>,
     ) -> Result<()> {
         match self {
-            Resampler::I8(resampler) => {
-                if let Some(buffer) = resampler.resample(decoded) {
-                    for i in buffer.iter() {
-                        for j in i.to_ne_bytes().iter() {
-                            streamer.send(StreamingData::Data(*j)).await?
-                        }
-                    }
-                }
-                if let Some(buffer) = resampler.flush() {
-                    for i in buffer.iter() {
-                        for j in i.to_ne_bytes().iter() {
-                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
             Resampler::I16(resampler) => {
-                if let Some(buffer) = resampler.resample(decoded) {
-                    for i in buffer.iter() {
+                if let Some(output) = resampler.resample(streambuffer) {
+                    for i in output.iter() {
                         for j in i.to_ne_bytes().iter() {
                             streamer.send(StreamingData::Data(*j)).await?
                         }
                     }
                 }
-                if let Some(buffer) = resampler.flush() {
-                    for i in buffer.iter() {
-                        for j in i.to_ne_bytes().iter() {
-                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+            },
             Resampler::I24(resampler) => {
-                if let Some(buffer) = resampler.resample(decoded) {
-                    for i in buffer.iter() {
+                if let Some(output) = resampler.resample(streambuffer) {
+                    for i in output.iter() {
                         for j in i.to_ne_bytes().iter() {
                             streamer.send(StreamingData::Data(*j)).await?
                         }
                     }
                 }
-                if let Some(buffer) = resampler.flush() {
-                    for i in buffer.iter() {
-                        for j in i.to_ne_bytes().iter() {
-                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+            },
             Resampler::F32(resampler) => {
-                if let Some(buffer) = resampler.resample(decoded) {
-                    for i in buffer.iter() {
+                if let Some(output) = resampler.resample(streambuffer) {
+                    for i in output.iter() {
                         for j in i.to_ne_bytes().iter() {
                             streamer.send(StreamingData::Data(*j)).await?
-                        }
-                    }
-                }
-                if let Some(buffer) = resampler.flush() {
-                    for i in buffer.iter() {
-                        for j in i.to_ne_bytes().iter() {
-                            if streamer.send(StreamingData::Data(*j)).await.is_err() {
-                                break;
-                            }
                         }
                     }
                 }
@@ -232,9 +185,6 @@ impl Player {
         Ok(())
     }
 
-    /// Plays a FLAC file
-    /// - params:
-    ///    - song: song struct
     pub async fn play(&mut self, song: Arc<MusicTrack>) -> Result<CurrentTrackInfo> {
         let streamparams = StreamParams {
             samplerate: song.sample,
@@ -244,8 +194,8 @@ impl Player {
             pollmode: self.pollmode,
         };
         let mut device = self.host.create_device(self.device_id)?;
-        let streamparams = device.adjust_stream_params(&streamparams)?;
-        let data_sender = device.start(&streamparams)?;
+        let adjusted_params = device.adjust_stream_params(&streamparams)?;
+        let data_sender = device.start(&adjusted_params)?;
         self.current_device = Some(device);
         self.previous_stream = Some(data_sender);
         let stream = self.previous_stream.clone();
@@ -253,7 +203,6 @@ impl Player {
         let is_streaming = Arc::new(AtomicBool::new(true));
         let report_streaming = Arc::clone(&is_streaming);
         let is_playing = self.is_playing.clone();
-        let report_song = song.clone();
         self.streaming_handle = Some(tokio::spawn(async move {
             let mut format = song.format.lock().await;
             format.seek(
@@ -295,19 +244,34 @@ impl Player {
                             break;
                         }
                     };
-                    progress.store(progress.load(Ordering::Relaxed) + packet.dur, Ordering::Relaxed);
+                    progress.store(
+                        progress.load(Ordering::Relaxed) + packet.dur,
+                        Ordering::Relaxed,
+                    );
                     let decoded = decoder.decode(&packet)?;
                     let spec = decoded.spec();
-                    let duration = decoded.capacity() as u64;
+                    let frames = decoded.capacity();
                     let sample_buffer = buffer.get_or_insert_with(|| {
-                        StreamBuffer::new(streamparams.bits_per_sample, duration, *spec)
+                        StreamBuffer::new(adjusted_params.bits_per_sample, frames, *spec)
                     });
-                    let resampled_sender = resampler.get_or_insert_with(|| {
-                        Resampler::new(streamparams.bits_per_sample, spec, streamparams.samplerate as usize, duration).unwrap()
-                    });
-                    sample_buffer.clear();
-                    if song.sample != streamparams.samplerate {
-                        if resampled_sender.send_resampled_data(decoded, &streamer).await.is_err() {
+                    //sample_buffer.clear();
+                    if song.sample != adjusted_params.samplerate {
+                        let resampled_sender = resampler.get_or_insert_with(|| {
+                            Resampler::new(
+                                streamparams.bits_per_sample,
+                                adjusted_params.bits_per_sample,
+                                streamparams.samplerate as usize,
+                                adjusted_params.samplerate as usize,
+                                frames,
+                                adjusted_params.channels as usize,
+                            )
+                            .unwrap()
+                        });
+                        if resampled_sender
+                            .send_resampled_data(&decoded, &streamer)
+                            .await
+                            .is_err()
+                        {
                             break;
                         }
                     } else {
@@ -330,8 +294,6 @@ impl Player {
 
         Ok(CurrentTrackInfo {
             is_streaming: report_streaming,
-            title: report_song.title.clone(),
-            artist: report_song.artist.clone(),
         })
     }
 }
