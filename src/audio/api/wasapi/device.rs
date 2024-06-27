@@ -15,7 +15,8 @@ use crate::audio::{Capabilities, DeviceTrait, StreamParams, StreamingData};
 pub struct Device {
     default_device_id: String,
     inner_device: IMMDevice,
-    stream_thread_handle: Option<tokio::task::JoinHandle<Result<()>>>
+    stream_thread_handle: Option<tokio::task::JoinHandle<Result<()>>>,
+    pub high_priority_mode: bool,
 }
 
 impl StreamParams {
@@ -25,11 +26,12 @@ impl StreamParams {
 }
 
 impl Device {
-    pub(crate) fn new(inner_device: IMMDevice, default_device_id: String) -> Result<Self> {
+    pub(crate) fn new(inner_device: IMMDevice, default_device_id: String, high_priority_mode: bool) -> Result<Self> {
         Ok(Self {
             inner_device,
             default_device_id,
             stream_thread_handle: Option::None,
+            high_priority_mode,
         })
     }
 

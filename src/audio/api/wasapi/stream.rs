@@ -11,6 +11,7 @@ use crate::audio::StreamingData;
 pub struct Streamer {
     client: AudioClient,
     receiver: Receiver<StreamingData>,
+    high_priority_mode: bool,
 }
 
 unsafe impl Send for Streamer {}
@@ -28,6 +29,7 @@ impl Streamer {
         Ok(Streamer {
             client,
             receiver,
+            high_priority_mode: device.high_priority_mode,
         })
     }
 
@@ -36,7 +38,7 @@ impl Streamer {
     }
 
     pub(crate) async fn start(&mut self) -> Result<()> {
-        let _thread_priority = ThreadPriority::new()?;
+        let _thread_priority = ThreadPriority::new(self.high_priority_mode)?;
         let mut buffer = vec![];
         let mut client_started = false;
         let mut available_buffer_size = self.client.get_buffer_size();

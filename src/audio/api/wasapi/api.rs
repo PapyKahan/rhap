@@ -113,7 +113,11 @@ impl Drop for AudioClient {
 }
 
 impl AudioClient {
-    pub(crate) fn is_supported(&self, format: WaveFormat, share_mode: &ShareMode) -> Result<WaveFormat> {
+    pub(crate) fn is_supported(
+        &self,
+        format: WaveFormat,
+        share_mode: &ShareMode,
+    ) -> Result<WaveFormat> {
         match share_mode {
             ShareMode::Exclusive => self.is_supported_exclusive(format),
             ShareMode::Shared => self.is_supported_shared(format),
@@ -227,8 +231,20 @@ impl AudioClient {
         };
 
         let flags = match self.sharemode {
-            ShareMode::Exclusive => if self.pollmode { 0 } else { AUDCLNT_STREAMFLAGS_EVENTCALLBACK },
-            ShareMode::Shared => if self.pollmode { 0 } else { AUDCLNT_STREAMFLAGS_EVENTCALLBACK },
+            ShareMode::Exclusive => {
+                if self.pollmode {
+                    0
+                } else {
+                    AUDCLNT_STREAMFLAGS_EVENTCALLBACK
+                }
+            }
+            ShareMode::Shared => {
+                if self.pollmode {
+                    0
+                } else {
+                    AUDCLNT_STREAMFLAGS_EVENTCALLBACK
+                }
+            }
         };
 
         unsafe {
@@ -514,19 +530,23 @@ impl From<&StreamParams> for WaveFormat {
 }
 
 pub struct ThreadPriority {
-    previous_process_priority: PROCESS_CREATION_FLAGS,
-    previous_thread_priority: THREAD_PRIORITY,
+    previous_process_priority: Option<PROCESS_CREATION_FLAGS>,
+    previous_thread_priority: Option<THREAD_PRIORITY>,
     taskhandle: HANDLE,
 }
 
 impl ThreadPriority {
-    pub fn new() -> Result<ThreadPriority> {
-        let previous_process_priority =
-            unsafe { PROCESS_CREATION_FLAGS(GetPriorityClass(GetCurrentProcess())) };
-        unsafe { SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)? }
-        let previous_thread_priority =
-            unsafe { THREAD_PRIORITY(GetThreadPriority(GetCurrentThread())) };
-        unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST)? };
+    pub fn new(high_priority_mode: bool) -> Result<ThreadPriority> {
+        let mut previous_process_priority = None;
+        let mut previous_thread_priority = None;
+        if high_priority_mode {
+            previous_process_priority =
+                Some(unsafe { PROCESS_CREATION_FLAGS(GetPriorityClass(GetCurrentProcess())) });
+            previous_thread_priority =
+                Some(unsafe { THREAD_PRIORITY(GetThreadPriority(GetCurrentThread())) });
+            unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST)? };
+            unsafe { SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)? }
+        }
         let taskhandle = unsafe { AvSetMmThreadCharacteristicsW(w!("Pro Audio"), &mut 0)? };
         Ok(ThreadPriority {
             previous_process_priority,
@@ -537,8 +557,12 @@ impl ThreadPriority {
 
     fn revert_thread_priority(&mut self) -> Result<()> {
         unsafe {
-            SetPriorityClass(GetCurrentProcess(), self.previous_process_priority)?;
-            SetThreadPriority(GetCurrentThread(), self.previous_thread_priority)?;
+            if let Some(previous_process_priority) = self.previous_process_priority {
+                SetPriorityClass(GetCurrentProcess(), previous_process_priority)?;
+            }
+            if let Some(previous_thread_priority) = self.previous_thread_priority {
+                SetThreadPriority(GetCurrentThread(), previous_thread_priority)?;
+            }
             AvRevertMmThreadCharacteristics(self.taskhandle)?;
         }
         Ok(())

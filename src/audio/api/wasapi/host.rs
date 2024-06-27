@@ -9,20 +9,22 @@ use windows::Win32::{
 };
 
 #[derive(Clone, Copy)]
-pub struct Host {}
+pub struct Host {
+    high_priority_mode: bool,
+}
 
 impl Host {
-    pub(crate) fn new() -> Self {
-        Self {}
+    pub(crate) fn new(high_priority_mode: bool) -> Self {
+        Self { high_priority_mode }
     }
 
-    pub fn get_default_device() -> Result<Device> {
+    pub fn get_default_device(&self) -> Result<Device> {
         com_initialize();
         let enumerator: IMMDeviceEnumerator =
             unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
         let device = unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia)? };
         let default_device_id = unsafe { device.GetId()?.to_string()? };
-        Ok(Device::new(device, default_device_id)?)
+        Ok(Device::new(device, default_device_id, self.high_priority_mode)?)
     }
 }
 
@@ -35,12 +37,13 @@ impl HostTrait for Host {
         let devices_collection =
             unsafe { enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)? };
 
-        let default_device = Self::get_default_device()?;
+        let default_device = self.get_default_device()?;
         let default_device_id = default_device.get_id()?;
         let device = match id {
             Some(index) => Device::new(
                 unsafe { devices_collection.Item(index)? },
                 default_device_id,
+                self.high_priority_mode
             )?,
             _ => default_device,
         };
@@ -53,21 +56,20 @@ impl HostTrait for Host {
             unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
         let devices_collection =
             unsafe { enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)? };
-        let default_device = Self::get_default_device()?;
+        let default_device = self.get_default_device()?;
         let default_device_id = default_device.get_id()?;
 
         let mut enumerated_devices: Vec<crate::audio::Device> = vec![];
 
         for i in 0..unsafe { devices_collection.GetCount()? } {
             let inner_device = unsafe { devices_collection.Item(i)? };
-            let device = Device::new(inner_device, default_device_id.clone())?;
+            let device = Device::new(inner_device, default_device_id.clone(), self.high_priority_mode)?;
             enumerated_devices.push(crate::audio::Device::Wasapi(device));
         }
         Ok(enumerated_devices)
     }
 
     fn get_default_device(&self) -> Result<crate::audio::Device> {
-        Ok(crate::audio::Device::Wasapi(Self::get_default_device()?))
+        Ok(crate::audio::Device::Wasapi(self.get_default_device()?))
     }
 }
-

@@ -23,10 +23,13 @@ mod tools;
 
 use crate::audio::{DeviceTrait, HostTrait};
 
-#[derive(Parser)]
-struct Cli {
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
     #[clap(short, long)]
     list: bool,
+    #[clap(short, long, default_value_t = false)]
+    high_priority_mode: bool,
     #[clap(short, long)]
     path: Option<PathBuf>,
     #[clap(short, long)]
@@ -37,9 +40,9 @@ struct Cli {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let cli = Cli::parse();
-    if cli.list {
-        let host = Host::new("wasapi");
+    let args = Args::parse();
+    if args.list {
+        let host = Host::new("wasapi", args.high_priority_mode);
         let devices = host.get_devices()?;
         let mut index = 0;
         for dev in devices {
@@ -59,8 +62,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             index = index + 1;
         }
         return Ok(());
-    } else if cli.path.is_none() {
-        let mut cmd = Cli::command();
+    } else if args.path.is_none() {
+        let mut cmd = Args::command();
         cmd.error(
             ErrorKind::MissingRequiredArgument,
             "File or directory must be specified",
@@ -68,8 +71,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .exit();
     }
 
-    let host = Host::new("wasapi");
-    let player = Player::new(host, cli.device, cli.pollmode)?;
+    let host = Host::new("wasapi", args.high_priority_mode);
+    let player = Player::new(host, args.device, args.pollmode)?;
     tokio::spawn(async move {
         tokio::signal::ctrl_c()
             .await
@@ -85,7 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     backend.execute(SetTitle("rhap - Rust Handcrafted Audio Player"))?;
 
     let mut terminal = Terminal::new(backend)?;
-    let path = cli.path.expect("Error: A file or a path is expected");
+    let path = args.path.expect("Error: A file or a path is expected");
     let mut app = App::new(host, player, path)?;
     app.run(&mut terminal).await?;
 
