@@ -5,9 +5,9 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
-clap = { version = "4.5.7", features = ["derive"] }
+clap = { version = "4.5.8", features = ["derive"] }
 crossterm = "0.27.0"
-log = "0.4.21"
+log = "0.4.22"
 rand = "0.8.5"
 rubato = { version = "0.15.0", features = ["fft_resampler", "realfft", "num-complex"] }
 libsoxr = "0.2.9"
