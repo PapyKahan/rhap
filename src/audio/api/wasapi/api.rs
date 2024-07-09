@@ -535,6 +535,9 @@ pub struct ThreadPriority {
     taskhandle: HANDLE,
 }
 
+unsafe impl Send for ThreadPriority {}
+unsafe impl Sync for ThreadPriority {}
+
 impl ThreadPriority {
     pub fn new(high_priority_mode: bool) -> Result<ThreadPriority> {
         let mut previous_process_priority = None;
