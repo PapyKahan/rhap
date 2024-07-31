@@ -60,7 +60,7 @@ impl App {
                 if let Event::Key(key) = event::read()? {
                     match current_screen {
                         Screens::OutputSelector(selector) => {
-                            selector.borrow_mut().key_event_handler(key)?;
+                            selector.borrow_mut().event_handler(key)?;
                             if key.kind == event::KeyEventKind::Press {
                                 match key.code {
                                     KeyCode::Char('q') => {

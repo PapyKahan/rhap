@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, MediaKeyCode};
 use rand::{seq::SliceRandom, thread_rng};
 use ratatui::{
     prelude::{Alignment, Constraint, Rect},
@@ -141,19 +141,31 @@ impl Playlist {
                         self.playing_track_list_index = 0;
                     }
                     self.play().await?;
-                }
+                },
                 KeyCode::Char('s') => {
                     self.stop().await?;
-                }
+                },
+                KeyCode::Media(MediaKeyCode::Stop) => {
+                    self.next().await?;
+                },
                 KeyCode::Char('n') => {
                     self.next().await?;
-                }
+                },
+                KeyCode::Media(MediaKeyCode::TrackNext) => {
+                    self.next().await?;
+                },
                 KeyCode::Char('p') => {
                     self.previous().await?;
                 },
+                KeyCode::Media(MediaKeyCode::TrackPrevious) => {
+                    self.next().await?;
+                },
                 KeyCode::Char(' ') => {
                     self.pause().await?;
-                }
+                },
+                KeyCode::Media(MediaKeyCode::Pause) => {
+                    self.next().await?;
+                },
                 _ => (),
             }
         }

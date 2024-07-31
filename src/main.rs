@@ -3,23 +3,23 @@ use audio::Host;
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
 use crossterm::event::{
-    DisableMouseCapture, EnableMouseCapture
+    DisableMouseCapture, EnableMouseCapture, KeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
 };
 use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetTitle,
+    disable_raw_mode, enable_raw_mode, supports_keyboard_enhancement, EnterAlternateScreen, LeaveAlternateScreen, SetTitle
 };
 use crossterm::{execute, ExecutableCommand};
 use player::Player;
 use ratatui::Terminal;
-use ui::App;
 use std::io::stdout;
 use std::path::PathBuf;
+use ui::App;
 
 mod audio;
-mod player;
 mod musictrack;
-mod ui;
+mod player;
 mod tools;
+mod ui;
 
 use crate::audio::{DeviceTrait, HostTrait};
 
@@ -81,7 +81,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mut out = stdout();
-    execute!(out, EnterAlternateScreen, EnableMouseCapture)?;
+    if supports_keyboard_enhancement().unwrap() {
+        execute!(
+            out,
+            EnterAlternateScreen,
+            EnableMouseCapture,
+            PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+        )?;
+    }
+    else {
+        execute!(
+            out,
+            EnterAlternateScreen,
+            EnableMouseCapture,
+        )?;
+    }
+
     enable_raw_mode()?;
 
     let mut backend = ratatui::backend::CrosstermBackend::new(out);
