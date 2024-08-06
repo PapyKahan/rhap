@@ -1,4 +1,4 @@
-use super::{screens::Playlist, utils::bottom_right_fixed_size, widgets::DeviceSelector};
+use super::{media_keys_handler::MediaKeysHandler, screens::Playlist, utils::bottom_right_fixed_size, widgets::DeviceSelector};
 use crate::{audio::Host, player::Player};
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode};
@@ -13,6 +13,7 @@ pub enum Screens {
 
 pub struct App {
     layers: Vec<Screens>,
+    _media_keys_handler: Rc<RefCell<MediaKeysHandler>>,
     output_selector: Rc<RefCell<DeviceSelector>>,
     playlist: Rc<RefCell<Playlist>>,
 }
@@ -21,6 +22,7 @@ impl App {
     pub fn new(host: Host, player: Player, path: PathBuf) -> Result<Self> {
         Ok(Self {
             layers: vec![],
+            _media_keys_handler: Rc::new(RefCell::new(MediaKeysHandler::new()?)),
             output_selector: Rc::new(RefCell::new(DeviceSelector::new(host)?)),
             playlist: Rc::new(RefCell::new(Playlist::new(path, player)?)),
         })

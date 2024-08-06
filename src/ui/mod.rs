@@ -1,9 +1,10 @@
 use ratatui::style::Color;
 
 mod app;
+mod media_keys_handler;
 mod utils;
-pub(crate) mod screens;
-pub(crate) mod widgets;
+mod screens;
+mod widgets;
 
 pub use app::App;
 

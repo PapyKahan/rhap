@@ -5,40 +5,19 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
-clap = { version = "4.5.10", features = ["derive"] }
-crossterm = "0.27.0"
+clap = { version = "4.5.13", features = ["derive"] }
+crossterm = "0.28.1"
 log = "0.4.22"
 rand = "0.8.5"
 rubato = { version = "0.15.0", features = ["fft_resampler", "realfft", "num-complex"] }
 libsoxr = "0.2.9"
 symphonia = { version = "0.5.4", features = ["all-formats", "all-codecs", "opt-simd", "opt-simd-avx", "opt-simd-neon", "opt-simd-sse"] }
-tokio = { version = "1.39.1", features = ["full"] }
+ratatui = { version = "0.27.0", features = ["crossterm", "all-widgets", "macros"] }
+tokio = { version = "1.39.2", features = ["full"] }
 walkdir = "2.5.0"
 num-integer = "0.1.46"
 rustfft = "6.2.0"
-
-[dependencies.ratatui]
-version = "0.27.0"
-default-features = false
-features = ["crossterm", "all-widgets", "macros"]
-
-[dependencies.windows]
-version = "0.58.0"
-features = [
-    "Win32_Foundation",
-    "Win32_Security",
-    "Win32_System_Com",
-    "Win32_System_Threading",
-    "Win32_Media_Audio",
-    "Devices_Enumeration",
-    "Media_Audio",
-    "Win32_UI_Shell_PropertiesSystem",
-    "Win32_System_Com_StructuredStorage",
-    "Win32_Devices_FunctionDiscovery",
-    "Win32_Media_KernelStreaming",
-    "Win32_Media_Multimedia",
-    "Win32_System_Variant",
-]
+windows = { version = "0.58.0", features = [ "Win32_Foundation", "Win32_Security", "Win32_System_Com", "Win32_System_LibraryLoader", "Win32_System_Threading", "Win32_Media_Audio", "Devices_Enumeration", "Media_Audio", "Win32_UI_Shell_PropertiesSystem", "Win32_System_Com_StructuredStorage", "Win32_Devices_FunctionDiscovery", "Win32_Media_KernelStreaming", "Win32_Media_Multimedia", "Win32_System_Variant", "Win32_UI_WindowsAndMessaging" , "Win32_Graphics_Gdi", "Win32_UI_Input_KeyboardAndMouse"] }
 
 [profile.release]
 opt-level = 3
