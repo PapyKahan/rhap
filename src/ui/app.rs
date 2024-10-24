@@ -2,8 +2,10 @@ use super::{screens::Playlist, utils::bottom_right_fixed_size, widgets::DeviceSe
 use crate::{audio::Host, player::Player};
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode};
+use crossterm::terminal::SetTitle;
+use crossterm::ExecutableCommand;
 use log::error;
-use ratatui::{prelude::Backend, Frame, Terminal};
+use ratatui::{DefaultTerminal, Frame};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 pub enum Screens {
@@ -27,7 +29,7 @@ impl App {
     }
 
     fn render(&mut self, frame: &mut Frame) -> Result<()> {
-        self.playlist.borrow_mut().render(frame, frame.size())?;
+        self.playlist.borrow_mut().render(frame, frame.area())?;
         let layer = if self.layers.is_empty() {
             return Ok(());
         } else {
@@ -35,7 +37,7 @@ impl App {
         };
         match layer {
             Screens::OutputSelector(selector) => {
-                let area = bottom_right_fixed_size(40, 6, frame.size());
+                let area = bottom_right_fixed_size(40, 6, frame.area());
                 (*selector).borrow_mut().render(frame, area)?;
             }
             _ => (),
@@ -43,7 +45,10 @@ impl App {
         Ok(())
     }
 
-    pub async fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
+    pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
+        terminal
+            .backend_mut()
+            .execute(SetTitle("rhap - Rust Handcrafted Audio Player"))?;
         let default = Screens::Default(self.playlist.clone());
         loop {
             terminal.draw(|frame| match self.render(frame) {
@@ -76,7 +81,8 @@ impl App {
                                 match key.code {
                                     KeyCode::Char('q') => {
                                         playlist.borrow_mut().stop().await?;
-                                        return Ok(());},
+                                        return Ok(());
+                                    }
                                     KeyCode::Char('o') => {
                                         self.output_selector.borrow_mut().refresh_device_list()?;
                                         self.layers.push(Screens::OutputSelector(

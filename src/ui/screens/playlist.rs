@@ -222,7 +222,7 @@ impl Playlist {
                 Constraint::Percentage(10),
                 Constraint::Percentage(10),
             ])
-            .highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
+            .row_highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
             .block(
                 Block::default()
                     .title(format!("Playlist - {}", self.songs.len()))

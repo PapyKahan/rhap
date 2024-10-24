@@ -131,7 +131,7 @@ impl DeviceSelector {
 
         let table = Table::new(items, &[Constraint::Length(1), Constraint::Percentage(100)])
             .highlight_symbol("=>")
-            .highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
+            .row_highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
             .block(
                 Block::default()
                     .title("Select Output Device")

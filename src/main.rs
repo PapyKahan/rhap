@@ -2,16 +2,7 @@ use anyhow::Result;
 use audio::Host;
 use clap::error::ErrorKind;
 use clap::{CommandFactory, Parser};
-use crossterm::event::{
-    DisableMouseCapture, EnableMouseCapture, KeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
-};
-use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, supports_keyboard_enhancement, EnterAlternateScreen, LeaveAlternateScreen, SetTitle
-};
-use crossterm::{execute, ExecutableCommand};
 use player::Player;
-use ratatui::Terminal;
-use std::io::stdout;
 use std::path::PathBuf;
 use ui::App;
 
@@ -80,36 +71,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(0);
     });
 
-    let mut out = stdout();
-    if supports_keyboard_enhancement().unwrap() {
-        execute!(
-            out,
-            EnterAlternateScreen,
-            EnableMouseCapture,
-            PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
-        )?;
-    }
-    else {
-        execute!(
-            out,
-            EnterAlternateScreen,
-            EnableMouseCapture,
-        )?;
-    }
-
-    enable_raw_mode()?;
-
-    let mut backend = ratatui::backend::CrosstermBackend::new(out);
-    backend.execute(SetTitle("rhap - Rust Handcrafted Audio Player"))?;
-
-    let mut terminal = Terminal::new(backend)?;
+    let mut terminal = ratatui::init();
     let path = args.path.expect("Error: A file or a path is expected");
     let mut app = App::new(host, player, path)?;
     app.run(&mut terminal).await?;
 
-    disable_raw_mode()?;
-    let mut out = stdout();
-    execute!(out, LeaveAlternateScreen, DisableMouseCapture)?;
+    ratatui::restore();
 
     Ok(())
 }
