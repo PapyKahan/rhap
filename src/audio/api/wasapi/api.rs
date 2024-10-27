@@ -47,8 +47,8 @@ use windows::{
 
 use crate::audio::{BitsPerSample, StreamParams};
 
-//const REFTIMES_PER_MILLISEC: u64 = 10000;
-//const REFTIMES_PER_SEC: u64 = 10000000;
+const REFTIMES_PER_MILLISEC: u64 = 10000;
+const REFTIMES_PER_SEC: u64 = 10000000;
 
 thread_local! {
     static WASAPI_COM_INIT: ComWasapi = {
@@ -100,6 +100,7 @@ pub struct AudioClient {
     max_buffer_frames: usize,
     sharemode: ShareMode,
     pollmode: bool,
+    internal_buffer: Vec<u8>,
     eventhandle: Option<EventHandle>,
 }
 
@@ -257,6 +258,10 @@ impl AudioClient {
                 None,
             );
             self.max_buffer_frames = self.inner_client.GetBufferSize()? as usize;
+            self.internal_buffer.resize(
+                self.max_buffer_frames * self.format.get_block_align() as usize,
+                0,
+            );
             match result {
                 Ok(()) => debug!("IAudioClient::Initialize ok"),
                 Err(e) => {
@@ -345,28 +350,27 @@ impl AudioClient {
         Ok(self.max_buffer_frames - unsafe { self.inner_client.GetCurrentPadding()? as usize })
     }
 
-    pub(crate) fn get_buffer_size(&self) -> usize {
-        self.max_buffer_frames * self.format.get_block_align() as usize
+    pub(crate) fn get_current_padding_size(&self) -> Result<usize> {
+        Ok(unsafe { self.inner_client.GetCurrentPadding()? as usize }
+            * self.format.get_block_align() as usize)
     }
 
-    pub(crate) fn wait_for_buffer(&self, available_buffer_size: &mut usize) -> Result<()> {
-        if !self.pollmode {
-            if let Some(event) = &self.eventhandle {
-                event.wait_for_event(1000)?;
-            }
-            return Ok(());
-        } else {
-            loop {
-                *available_buffer_size =
-                    self.get_available_buffer_frames()? * self.format.get_block_align() as usize;
-                if *available_buffer_size
-                    >= (self.max_buffer_frames * self.format.get_block_align() as usize) / 4
-                {
-                    return Ok(());
-                }
-                std::thread::sleep(Duration::from_millis(1));
-            }
-        }
+    pub(crate) fn wait_for_buffer(&self) -> Result<()> {
+        // sleep half the buffer time
+        let duration = REFTIMES_PER_SEC as f64 * self.max_buffer_frames as f64 / self.format.get_samples_per_sec() as f64;
+        let sleep = duration / REFTIMES_PER_MILLISEC as f64/ 2.0;
+        println!("REFTIMES_PER_SEC: {}", REFTIMES_PER_SEC);
+        println!("REFTIMES_PER_MILLISEC: {}", REFTIMES_PER_MILLISEC);
+        println!("max_buffer_frames: {}", self.max_buffer_frames);
+        println!("samples_per_sec: {}", self.format.get_samples_per_sec());
+        println!("duration: {}", duration);
+        println!("sleep: {}", sleep);
+        std::thread::sleep(Duration::from_millis(sleep as u64));
+        Ok(())
+    }
+
+    pub(crate) fn get_buffer_size(&self) -> usize {
+        self.max_buffer_frames * self.format.get_block_align() as usize
     }
 
     pub(crate) fn new(device: &IMMDevice, params: &StreamParams) -> Result<AudioClient> {
@@ -382,6 +386,7 @@ impl AudioClient {
             renderer: None,
             sharemode,
             max_buffer_frames: 0,
+            internal_buffer: Vec::new(),
             pollmode: params.pollmode,
             eventhandle: None,
         })

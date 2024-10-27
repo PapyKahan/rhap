@@ -1,14 +1,14 @@
-use super::{api, Capabilities, StreamParams, StreamingData};
-use anyhow::{anyhow, Result};
-use tokio::sync::mpsc::Sender;
+use super::{api, Capabilities, StreamParams};
+use anyhow::Result;
+use async_trait::async_trait;
 
+#[async_trait]
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> Result<bool>;
     fn name(&self) -> Result<String>;
     fn get_capabilities(&self) -> Result<Capabilities>;
-    fn start(&mut self, params: &StreamParams) -> Result<Sender<StreamingData>>;
-    fn pause(&mut self) -> Result<()>;
-    fn resume(&mut self) -> Result<()>;
+    fn start(&mut self, params: &StreamParams) -> Result<()>;
+    async fn write(&mut self, data: &[u8]) -> Result<()>;
     fn stop(&mut self) -> Result<()>;
 }
 
@@ -21,7 +21,9 @@ impl Device {
     pub fn adjust_stream_params(&self, params: &StreamParams) -> Result<StreamParams> {
         let capabilities = self.get_capabilities()?;
         let contains_sample_rates = capabilities.sample_rates.contains(&params.samplerate);
-        let contains_bits_per_samples = capabilities.bits_per_samples.contains(&params.bits_per_sample);
+        let contains_bits_per_samples = capabilities
+            .bits_per_samples
+            .contains(&params.bits_per_sample);
         if !contains_sample_rates || !contains_bits_per_samples {
             let samplerate = if contains_sample_rates {
                 params.samplerate
@@ -39,13 +41,12 @@ impl Device {
                 ..*params
             });
         } else {
-            Ok(StreamParams {
-                ..*params
-            })
+            Ok(StreamParams { ..*params })
         }
     }
 }
 
+#[async_trait]
 impl DeviceTrait for Device {
     fn is_default(&self) -> Result<bool> {
         let device = match self {
@@ -71,28 +72,20 @@ impl DeviceTrait for Device {
         device.get_capabilities()
     }
 
-    fn start(&mut self, params: &StreamParams) -> Result<Sender<StreamingData>> {
+    fn start(&mut self, params: &StreamParams) -> Result<()> {
         let device = match self {
             Self::Wasapi(device) => device,
-            Self::None => return Err(anyhow!("No host selected")),
+            Self::None => return Ok(()),
         };
         device.start(params)
     }
 
-    fn pause(&mut self) -> Result<()> {
+    async fn write(&mut self, data: &[u8]) -> Result<()> {
         let device = match self {
             Self::Wasapi(device) => device,
             Self::None => return Ok(()),
         };
-        device.pause()
-    }
-
-    fn resume(&mut self) -> Result<()> {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return Ok(()),
-        };
-        device.resume()
+        device.write(data).await
     }
 
     fn stop(&mut self) -> Result<()> {

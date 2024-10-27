@@ -82,6 +82,8 @@ pub struct StreamParams {
     pub exclusive: bool,
     pub pollmode: bool,
 }
+unsafe impl Send for StreamParams {}
+unsafe impl Sync for StreamParams {}
 
 #[derive(Copy, Clone)]
 pub enum StreamingData {

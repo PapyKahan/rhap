@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use rubato::{FftFixedIn, Resampler};
 use symphonia::core::{
     audio::{AudioBuffer, AudioBufferRef, Signal},
@@ -50,7 +50,7 @@ where
         })
     }
 
-    pub fn resample(&mut self, input: &AudioBufferRef<'_>) -> Option<&[O]> {
+    pub fn resample(&mut self, input: &AudioBufferRef<'_>) -> Result<&[O]> {
         if input.frames() != self.frames {
             self.frames = input.frames();
             self.resampler = rubato::FftFixedIn::<f64>::new(
@@ -89,11 +89,11 @@ where
                 }
             }
             _ => {
-                println!("Unsupported sample format");
+                return Err(anyhow!("Unsupported sample format"));
             }
         }
 
-        Some(&self.interleaved_output)
+        Ok(&self.interleaved_output)
     }
 }
 

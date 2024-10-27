@@ -3,7 +3,7 @@ use anyhow::Result;
 
 
 pub trait HostTrait: Send + Sync {
-    fn create_device(&self, id: Option<u32>) -> Result<Device>;
+    fn create_device(&self, id: &Option<u32>) -> Result<Device>;
     fn get_devices(&self) -> Result<Vec<Device>>;
     fn get_default_device(&self) -> Result<Device>;
 }
@@ -20,7 +20,7 @@ impl HostTrait for Host {
         }
     }
 
-    fn create_device(&self, id: Option<u32>) -> Result<Device> {
+    fn create_device(&self, id: &Option<u32>) -> Result<Device> {
         match self {
             Self::Wasapi(host) => host.create_device(id),
         }

@@ -29,7 +29,7 @@ impl Host {
 }
 
 impl HostTrait for Host {
-    fn create_device(&self, id: Option<u32>) -> Result<crate::audio::Device> {
+    fn create_device(&self, id: &Option<u32>) -> Result<crate::audio::Device> {
         com_initialize();
         let enumerator: IMMDeviceEnumerator =
             unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
@@ -41,7 +41,7 @@ impl HostTrait for Host {
         let default_device_id = default_device.get_id()?;
         let device = match id {
             Some(index) => Device::new(
-                unsafe { devices_collection.Item(index)? },
+                unsafe { devices_collection.Item(*index)? },
                 default_device_id,
                 self.high_priority_mode
             )?,
