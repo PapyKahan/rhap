@@ -359,12 +359,12 @@ impl AudioClient {
         // sleep half the buffer time
         let duration = REFTIMES_PER_SEC as f64 * self.max_buffer_frames as f64 / self.format.get_samples_per_sec() as f64;
         let sleep = duration / REFTIMES_PER_MILLISEC as f64/ 2.0;
-        println!("REFTIMES_PER_SEC: {}", REFTIMES_PER_SEC);
-        println!("REFTIMES_PER_MILLISEC: {}", REFTIMES_PER_MILLISEC);
-        println!("max_buffer_frames: {}", self.max_buffer_frames);
-        println!("samples_per_sec: {}", self.format.get_samples_per_sec());
-        println!("duration: {}", duration);
-        println!("sleep: {}", sleep);
+        //println!("REFTIMES_PER_SEC: {}", REFTIMES_PER_SEC);
+        //println!("REFTIMES_PER_MILLISEC: {}", REFTIMES_PER_MILLISEC);
+        //println!("max_buffer_frames: {}", self.max_buffer_frames);
+        //println!("samples_per_sec: {}", self.format.get_samples_per_sec());
+        //println!("duration: {}", duration);
+        //println!("sleep: {}", sleep);
         std::thread::sleep(Duration::from_millis(sleep as u64));
         Ok(())
     }

@@ -186,7 +186,6 @@ impl Player {
         let host = Arc::new(self.host.clone());
 
         self.streaming_handle = Some(tokio::spawn(async move {
-            println!("starting streaming");
             let mut device = host.create_device(device_id.as_ref())?;
             let adjusted_params = device.adjust_stream_params(&streamparams)?;
             device.start(&adjusted_params)?;
@@ -255,10 +254,10 @@ impl Player {
                     if resampled.is_err() {
                         break;
                     }
-                    device.write(resampled.unwrap().as_slice()).await?;
+                    device.write(resampled.unwrap().as_slice())?;
                 } else {
                     sample_buffer.copy_interleaved_ref(decoded);
-                    device.write(sample_buffer.as_bytes()).await?;
+                    device.write(sample_buffer.as_bytes())?;
                 }
             }
             device.stop()?;

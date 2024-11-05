@@ -1,14 +1,12 @@
 use super::{api, Capabilities, StreamParams};
 use anyhow::Result;
-use async_trait::async_trait;
 
-#[async_trait]
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> Result<bool>;
     fn name(&self) -> Result<String>;
     fn get_capabilities(&self) -> Result<Capabilities>;
     fn start(&mut self, params: &StreamParams) -> Result<()>;
-    async fn write(&mut self, data: &[u8]) -> Result<()>;
+    fn write(&mut self, data: &[u8]) -> Result<()>;
     fn stop(&mut self) -> Result<()>;
 }
 
@@ -46,7 +44,6 @@ impl Device {
     }
 }
 
-#[async_trait]
 impl DeviceTrait for Device {
     fn is_default(&self) -> Result<bool> {
         let device = match self {
@@ -80,12 +77,12 @@ impl DeviceTrait for Device {
         device.start(params)
     }
 
-    async fn write(&mut self, data: &[u8]) -> Result<()> {
+    fn write(&mut self, data: &[u8]) -> Result<()> {
         let device = match self {
             Self::Wasapi(device) => device,
             Self::None => return Ok(()),
         };
-        device.write(data).await
+        device.write(data)
     }
 
     fn stop(&mut self) -> Result<()> {

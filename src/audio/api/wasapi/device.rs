@@ -131,25 +131,26 @@ impl DeviceTrait for Device {
         self.capabilities()
     }
 
-    async fn write(&mut self, data: &[u8]) -> Result<()> {
+    fn write(&mut self, data: &[u8]) -> Result<()> {
         if let Some(client) = &mut self.current_client {
-            let writen = 0;
+            let mut writen = 0;
             loop {
-                println!("waiting for buffer...");
+                //println!("waiting for buffer...");
                 client.wait_for_buffer()?;
                 let mut to_write = client.get_buffer_size() - client.get_current_padding_size()?;
-                println!("got buffer, to write {}", to_write);
+                //println!("got buffer, to write {}", to_write);
                 if writen + to_write > data.len() {
                     to_write = data.len() - writen;
-                    println!("to write {}", to_write);
+                    //println!("to write {}", to_write);
                     client.write(&data[writen..writen + to_write])?;
-                    println!("wrote {} bytes", to_write);
+                    //println!("wrote {} bytes", to_write);
                     break;
                 } else {
-                    println!("to write {}", to_write);
+                    //println!("to write {}", to_write);
                     client.write(&data[writen..writen + to_write])?;
-                    println!("wrote {} bytes", to_write);
+                    //println!("wrote {} bytes", to_write);
                 }
+               writen += to_write; 
             }
         }
         Ok(())
