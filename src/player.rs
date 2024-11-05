@@ -247,10 +247,10 @@ impl Player {
                     if resampled.is_err() {
                         break;
                     }
-                    device.write(resampled.unwrap().as_slice())?;
+                    device.write(resampled.unwrap().as_slice()).await?;
                 } else {
                     sample_buffer.copy_interleaved_ref(decoded);
-                    device.write(sample_buffer.as_bytes())?;
+                    device.write(sample_buffer.as_bytes()).await?;
                 }
             }
             device.stop()?;

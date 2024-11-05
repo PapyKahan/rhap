@@ -120,7 +120,7 @@ impl DeviceTrait for Device {
         let mut client = self.get_client(params)?;
         client.initialize()?;
         // prefill the buffer with silence
-        client.write(&vec![0 as u8; client.get_buffer_size()].as_slice())?;
+        //client.write(&vec![0 as u8; client.get_buffer_size()].as_slice())?;
         client.start()?;
         self.current_client = Some(client);
         Ok(())
@@ -130,7 +130,7 @@ impl DeviceTrait for Device {
         self.capabilities()
     }
 
-    fn write(&mut self, data: &[u8]) -> Result<()> {
+    async fn write(&mut self, data: &[u8]) -> Result<()> {
         if let Some(client) = &mut self.current_client {
             let mut writen = 0;
             let mut available_buffer_size = client.get_buffer_size();
