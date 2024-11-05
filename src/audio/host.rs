@@ -1,6 +1,5 @@
-use super::{Device, api};
+use super::{api, Device};
 use anyhow::Result;
-
 
 pub trait HostTrait: Send + Sync {
     fn create_device(&self, id: &Option<u32>) -> Result<Device>;
@@ -8,7 +7,7 @@ pub trait HostTrait: Send + Sync {
     fn get_default_device(&self) -> Result<Device>;
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum Host {
     Wasapi(api::wasapi::host::Host),
 }
@@ -34,10 +33,10 @@ impl HostTrait for Host {
 }
 
 impl Host {
-    pub(crate) fn new(name: &str, high_priority_mode: bool) -> Self {
-        match name {
-            "wasapi" => Host::Wasapi(api::wasapi::host::Host::new(high_priority_mode)),
-            _ => Host::Wasapi(api::wasapi::host::Host::new(high_priority_mode)),
-        }
+    pub(crate) fn new(name: &str, high_priority_mode: bool) -> Result<Self> {
+        Ok(match name {
+            "wasapi" => Host::Wasapi(api::wasapi::host::Host::new(high_priority_mode)?),
+            _ => Host::Wasapi(api::wasapi::host::Host::new(high_priority_mode)?),
+        })
     }
 }

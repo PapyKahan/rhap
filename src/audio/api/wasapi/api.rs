@@ -339,10 +339,13 @@ impl AudioClient {
         }))
     }
 
-    pub(crate) fn stop(&self) -> Result<()> {
+    pub(crate) fn stop(&mut self) -> Result<()> {
         Ok(unsafe {
             self.inner_client.Stop()?;
-            self.inner_client.Reset()?
+            self.inner_client.Reset()?;
+            if let Some(renderer) = self.renderer.take() {
+                drop(renderer);
+            }
         })
     }
 
@@ -355,18 +358,35 @@ impl AudioClient {
             * self.format.get_block_align() as usize)
     }
 
-    pub(crate) fn wait_for_buffer(&self) -> Result<()> {
-        // sleep half the buffer time
-        let duration = REFTIMES_PER_SEC as f64 * self.max_buffer_frames as f64 / self.format.get_samples_per_sec() as f64;
-        let sleep = duration / REFTIMES_PER_MILLISEC as f64/ 2.0;
-        //println!("REFTIMES_PER_SEC: {}", REFTIMES_PER_SEC);
-        //println!("REFTIMES_PER_MILLISEC: {}", REFTIMES_PER_MILLISEC);
-        //println!("max_buffer_frames: {}", self.max_buffer_frames);
-        //println!("samples_per_sec: {}", self.format.get_samples_per_sec());
-        //println!("duration: {}", duration);
-        //println!("sleep: {}", sleep);
-        std::thread::sleep(Duration::from_millis(sleep as u64));
-        Ok(())
+    pub(crate) fn wait_for_buffer(&self, available_buffer_size: &mut usize) -> Result<()> {
+        //let frames = size / self.format.get_block_align() as usize;
+        //let frames = if frames < self.max_buffer_frames {
+        //    size
+        //} else {
+        //    self.max_buffer_frames
+        //};
+        //let duration =
+        //    REFTIMES_PER_SEC as f64 * frames as f64 / self.format.get_samples_per_sec() as f64;
+        //let sleep = duration / REFTIMES_PER_MILLISEC as f64 / 2.0;
+        //std::thread::sleep(Duration::from_millis(sleep as u64));
+        //Ok(())
+        if !self.pollmode {
+            if let Some(event) = &self.eventhandle {
+                event.wait_for_event(1000)?;
+            }
+            return Ok(());
+        } else {
+            loop {
+                *available_buffer_size =
+                    self.get_available_buffer_frames()? * self.format.get_block_align() as usize;
+                if *available_buffer_size
+                    >= (self.max_buffer_frames * self.format.get_block_align() as usize) / 4
+                {
+                    return Ok(());
+                }
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
     }
 
     pub(crate) fn get_buffer_size(&self) -> usize {
@@ -534,6 +554,7 @@ impl From<&StreamParams> for WaveFormat {
     }
 }
 
+#[derive(Clone)]
 pub struct ThreadPriority {
     previous_process_priority: Option<PROCESS_CREATION_FLAGS>,
     previous_thread_priority: Option<THREAD_PRIORITY>,

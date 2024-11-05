@@ -8,11 +8,10 @@ use symphonia::core::errors::Error;
 use symphonia::core::formats::{SeekMode, SeekTo};
 use symphonia::core::sample::i24;
 use symphonia::core::units::Time;
-use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 
 use crate::audio::{
-    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamingData,
+    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams
 };
 use crate::musictrack::MusicTrack;
 use crate::tools::resampler::RubatoResampler;
@@ -22,7 +21,6 @@ pub struct Player {
     host: Host,
     device_id: Option<u32>,
     pollmode: bool,
-    previous_stream: Option<Sender<StreamingData>>,
     streaming_handle: Option<JoinHandle<Result<()>>>,
     is_playing: Arc<AtomicBool>,
 }
@@ -145,7 +143,6 @@ impl Player {
             host,
             device_id,
             pollmode,
-            previous_stream: None,
             streaming_handle: None,
             is_playing: Arc::new(AtomicBool::new(false)),
         })
@@ -155,10 +152,6 @@ impl Player {
         self.is_playing.store(false, Ordering::Relaxed);
         if let Some(device) = &mut self.current_device {
             device.stop()?;
-        }
-        if let Some(stream) = self.previous_stream.take() {
-            stream.closed().await;
-            drop(stream);
         }
         if let Some(handle) = self.streaming_handle.take() {
             handle.abort();

@@ -13,7 +13,6 @@ pub struct Device {
     default_device_id: String,
     inner_device: IMMDevice,
     current_client: Option<AudioClient>,
-    pub high_priority_mode: bool,
 }
 
 impl StreamParams {
@@ -30,13 +29,11 @@ impl Device {
     pub(crate) fn new(
         inner_device: IMMDevice,
         default_device_id: String,
-        high_priority_mode: bool,
     ) -> Result<Self> {
         Ok(Self {
             inner_device,
             current_client: None,
             default_device_id,
-            high_priority_mode,
         })
     }
 
@@ -122,6 +119,8 @@ impl DeviceTrait for Device {
     fn start(&mut self, params: &StreamParams) -> Result<()> {
         let mut client = self.get_client(params)?;
         client.initialize()?;
+        // prefill the buffer with silence
+        client.write(&vec![0 as u8; client.get_buffer_size()].as_slice())?;
         client.start()?;
         self.current_client = Some(client);
         Ok(())
@@ -134,30 +133,25 @@ impl DeviceTrait for Device {
     fn write(&mut self, data: &[u8]) -> Result<()> {
         if let Some(client) = &mut self.current_client {
             let mut writen = 0;
+            let mut available_buffer_size = client.get_buffer_size();
             loop {
-                //println!("waiting for buffer...");
-                client.wait_for_buffer()?;
-                let mut to_write = client.get_buffer_size() - client.get_current_padding_size()?;
-                //println!("got buffer, to write {}", to_write);
+                client.wait_for_buffer(&mut available_buffer_size)?;
+                let mut to_write = available_buffer_size;
                 if writen + to_write > data.len() {
                     to_write = data.len() - writen;
-                    //println!("to write {}", to_write);
                     client.write(&data[writen..writen + to_write])?;
-                    //println!("wrote {} bytes", to_write);
                     break;
                 } else {
-                    //println!("to write {}", to_write);
                     client.write(&data[writen..writen + to_write])?;
-                    //println!("wrote {} bytes", to_write);
                 }
-               writen += to_write; 
+                writen += to_write;
             }
         }
         Ok(())
     }
 
     fn stop(&mut self) -> Result<()> {
-        if let Some(client) = self.current_client.take() {
+        if let Some(mut client) = self.current_client.take() {
             client.stop()?;
         }
         Ok(())

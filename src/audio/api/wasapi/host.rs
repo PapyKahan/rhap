@@ -1,4 +1,7 @@
-use super::{api::com_initialize, device::Device};
+use super::{
+    api::{com_initialize, ThreadPriority},
+    device::Device,
+};
 use crate::audio::HostTrait;
 use anyhow::Result;
 use windows::Win32::{
@@ -8,14 +11,16 @@ use windows::Win32::{
     System::Com::{CoCreateInstance, CLSCTX_ALL},
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Host {
-    high_priority_mode: bool,
+    _thread_priority: ThreadPriority,
 }
 
 impl Host {
-    pub(crate) fn new(high_priority_mode: bool) -> Self {
-        Self { high_priority_mode }
+    pub(crate) fn new(high_priority_mode: bool) -> Result<Self> {
+        Ok(Self {
+            _thread_priority: ThreadPriority::new(high_priority_mode)?,
+        })
     }
 
     pub fn get_default_device(&self) -> Result<Device> {
@@ -24,7 +29,10 @@ impl Host {
             unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
         let device = unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia)? };
         let default_device_id = unsafe { device.GetId()?.to_string()? };
-        Ok(Device::new(device, default_device_id, self.high_priority_mode)?)
+        Ok(Device::new(
+            device,
+            default_device_id
+        )?)
     }
 }
 
@@ -42,8 +50,7 @@ impl HostTrait for Host {
         let device = match id {
             Some(index) => Device::new(
                 unsafe { devices_collection.Item(*index)? },
-                default_device_id,
-                self.high_priority_mode
+                default_device_id
             )?,
             _ => default_device,
         };
@@ -63,7 +70,10 @@ impl HostTrait for Host {
 
         for i in 0..unsafe { devices_collection.GetCount()? } {
             let inner_device = unsafe { devices_collection.Item(i)? };
-            let device = Device::new(inner_device, default_device_id.clone(), self.high_priority_mode)?;
+            let device = Device::new(
+                inner_device,
+                default_device_id.clone()
+            )?;
             enumerated_devices.push(crate::audio::Device::Wasapi(device));
         }
         Ok(enumerated_devices)

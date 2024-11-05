@@ -84,10 +84,3 @@ pub struct StreamParams {
 }
 unsafe impl Send for StreamParams {}
 unsafe impl Sync for StreamParams {}
-
-#[derive(Copy, Clone)]
-pub enum StreamingData {
-    Data(u8),
-    EndOfStream
-}
-

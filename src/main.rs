@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
 
     let args = Args::parse();
     if args.list {
-        let host = Host::new("wasapi", args.high_priority_mode);
+        let host = Host::new("wasapi", args.high_priority_mode)?;
         let devices = host.get_devices()?;
         let mut index = 0;
         for device in devices {
@@ -63,9 +63,9 @@ async fn main() -> Result<()> {
     });
 
     let mut terminal = ratatui::init();
-    let host = Host::new("wasapi", args.high_priority_mode);
-    let player = Player::new(host, args.device, args.pollmode)?;
-    let mut app = App::new(host, player, args.path)?;
+    let host = Host::new("wasapi", args.high_priority_mode)?;
+    let player = Player::new(host.clone(), args.device, args.pollmode)?;
+    let mut app = App::new(player, args.path)?;
     app.run(&mut terminal).await?;
     ratatui::restore();
 

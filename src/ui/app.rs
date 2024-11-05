@@ -9,21 +9,21 @@ use ratatui::{DefaultTerminal, Frame};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 pub enum Screens {
-    OutputSelector(Rc<RefCell<DeviceSelector>>),
+    //OutputSelector(Rc<RefCell<DeviceSelector>>),
     Default(Rc<RefCell<Playlist>>),
 }
 
 pub struct App {
     layers: Vec<Screens>,
-    output_selector: Rc<RefCell<DeviceSelector>>,
+    //output_selector: Rc<RefCell<DeviceSelector>>,
     playlist: Rc<RefCell<Playlist>>,
 }
 
 impl App {
-    pub fn new(host: Host, player: Player, path: PathBuf) -> Result<Self> {
+    pub fn new(player: Player, path: PathBuf) -> Result<Self> {
         Ok(Self {
             layers: vec![],
-            output_selector: Rc::new(RefCell::new(DeviceSelector::new(host)?)),
+            //output_selector: Rc::new(RefCell::new(DeviceSelector::new(host)?)),
             playlist: Rc::new(RefCell::new(Playlist::new(path, player)?)),
         })
     }
@@ -36,10 +36,10 @@ impl App {
             self.layers.last().unwrap()
         };
         match layer {
-            Screens::OutputSelector(selector) => {
-                let area = bottom_right_fixed_size(40, 6, frame.area());
-                (*selector).borrow_mut().render(frame, area)?;
-            }
+            //Screens::OutputSelector(selector) => {
+            //    let area = bottom_right_fixed_size(40, 6, frame.area());
+            //    (*selector).borrow_mut().render(frame, area)?;
+            //}
             _ => (),
         }
         Ok(())
@@ -64,17 +64,17 @@ impl App {
                 let current_screen = self.layers.last().unwrap_or(&default);
                 if let Event::Key(key) = event::read()? {
                     match current_screen {
-                        Screens::OutputSelector(selector) => {
-                            selector.borrow_mut().event_handler(key)?;
-                            if key.kind == event::KeyEventKind::Press {
-                                match key.code {
-                                    KeyCode::Char('q') => {
-                                        self.layers.pop();
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
+                        //Screens::OutputSelector(selector) => {
+                        //    selector.borrow_mut().event_handler(key)?;
+                        //    if key.kind == event::KeyEventKind::Press {
+                        //        match key.code {
+                        //            KeyCode::Char('q') => {
+                        //                self.layers.pop();
+                        //            }
+                        //            _ => {}
+                        //        }
+                        //    }
+                        //}
                         Screens::Default(playlist) => {
                             playlist.borrow_mut().event_hanlder(key).await?;
                             if key.kind == event::KeyEventKind::Press {
@@ -83,12 +83,12 @@ impl App {
                                         playlist.borrow_mut().stop().await?;
                                         return Ok(());
                                     }
-                                    KeyCode::Char('o') => {
-                                        self.output_selector.borrow_mut().refresh_device_list()?;
-                                        self.layers.push(Screens::OutputSelector(
-                                            self.output_selector.clone(),
-                                        ));
-                                    }
+                                    //KeyCode::Char('o') => {
+                                    //    self.output_selector.borrow_mut().refresh_device_list()?;
+                                    //    self.layers.push(Screens::OutputSelector(
+                                    //        self.output_selector.clone(),
+                                    //    ));
+                                    //}
                                     _ => {}
                                 }
                             }
