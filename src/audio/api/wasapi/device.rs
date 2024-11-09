@@ -6,10 +6,7 @@ use windows::Win32::{
     System::Com::{StructuredStorage::PropVariantToStringAlloc, STGM_READ},
 };
 
-use super::{
-    api::{com_initialize, AudioClient, ShareMode, WaveFormat},
-    stream::Streamer,
-};
+use super::api::{com_initialize, AudioClient, ShareMode, ThreadPriority, WaveFormat};
 use crate::audio::{Capabilities, DeviceTrait, StreamParams, StreamingData};
 
 pub struct Device {
@@ -21,12 +18,20 @@ pub struct Device {
 
 impl StreamParams {
     fn create_wave_format(&self) -> WaveFormat {
-        WaveFormat::new(self.bits_per_sample, self.samplerate as usize, self.channels as usize)
+        WaveFormat::new(
+            self.bits_per_sample,
+            self.samplerate as usize,
+            self.channels as usize,
+        )
     }
 }
 
 impl Device {
-    pub(crate) fn new(inner_device: IMMDevice, default_device_id: String, high_priority_mode: bool) -> Result<Self> {
+    pub(crate) fn new(
+        inner_device: IMMDevice,
+        default_device_id: String,
+        high_priority_mode: bool,
+    ) -> Result<Self> {
         Ok(Self {
             inner_device,
             default_device_id,
@@ -58,7 +63,7 @@ impl Device {
                     bits_per_sample,
                     channels: 2,
                     exclusive: true,
-                    pollmode: false
+                    pollmode: false,
                 };
                 let client = self.get_client(&params)?;
                 let wave_format = params.create_wave_format();
@@ -121,14 +126,32 @@ impl DeviceTrait for Device {
         self.stop()?;
         let buffer = params.channels as usize
             * ((params.bits_per_sample as usize * params.samplerate as usize) / 8 as usize);
-        let (data_tx, data_rx) = channel::<StreamingData>(buffer);
-        let mut streamer = Streamer::new(&self, data_rx, params)?;
+        let (data_tx, mut data_rx) = channel::<StreamingData>(buffer);
+
+        let mut client = self.get_client(params)?;
+        let high_priority_mode = self.high_priority_mode;
+        client.initialize()?;
+
         self.stream_thread_handle = Some(tokio::spawn(async move {
-            let result = streamer.start().await;
-            if let Some(error) = result.as_ref().err() {
-                println!("Error: {:?}", error);
+            let _thread_priority = ThreadPriority::new(high_priority_mode)?;
+            let mut buffer = vec![];
+            let mut available_buffer_size = client.get_buffer_size();
+            client.start()?;
+            while let Some(streaming_data) = data_rx.recv().await {
+                let data = match streaming_data {
+                    StreamingData::Data(data) => data,
+                    StreamingData::EndOfStream => break,
+                };
+                buffer.push(data);
+                if buffer.len() != available_buffer_size {
+                    continue;
+                }
+
+                client.write(buffer.as_slice())?;
+                buffer.clear();
+                client.wait_for_buffer(&mut available_buffer_size)?;
             }
-            result
+            client.stop()
         }));
         Ok(data_tx)
     }

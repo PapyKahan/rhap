@@ -103,6 +103,9 @@ pub struct AudioClient {
     eventhandle: Option<EventHandle>,
 }
 
+unsafe impl Send for AudioClient {}
+unsafe impl Sync for AudioClient {}
+
 impl Drop for AudioClient {
     fn drop(&mut self) {
         unsafe {
