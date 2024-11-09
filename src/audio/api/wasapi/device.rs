@@ -129,14 +129,17 @@ impl DeviceTrait for Device {
         let (data_tx, mut data_rx) = channel::<StreamingData>(buffer);
 
         let mut client = self.get_client(params)?;
-        let high_priority_mode = self.high_priority_mode;
         client.initialize()?;
+        let high_priority_mode = self.high_priority_mode;
 
         self.stream_thread_handle = Some(tokio::spawn(async move {
             let _thread_priority = ThreadPriority::new(high_priority_mode)?;
             let mut buffer = vec![];
             let mut available_buffer_size = client.get_buffer_size();
+            // write silence to fill the buffer
+            //client.write(vec![0u8; available_buffer_size].as_slice())?;
             client.start()?;
+            //client.wait_for_buffer(&mut available_buffer_size)?;
             while let Some(streaming_data) = data_rx.recv().await {
                 let data = match streaming_data {
                     StreamingData::Data(data) => data,
