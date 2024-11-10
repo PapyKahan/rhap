@@ -13,7 +13,7 @@ pub struct Device {
     default_device_id: String,
     inner_device: IMMDevice,
     stream_thread_handle: Option<tokio::task::JoinHandle<Result<()>>>,
-    pub high_priority_mode: bool,
+    high_priority_mode: bool,
 }
 
 impl StreamParams {
@@ -47,8 +47,23 @@ impl Device {
     pub fn get_client(&self, params: &StreamParams) -> Result<AudioClient> {
         AudioClient::new(&self.inner_device, params)
     }
+}
 
-    fn capabilities(&self) -> Result<Capabilities> {
+unsafe impl Send for Device {}
+unsafe impl Sync for Device {}
+
+impl DeviceTrait for Device {
+    fn is_default(&self) -> Result<bool> {
+        Ok(self.default_device_id == self.get_id()?)
+    }
+
+    fn name(&self) -> Result<String> {
+        let store = unsafe { self.inner_device.OpenPropertyStore(STGM_READ)? };
+        let prop = unsafe { store.GetValue(&PKEY_DeviceInterface_FriendlyName)? };
+        Ok(unsafe { PropVariantToStringAlloc(&prop)?.to_string()? })
+    }
+
+    fn get_capabilities(&self) -> Result<Capabilities> {
         let mut sample_rates = Vec::new();
         let mut bits_per_samples = Vec::new();
 
@@ -101,25 +116,6 @@ impl Device {
             sample_rates,
             bits_per_samples,
         })
-    }
-}
-
-unsafe impl Send for Device {}
-unsafe impl Sync for Device {}
-
-impl DeviceTrait for Device {
-    fn is_default(&self) -> Result<bool> {
-        Ok(self.default_device_id == self.get_id()?)
-    }
-
-    fn name(&self) -> Result<String> {
-        let store = unsafe { self.inner_device.OpenPropertyStore(STGM_READ)? };
-        let prop = unsafe { store.GetValue(&PKEY_DeviceInterface_FriendlyName)? };
-        Ok(unsafe { PropVariantToStringAlloc(&prop)?.to_string()? })
-    }
-
-    fn get_capabilities(&self) -> Result<Capabilities> {
-        self.capabilities()
     }
 
     fn start(&mut self, params: &StreamParams) -> Result<Sender<StreamingData>> {
