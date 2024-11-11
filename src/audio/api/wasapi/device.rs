@@ -130,25 +130,22 @@ impl DeviceTrait for Device {
 
         self.stream_thread_handle = Some(tokio::spawn(async move {
             let _thread_priority = ThreadPriority::new(high_priority_mode)?;
-            let mut buffer = vec![];
-            let mut available_buffer_size = client.get_buffer_size();
-            // write silence to fill the buffer
-            //client.write(vec![0u8; available_buffer_size].as_slice())?;
             client.start()?;
-            //client.wait_for_buffer(&mut available_buffer_size)?;
+            let mut buffer = vec![];
+            let mut available_buffer_size = client.get_available_buffer_size()?;
             while let Some(streaming_data) = data_rx.recv().await {
-                let data = match streaming_data {
-                    StreamingData::Data(data) => data,
+                match streaming_data {
+                    StreamingData::Data(data) => {
+                        buffer.push(data);
+                        if buffer.len() == available_buffer_size {
+                            client.write(buffer.as_slice())?;
+                            client.wait_for_buffer()?;
+                            available_buffer_size = client.get_available_buffer_size()?;
+                            buffer.clear();
+                        }
+                    }
                     StreamingData::EndOfStream => break,
                 };
-                buffer.push(data);
-                if buffer.len() != available_buffer_size {
-                    continue;
-                }
-
-                client.write(buffer.as_slice())?;
-                buffer.clear();
-                client.wait_for_buffer(&mut available_buffer_size)?;
             }
             client.stop()
         }));
@@ -165,7 +162,7 @@ impl DeviceTrait for Device {
 
     fn stop(&mut self) -> Result<()> {
         if let Some(handle) = self.stream_thread_handle.take() {
-            handle.abort_handle().abort();
+            handle.abort();
         }
         Ok(())
     }

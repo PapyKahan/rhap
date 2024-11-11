@@ -344,15 +344,18 @@ impl AudioClient {
         })
     }
 
+    #[inline(always)]
     fn get_available_buffer_frames(&self) -> Result<usize> {
         Ok(self.max_buffer_frames - unsafe { self.inner_client.GetCurrentPadding()? as usize })
     }
 
-    pub(crate) fn get_buffer_size(&self) -> usize {
-        self.max_buffer_frames * self.format.get_block_align() as usize
+    #[inline(always)]
+    pub(crate) fn get_available_buffer_size(&self) -> Result<usize> {
+        Ok(self.get_available_buffer_frames()? * self.format.get_block_align() as usize)
     }
 
-    pub(crate) fn wait_for_buffer(&self, available_buffer_size: &mut usize) -> Result<()> {
+    #[inline(always)]
+    pub(crate) fn wait_for_buffer(&self) -> Result<()> {
         if !self.pollmode {
             if let Some(event) = &self.eventhandle {
                 event.wait_for_event(1000)?;
@@ -360,11 +363,8 @@ impl AudioClient {
             return Ok(());
         } else {
             loop {
-                *available_buffer_size =
-                    self.get_available_buffer_frames()? * self.format.get_block_align() as usize;
-                if *available_buffer_size
-                    >= (self.max_buffer_frames * self.format.get_block_align() as usize) / 4
-                {
+                let available_buffer_size = self.get_available_buffer_frames()?;
+                if available_buffer_size >= self.max_buffer_frames / 4 {
                     return Ok(());
                 }
                 std::thread::sleep(Duration::from_millis(1));
