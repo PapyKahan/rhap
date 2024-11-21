@@ -130,7 +130,7 @@ impl DeviceTrait for Device {
 
         self.stream_thread_handle = Some(tokio::spawn(async move {
             let _thread_priority = ThreadPriority::new(high_priority_mode)?;
-            client.start()?;
+            let mut client_started = false;
             let mut buffer = vec![];
             let mut available_buffer_size = client.get_available_buffer_size()?;
             while let Some(streaming_data) = data_rx.recv().await {
@@ -139,6 +139,10 @@ impl DeviceTrait for Device {
                         buffer.push(data);
                         if buffer.len() == available_buffer_size {
                             client.write(buffer.as_slice())?;
+                            if !client_started {
+                                client.start()?;
+                                client_started = true;
+                            }
                             client.wait_for_buffer()?;
                             available_buffer_size = client.get_available_buffer_size()?;
                             buffer.clear();
@@ -161,6 +165,7 @@ impl DeviceTrait for Device {
     }
 
     fn stop(&mut self) -> Result<()> {
+        //self.inner_device.Reset()?;
         if let Some(handle) = self.stream_thread_handle.take() {
             handle.abort();
         }

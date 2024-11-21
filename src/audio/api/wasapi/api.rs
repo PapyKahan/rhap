@@ -7,6 +7,7 @@ use std::time::Duration;
 use windows::core::w;
 use windows::Win32::Foundation::E_INVALIDARG;
 use windows::Win32::Media::Audio::IMMDevice;
+use windows::Win32::Media::Audio::AUDCLNT_BUFFERFLAGS_SILENT;
 use windows::Win32::Media::Audio::AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED;
 use windows::Win32::Media::Audio::AUDCLNT_E_DEVICE_IN_USE;
 use windows::Win32::Media::Audio::AUDCLNT_E_ENDPOINT_CREATE_FAILED;
@@ -70,7 +71,6 @@ struct ComWasapi {
 }
 
 impl Drop for ComWasapi {
-    #[inline]
     fn drop(&mut self) {
         if self.is_ok {
             unsafe { CoUninitialize() }
@@ -78,7 +78,6 @@ impl Drop for ComWasapi {
     }
 }
 
-#[inline]
 pub fn com_initialize() {
     WASAPI_COM_INIT.with(|_| {})
 }
@@ -108,10 +107,7 @@ unsafe impl Sync for AudioClient {}
 
 impl Drop for AudioClient {
     fn drop(&mut self) {
-        unsafe {
-            let _ = self.inner_client.Stop();
-            let _ = self.inner_client.Reset();
-        }
+        let _ = self.stop();
     }
 }
 
@@ -131,6 +127,13 @@ impl AudioClient {
         if let Some(renderer) = &self.renderer {
             let frames = data.len() / self.format.get_block_align() as usize;
             renderer.write(frames, self.format.get_block_align() as usize, data, None)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn write_silence(&self) -> Result<()> {
+        if let Some(renderer) = &self.renderer {
+            renderer.write_silence(self.get_available_buffer_size()?)?;
         }
         Ok(())
     }
@@ -224,10 +227,10 @@ impl AudioClient {
             ShareMode::Shared => AUDCLNT_SHAREMODE_SHARED,
         };
 
-        let (_, min_device_period) = self.get_default_and_min_periods()?;
+        let (_default_device_period, _min_device_period) = self.get_default_and_min_periods()?;
         // Calculate desired period for better device compatibility.
         let mut desired_period =
-            self.calculate_aligned_period_near(3 * min_device_period / 2, Some(128))?;
+            self.calculate_aligned_period_near(3 * _min_device_period / 2, Some(128))?;
         let device_period = match self.sharemode {
             ShareMode::Exclusive => desired_period,
             ShareMode::Shared => 0,
@@ -344,17 +347,18 @@ impl AudioClient {
         })
     }
 
-    #[inline(always)]
     fn get_available_buffer_frames(&self) -> Result<usize> {
-        Ok(self.max_buffer_frames - unsafe { self.inner_client.GetCurrentPadding()? as usize })
+        if self.pollmode {
+            Ok(self.max_buffer_frames - unsafe { self.inner_client.GetCurrentPadding()? as usize })
+        } else {
+            Ok(self.max_buffer_frames)
+        }
     }
 
-    #[inline(always)]
     pub(crate) fn get_available_buffer_size(&self) -> Result<usize> {
         Ok(self.get_available_buffer_frames()? * self.format.get_block_align() as usize)
     }
 
-    #[inline(always)]
     pub(crate) fn wait_for_buffer(&self) -> Result<()> {
         if !self.pollmode {
             if let Some(event) = &self.eventhandle {
@@ -415,7 +419,6 @@ impl EventHandle {
 
 pub struct AudioRenderClient(IAudioRenderClient);
 impl AudioRenderClient {
-    #[inline(always)]
     fn write(
         &self,
         frames: usize,
@@ -442,6 +445,15 @@ impl AudioRenderClient {
         }
         Ok(())
     }
+
+    fn write_silence(&self, size: usize) -> Result<()> {
+        unsafe {
+            let _buffer_ptr = self.0.GetBuffer(size as u32)?;
+            self.0
+                .ReleaseBuffer(size as u32, AUDCLNT_BUFFERFLAGS_SILENT.0 as u32)?;
+        }
+        Ok(())
+    }
 }
 
 /// Struct wrapping a [WAVEFORMATEXTENSIBLE](https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible) format descriptor.
@@ -449,7 +461,6 @@ impl AudioRenderClient {
 pub struct WaveFormat(WAVEFORMATEXTENSIBLE);
 
 impl WaveFormat {
-    #[inline(always)]
     pub(crate) fn new(bits_per_sample: BitsPerSample, samplerate: usize, channels: usize) -> Self {
         let blockalign = channels * bits_per_sample as usize / 8;
         let byterate = samplerate * blockalign;
@@ -495,7 +506,6 @@ impl WaveFormat {
     }
 
     /// convert from [WAVEFORMATEX](https://docs.microsoft.com/en-us/previous-versions/dd757713(v=vs.85)) structure
-    #[inline(always)]
     fn from_waveformatex(wavefmt: WAVEFORMATEX) -> Result<Self> {
         let bits_per_sample = BitsPerSample::from(wavefmt.wBitsPerSample as usize);
         let samplerate = wavefmt.nSamplesPerSec as usize;
@@ -503,17 +513,14 @@ impl WaveFormat {
         Ok(WaveFormat::new(bits_per_sample, samplerate, channels))
     }
 
-    #[inline(always)]
     fn get_samples_per_sec(&self) -> u32 {
         self.0.Format.nSamplesPerSec
     }
 
-    #[inline(always)]
     fn get_block_align(&self) -> u16 {
         self.0.Format.nBlockAlign
     }
 
-    #[inline(always)]
     fn get_format(&self) -> &WAVEFORMATEX {
         &self.0.Format
     }
@@ -522,7 +529,6 @@ impl WaveFormat {
 // WAVEFORMATEX documentation: https://learn.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatex
 // WAVEFORMATEXTENSIBLE documentation: https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
 impl From<&StreamParams> for WaveFormat {
-    #[inline(always)]
     fn from(value: &StreamParams) -> Self {
         WaveFormat::new(
             value.bits_per_sample,
