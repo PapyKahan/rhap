@@ -165,7 +165,6 @@ impl DeviceTrait for Device {
     }
 
     fn stop(&mut self) -> Result<()> {
-        //self.inner_device.Reset()?;
         if let Some(handle) = self.stream_thread_handle.take() {
             handle.abort();
         }

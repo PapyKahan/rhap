@@ -7,7 +7,6 @@ use std::time::Duration;
 use windows::core::w;
 use windows::Win32::Foundation::E_INVALIDARG;
 use windows::Win32::Media::Audio::IMMDevice;
-use windows::Win32::Media::Audio::AUDCLNT_BUFFERFLAGS_SILENT;
 use windows::Win32::Media::Audio::AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED;
 use windows::Win32::Media::Audio::AUDCLNT_E_DEVICE_IN_USE;
 use windows::Win32::Media::Audio::AUDCLNT_E_ENDPOINT_CREATE_FAILED;
@@ -127,13 +126,6 @@ impl AudioClient {
         if let Some(renderer) = &self.renderer {
             let frames = data.len() / self.format.get_block_align() as usize;
             renderer.write(frames, self.format.get_block_align() as usize, data, None)?;
-        }
-        Ok(())
-    }
-
-    pub(crate) fn write_silence(&self) -> Result<()> {
-        if let Some(renderer) = &self.renderer {
-            renderer.write_silence(self.get_available_buffer_size()?)?;
         }
         Ok(())
     }
@@ -340,7 +332,7 @@ impl AudioClient {
         }))
     }
 
-    pub(crate) fn stop(&self) -> Result<()> {
+    pub(crate) fn stop(&mut self) -> Result<()> {
         Ok(unsafe {
             self.inner_client.Stop()?;
             self.inner_client.Reset()?
@@ -442,15 +434,6 @@ impl AudioRenderClient {
             let buffer_ptr = self.0.GetBuffer(frames as u32)?;
             std::ptr::copy_nonoverlapping(data.as_ptr(), buffer_ptr, nbr_bytes);
             self.0.ReleaseBuffer(frames as u32, flags)?;
-        }
-        Ok(())
-    }
-
-    fn write_silence(&self, size: usize) -> Result<()> {
-        unsafe {
-            let _buffer_ptr = self.0.GetBuffer(size as u32)?;
-            self.0
-                .ReleaseBuffer(size as u32, AUDCLNT_BUFFERFLAGS_SILENT.0 as u32)?;
         }
         Ok(())
     }
