@@ -10,7 +10,6 @@ crossterm = "0.28.1"
 log = "0.4.22"
 rand = "0.8.5"
 rubato = { version = "0.16.1", features = ["fft_resampler", "realfft", "num-complex"] }
-libsoxr = "0.2.9"
 symphonia = { version = "0.5.4", features = ["all-formats", "all-codecs", "opt-simd", "opt-simd-avx", "opt-simd-neon", "opt-simd-sse"] }
 tokio = { version = "1.41.1", features = ["full"] }
 walkdir = "2.5.0"
