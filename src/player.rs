@@ -46,9 +46,15 @@ pub enum StreamBuffer {
 impl StreamBuffer {
     pub fn new(bits_per_sample: BitsPerSample, duration: usize, spec: SignalSpec) -> Self {
         match bits_per_sample {
-            BitsPerSample::Bits16 => StreamBuffer::I16(RawSampleBuffer::<i16>::new(duration as u64, spec)),
-            BitsPerSample::Bits24 => StreamBuffer::I24(RawSampleBuffer::<i24>::new(duration as u64, spec)),
-            BitsPerSample::Bits32 => StreamBuffer::F32(RawSampleBuffer::<f32>::new(duration as u64, spec)),
+            BitsPerSample::Bits16 => {
+                StreamBuffer::I16(RawSampleBuffer::<i16>::new(duration as u64, spec))
+            }
+            BitsPerSample::Bits24 => {
+                StreamBuffer::I24(RawSampleBuffer::<i24>::new(duration as u64, spec))
+            }
+            BitsPerSample::Bits32 => {
+                StreamBuffer::F32(RawSampleBuffer::<f32>::new(duration as u64, spec))
+            }
         }
     }
 
@@ -119,29 +125,26 @@ impl Resampler {
     ) -> Result<()> {
         match self {
             Resampler::I16(resampler) => {
-                if let Some(output) = resampler.resample(streambuffer) {
-                    for i in output.iter() {
-                        for j in i.to_ne_bytes().iter() {
-                            streamer.send(StreamingData::Data(*j)).await?
-                        }
+                let output = resampler.resample(streambuffer)?;
+                for i in output.iter() {
+                    for j in i.to_ne_bytes().iter() {
+                        streamer.send(StreamingData::Data(*j)).await?
                     }
                 }
-            },
+            }
             Resampler::I24(resampler) => {
-                if let Some(output) = resampler.resample(streambuffer) {
-                    for i in output.iter() {
-                        for j in i.to_ne_bytes().iter() {
-                            streamer.send(StreamingData::Data(*j)).await?
-                        }
+                let output = resampler.resample(streambuffer)?;
+                for i in output.iter() {
+                    for j in i.to_ne_bytes().iter() {
+                        streamer.send(StreamingData::Data(*j)).await?
                     }
                 }
-            },
+            }
             Resampler::F32(resampler) => {
-                if let Some(output) = resampler.resample(streambuffer) {
-                    for i in output.iter() {
-                        for j in i.to_ne_bytes().iter() {
-                            streamer.send(StreamingData::Data(*j)).await?
-                        }
+                let output = resampler.resample(streambuffer)?;
+                for i in output.iter() {
+                    for j in i.to_ne_bytes().iter() {
+                        streamer.send(StreamingData::Data(*j)).await?
                     }
                 }
             }

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use log::error;
 use rubato::{FftFixedIn, Resampler};
 use symphonia::core::{
     audio::{AudioBuffer, AudioBufferRef, Signal},
@@ -50,7 +51,7 @@ where
         })
     }
 
-    pub fn resample(&mut self, input: &AudioBufferRef<'_>) -> Option<&[O]> {
+    pub fn resample(&mut self, input: &AudioBufferRef<'_>) -> Result<&[O]> {
         if input.frames() != self.frames {
             self.frames = input.frames();
             self.resampler = rubato::FftFixedIn::<f64>::new(
@@ -68,8 +69,7 @@ where
             AudioBufferRef::S32(buffer) => {
                 copy_samples_vec(buffer, &mut self.input);
                 self.resampler
-                    .process_into_buffer(&self.input, &mut self.output, None)
-                    .unwrap();
+                    .process_into_buffer(&self.input, &mut self.output, None)?;
 
                 self.input.iter_mut().for_each(|channel| {
                     channel.drain(0..self.frames);
@@ -78,31 +78,34 @@ where
                 self.interleaved_output
                     .resize(self.channels * self.output[0].len(), O::MID);
 
-                for (i, frame) in self
-                    .interleaved_output
+                self.interleaved_output
                     .chunks_exact_mut(self.channels)
                     .enumerate()
-                {
-                    for (ch, s) in frame.iter_mut().enumerate() {
-                        *s = self.output[ch][i].into_sample();
-                    }
-                }
+                    .for_each(|(i, frame)| {
+                        frame.iter_mut().enumerate().for_each(|(ch, s)| {
+                            *s = self.output[ch][i].into_sample();
+                        })
+                    });
             }
             _ => {
-                println!("Unsupported sample format");
+                error!("Unsupported sample format");
             }
         }
 
-        Some(&self.interleaved_output)
+        Ok(&self.interleaved_output)
     }
 }
 
+#[inline(always)]
 fn copy_samples_vec<S, T>(input: &AudioBuffer<S>, output: &mut [Vec<T>])
 where
     S: Sample + IntoSample<T>,
 {
-    for (channel, samples) in output.iter_mut().enumerate() {
-        let source = input.chan(channel);
-        samples.extend(source.iter().map(|&s| s.into_sample()));
-    }
+    output
+        .iter_mut()
+        .enumerate()
+        .for_each(|(channel, samples)| {
+            let source = input.chan(channel);
+            samples.extend(source.iter().map(|&s| s.into_sample()));
+        });
 }
