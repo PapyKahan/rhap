@@ -2,7 +2,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, MediaKeyCode};
-use rand::{seq::SliceRandom, thread_rng};
+use rand::{seq::SliceRandom, rng};
 use ratatui::{
     prelude::{Alignment, Constraint, Rect},
     style::Style,
@@ -43,7 +43,7 @@ impl Playlist {
                 })
                 .map(|e| e.path().to_str().unwrap().to_string())
                 .collect::<Vec<String>>();
-            files.shuffle(&mut thread_rng());
+            files.shuffle(&mut rng());
             for f in files {
                 songs.push(Arc::new(MusicTrack::new(f)?));
             }
