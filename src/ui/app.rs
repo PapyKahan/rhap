@@ -83,8 +83,7 @@ impl App {
                     }
                     Screens::Default(playlist) => {
                         match event {
-                            KeyboardEvent::Play => playlist.borrow_mut().play_selected().await?,
-                            KeyboardEvent::Pause => {
+                            KeyboardEvent::Play | KeyboardEvent::Pause => {
                                 if playlist.borrow_mut().is_playing() {
                                     playlist.borrow_mut().pause().await?;
                                 } else {

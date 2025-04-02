@@ -31,7 +31,8 @@ impl KeyboardManager {
         if let Event::Key(key) = event {
             if key.kind == KeyEventKind::Press {
                 let keyboard_event = match key.code {
-                    KeyCode::Enter => Some(KeyboardEvent::Play),
+                    KeyCode::Enter => Some(KeyboardEvent::Enter),
+                    KeyCode::Char('p') => Some(KeyboardEvent::Play),
                     KeyCode::Char(' ') => Some(KeyboardEvent::Pause),
                     KeyCode::Char('s') => Some(KeyboardEvent::Stop),
                     KeyCode::Char('l') => Some(KeyboardEvent::Next),
