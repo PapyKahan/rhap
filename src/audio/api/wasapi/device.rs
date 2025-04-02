@@ -8,12 +8,15 @@ use windows::Win32::{
 
 use super::api::{com_initialize, AudioClient, ShareMode, ThreadPriority, WaveFormat};
 use crate::audio::{Capabilities, DeviceTrait, StreamParams, StreamingData};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 pub struct Device {
     default_device_id: String,
     inner_device: IMMDevice,
     stream_thread_handle: Option<tokio::task::JoinHandle<Result<()>>>,
     high_priority_mode: bool,
+    is_paused: Arc<AtomicBool>,
 }
 
 impl StreamParams {
@@ -37,6 +40,7 @@ impl Device {
             default_device_id,
             stream_thread_handle: Option::None,
             high_priority_mode,
+            is_paused: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -127,6 +131,7 @@ impl DeviceTrait for Device {
         let mut client = self.get_client(params)?;
         client.initialize()?;
         let high_priority_mode = self.high_priority_mode;
+        let is_paused = self.is_paused.clone();
 
         self.stream_thread_handle = Some(tokio::spawn(async move {
             let _thread_priority = ThreadPriority::new(high_priority_mode)?;
@@ -134,6 +139,13 @@ impl DeviceTrait for Device {
             let mut buffer = vec![];
             let mut available_buffer_size = client.get_available_buffer_size()?;
             while let Some(streaming_data) = data_rx.recv().await {
+                if is_paused.load(Ordering::Relaxed) {
+                    client.stop()?;
+                    while is_paused.load(Ordering::Relaxed) {
+                        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                    }
+                    client.start()?;
+                }
                 match streaming_data {
                     StreamingData::Data(data) => {
                         buffer.push(data);
@@ -157,10 +169,12 @@ impl DeviceTrait for Device {
     }
 
     fn pause(&mut self) -> Result<()> {
+        self.is_paused.store(true, Ordering::Relaxed);
         Ok(())
     }
 
     fn resume(&mut self) -> Result<()> {
+        self.is_paused.store(false, Ordering::Relaxed);
         Ok(())
     }
 

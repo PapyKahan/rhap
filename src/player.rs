@@ -188,6 +188,13 @@ impl Player {
         Ok(())
     }
 
+    pub fn resume(&mut self) -> Result<()> {
+        if let Some(device) = &mut self.current_device {
+            device.resume()?;
+        }
+        Ok(())
+    }
+
     pub async fn play(&mut self, song: Arc<MusicTrack>) -> Result<CurrentTrackInfo> {
         let streamparams = StreamParams {
             samplerate: song.sample,
