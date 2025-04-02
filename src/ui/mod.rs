@@ -2,6 +2,7 @@ use ratatui::style::Color;
 
 mod app;
 mod utils;
+mod events;
 pub(crate) mod screens;
 pub(crate) mod widgets;
 

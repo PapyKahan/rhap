@@ -3,7 +3,6 @@ use crate::{
     ui::{HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_COLOR},
 };
 use anyhow::{anyhow, Result};
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     prelude::{Alignment, Constraint, Rect},
     style::Style,
@@ -65,21 +64,7 @@ impl DeviceSelector {
         Ok(())
     }
 
-    pub fn next(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i >= self.devices.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-    }
-
-    pub fn previous(&mut self) {
+    pub fn select_previous(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
                 if i == 0 {
@@ -93,16 +78,18 @@ impl DeviceSelector {
         self.state.select(Some(i));
     }
 
-    pub fn event_handler(&mut self, key: KeyEvent) -> Result<()> {
-        if key.kind == KeyEventKind::Press {
-            match key.code {
-                KeyCode::Up => self.previous(),
-                KeyCode::Down => self.next(),
-                KeyCode::Enter => self.set_selected_device()?,
-                _ => (),
+    pub fn select_next(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i + 1 >= self.devices.len() {
+                    0
+                } else {
+                    i + 1
+                }
             }
-        }
-        Ok(())
+            None => 0,
+        };
+        self.state.select(Some(i));
     }
 
     pub(crate) fn render(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {

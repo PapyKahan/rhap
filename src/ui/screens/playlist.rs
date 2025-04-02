@@ -1,7 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, MediaKeyCode};
 use rand::{seq::SliceRandom, rng};
 use ratatui::{
     prelude::{Alignment, Constraint, Rect},
@@ -92,26 +91,7 @@ impl Playlist {
         self.state.select(Some(i));
     }
 
-    async fn next(&mut self) -> Result<()> {
-        self.playing_track_list_index = if self.playing_track_list_index + 1 > self.songs.len() - 1
-        {
-            0
-        } else {
-            self.playing_track_list_index + 1
-        };
-        self.play().await
-    }
-
-    async fn previous(&mut self) -> Result<()> {
-        self.playing_track_list_index = if self.playing_track_list_index == 0 {
-            self.songs.len() - 1
-        } else {
-            self.playing_track_list_index - 1
-        };
-        self.play().await
-    }
-
-    async fn play(&mut self) -> Result<()> {
+    pub async fn play(&mut self) -> Result<()> {
         self.stop().await?;
         if let Some(song) = self.songs.get(self.playing_track_list_index) {
             let current_track_info = self.player.play(song.clone()).await?;
@@ -120,56 +100,31 @@ impl Playlist {
         Ok(())
     }
 
+    pub async fn next(&mut self) -> Result<()> {
+        self.playing_track_list_index = if self.playing_track_list_index + 1 > self.songs.len() - 1 {
+            0
+        } else {
+            self.playing_track_list_index + 1
+        };
+        self.play().await
+    }
+
+    pub async fn previous(&mut self) -> Result<()> {
+        self.playing_track_list_index = if self.playing_track_list_index == 0 {
+            self.songs.len() - 1
+        } else {
+            self.playing_track_list_index - 1
+        };
+        self.play().await
+    }
+
     pub async fn stop(&mut self) -> Result<()> {
         self.playing_track = None;
         self.player.stop().await
     }
 
-    async fn pause(&mut self) -> Result<()> {
+    pub async fn pause(&mut self) -> Result<()> {
         self.player.pause()
-    }
-
-    pub async fn event_hanlder(&mut self, key: KeyEvent) -> Result<()> {
-        if key.kind == KeyEventKind::Press {
-            match key.code {
-                KeyCode::Up | KeyCode::Char('k') => self.select_previous(),
-                KeyCode::Down | KeyCode::Char('j') => self.select_next(),
-                KeyCode::Enter => {
-                    if let Some(index) = self.state.selected() {
-                        self.playing_track_list_index = index;
-                    } else {
-                        self.playing_track_list_index = 0;
-                    }
-                    self.play().await?;
-                },
-                KeyCode::Char('s') => {
-                    self.stop().await?;
-                },
-                KeyCode::Media(MediaKeyCode::Stop) => {
-                    self.next().await?;
-                },
-                KeyCode::Char('n') => {
-                    self.next().await?;
-                },
-                KeyCode::Media(MediaKeyCode::TrackNext) => {
-                    self.next().await?;
-                },
-                KeyCode::Char('p') => {
-                    self.previous().await?;
-                },
-                KeyCode::Media(MediaKeyCode::TrackPrevious) => {
-                    self.next().await?;
-                },
-                KeyCode::Char(' ') => {
-                    self.pause().await?;
-                },
-                KeyCode::Media(MediaKeyCode::Pause) => {
-                    self.next().await?;
-                },
-                _ => (),
-            }
-        }
-        Ok(())
     }
 
     pub async fn run(&mut self) -> Result<()> {
@@ -234,6 +189,14 @@ impl Playlist {
 
         frame.render_widget(Clear, area);
         frame.render_stateful_widget(table, area, &mut self.state);
+        Ok(())
+    }
+
+    pub async fn play_selected(&mut self) -> Result<()> {
+        if let Some(index) = self.state.selected() {
+            self.playing_track_list_index = index;
+            self.play().await?;
+        }
         Ok(())
     }
 }
