@@ -1,4 +1,5 @@
-use super::{screens::Playlist, utils::bottom_right_fixed_size, widgets::DeviceSelector, events::{KeyboardManager, KeyboardEvent}};
+use super::{KeyboardEvent, KeyboardManager};
+use super::{screens::Playlist, utils::bottom_right_fixed_size, widgets::DeviceSelector};
 use crate::{audio::Host, player::Player};
 use anyhow::Result;
 use crossterm::event::{self};
