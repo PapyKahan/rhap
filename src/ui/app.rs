@@ -83,16 +83,20 @@ impl App {
                     }
                     Screens::Default(playlist) => {
                         match event {
-                            KeyboardEvent::Play => playlist.borrow_mut().play().await?,
-                            KeyboardEvent::Pause => playlist.borrow_mut().pause().await?,
+                            KeyboardEvent::Play => playlist.borrow_mut().play_selected().await?,
+                            KeyboardEvent::Pause => {
+                                if playlist.borrow_mut().is_playing() {
+                                    playlist.borrow_mut().pause().await?;
+                                } else {
+                                    playlist.borrow_mut().resume().await?;
+                                }
+                            },
                             KeyboardEvent::Stop => playlist.borrow_mut().stop().await?,
                             KeyboardEvent::Next => playlist.borrow_mut().next().await?,
                             KeyboardEvent::Previous => playlist.borrow_mut().previous().await?,
                             KeyboardEvent::Up => playlist.borrow_mut().select_previous(),
                             KeyboardEvent::Down => playlist.borrow_mut().select_next(),
-                            KeyboardEvent::Enter => {
-                                playlist.borrow_mut().play_selected().await?;
-                            }
+                            KeyboardEvent::Enter => playlist.borrow_mut().play_selected().await?,
                             _ => {}
                         }
                     }

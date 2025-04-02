@@ -21,9 +21,8 @@ pub struct Playlist {
     songs: Vec<Arc<MusicTrack>>,
     player: Player,
     playing_track: Option<CurrentTrackInfo>,
-    playing_track_list_index: usize,
+    playing_track_index: usize,
     automatically_play_next: bool,
-    is_paused: bool,
 }
 
 impl Playlist {
@@ -59,9 +58,8 @@ impl Playlist {
             songs,
             player,
             playing_track: None,
-            playing_track_list_index: 0,
+            playing_track_index: 0,
             automatically_play_next: true,
-            is_paused: false,
         })
     }
 
@@ -94,34 +92,28 @@ impl Playlist {
     }
 
     pub async fn play(&mut self) -> Result<()> {
-        if self.is_paused {
-            self.player.resume()?;
-            self.is_paused = false;
-            return Ok(());
-        }
-        self.stop().await?;
-        if let Some(song) = self.songs.get(self.playing_track_list_index) {
+        self.player.stop().await?;
+        if let Some(song) = self.songs.get(self.playing_track_index) {
             let current_track_info = self.player.play(song.clone()).await?;
             self.playing_track = Some(current_track_info);
-            self.is_paused = false;
         }
         Ok(())
     }
 
     pub async fn next(&mut self) -> Result<()> {
-        self.playing_track_list_index = if self.playing_track_list_index + 1 > self.songs.len() - 1 {
+        self.playing_track_index = if self.playing_track_index + 1 > self.songs.len() - 1 {
             0
         } else {
-            self.playing_track_list_index + 1
+            self.playing_track_index + 1
         };
         self.play().await
     }
 
     pub async fn previous(&mut self) -> Result<()> {
-        self.playing_track_list_index = if self.playing_track_list_index == 0 {
+        self.playing_track_index = if self.playing_track_index == 0 {
             self.songs.len() - 1
         } else {
-            self.playing_track_list_index - 1
+            self.playing_track_index - 1
         };
         self.play().await
     }
@@ -132,9 +124,15 @@ impl Playlist {
     }
 
     pub async fn pause(&mut self) -> Result<()> {
-        if !self.is_paused {
-            self.player.pause()?;
-            self.is_paused = true;
+        self.player.pause()?;
+        Ok(())
+    }
+
+    pub async fn resume(&mut self) -> Result<()> {
+        if self.playing_track.is_some() {
+            self.player.resume()?;
+        } else {
+            self.play_selected().await?;
         }
         Ok(())
     }
@@ -153,11 +151,13 @@ impl Playlist {
         for index in 0..self.songs.len() {
             if let Some(song) = self.songs.get(index) {
                 let row = Row::new(vec![
-                    Cell::from(if self.playing_track_list_index == index {
-                        if self.is_paused {
+                    Cell::from(if index == self.playing_track_index {
+                        if self.player.is_paused() {
                             "󰏤"
-                        } else {
+                        } else if self.player.is_playing() {
                             "󰐊"
+                        } else {
+                            "  "
                         }
                     } else {
                         "  "
@@ -210,9 +210,13 @@ impl Playlist {
 
     pub async fn play_selected(&mut self) -> Result<()> {
         if let Some(index) = self.state.selected() {
-            self.playing_track_list_index = index;
+            self.playing_track_index = index;
             self.play().await?;
         }
         Ok(())
+    }
+
+    pub fn is_playing(&self) -> bool {
+        self.player.is_playing()
     }
 }

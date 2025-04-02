@@ -24,6 +24,7 @@ pub struct Player {
     previous_stream: Option<Sender<StreamingData>>,
     streaming_handle: Option<JoinHandle<Result<()>>>,
     is_playing: Arc<AtomicBool>,
+    is_paused: Arc<AtomicBool>,
 }
 
 #[derive(Clone)]
@@ -163,12 +164,14 @@ impl Player {
             previous_stream: None,
             streaming_handle: None,
             is_playing: Arc::new(AtomicBool::new(false)),
+            is_paused: Arc::new(AtomicBool::new(false)),
         })
     }
 
     pub async fn stop(&mut self) -> Result<()> {
         self.is_playing.store(false, Ordering::Relaxed);
-        if let Some(device) = &mut self.current_device {
+        self.is_paused.store(false, Ordering::Relaxed);
+        if let Some(mut device) = self.current_device.take() {
             device.stop()?;
         }
         if let Some(stream) = self.previous_stream.take() {
@@ -182,17 +185,31 @@ impl Player {
     }
 
     pub fn pause(&mut self) -> Result<()> {
-        if let Some(device) = &mut self.current_device {
-            device.pause()?;
+        if !self.is_paused.load(Ordering::Relaxed) {
+            if let Some(device) = self.current_device.as_mut() {
+                device.pause()?;
+            }
+            self.is_paused.store(true, Ordering::Relaxed);
         }
         Ok(())
     }
 
     pub fn resume(&mut self) -> Result<()> {
-        if let Some(device) = &mut self.current_device {
-            device.resume()?;
+        if self.is_paused.load(Ordering::Relaxed) {
+            if let Some(device) = self.current_device.as_mut() {
+                device.resume()?;
+            }
+            self.is_paused.store(false, Ordering::Relaxed);
         }
         Ok(())
+    }
+
+    pub fn is_playing(&self) -> bool {
+        self.is_playing.load(Ordering::Relaxed) && !self.is_paused.load(Ordering::Relaxed)
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.is_paused.load(Ordering::Relaxed)
     }
 
     pub async fn play(&mut self, song: Arc<MusicTrack>) -> Result<CurrentTrackInfo> {
