@@ -30,6 +30,8 @@ pub struct Player {
 #[derive(Clone)]
 pub struct CurrentTrackInfo {
     is_streaming: Arc<AtomicBool>,
+    pub title: String,
+    pub artist: String,
 }
 
 impl CurrentTrackInfo {
@@ -230,8 +232,9 @@ impl Player {
         let is_streaming = Arc::new(AtomicBool::new(true));
         let report_streaming = Arc::clone(&is_streaming);
         let is_playing = self.is_playing.clone();
+        let track = song.clone();
         self.streaming_handle = Some(tokio::spawn(async move {
-            let mut format = song.format.lock().await;
+            let mut format = track.format.lock().await;
             format.seek(
                 SeekMode::Accurate,
                 SeekTo::Time {
@@ -239,7 +242,7 @@ impl Player {
                     track_id: None,
                 },
             )?;
-            let mut decoder = song.decoder.lock().await;
+            let mut decoder = track.decoder.lock().await;
             decoder.reset();
             is_playing.store(true, Ordering::Relaxed);
             if let Some(streamer) = stream {
@@ -282,7 +285,7 @@ impl Player {
                         StreamBuffer::new(adjusted_params.bits_per_sample, frames, *spec)
                     });
                     //sample_buffer.clear();
-                    if song.sample != adjusted_params.samplerate {
+                    if track.sample != adjusted_params.samplerate {
                         let resampled_sender = resampler.get_or_insert_with(|| {
                             Resampler::new(
                                 streamparams.bits_per_sample,
@@ -321,6 +324,9 @@ impl Player {
 
         Ok(CurrentTrackInfo {
             is_streaming: report_streaming,
+            title: song.title.clone(),
+            artist: song.artist.clone(),
         })
     }
 }
+

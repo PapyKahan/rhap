@@ -5,7 +5,7 @@ use rand::{seq::SliceRandom, rng};
 use ratatui::{
     prelude::{Alignment, Constraint, Rect},
     style::Style,
-    widgets::{Block, BorderType, Borders, Cell, Clear, Row, Table, TableState},
+    widgets::{Block, BorderType, Borders, Cell, Clear, Paragraph, Row, Table, TableState},
     Frame,
 };
 use walkdir::WalkDir;
@@ -23,6 +23,7 @@ pub struct Playlist {
     playing_track: Option<CurrentTrackInfo>,
     playing_track_index: usize,
     automatically_play_next: bool,
+    currently_playing_widget: CurrentlyPlayingWidget,
 }
 
 impl Playlist {
@@ -60,6 +61,7 @@ impl Playlist {
             playing_track: None,
             playing_track_index: 0,
             automatically_play_next: true,
+            currently_playing_widget: CurrentlyPlayingWidget::new(None)
         })
     }
 
@@ -95,7 +97,8 @@ impl Playlist {
         self.player.stop().await?;
         if let Some(song) = self.songs.get(self.playing_track_index) {
             let current_track_info = self.player.play(song.clone()).await?;
-            self.playing_track = Some(current_track_info);
+            self.playing_track = Some(current_track_info.clone());
+            self.currently_playing_widget = CurrentlyPlayingWidget::new(Some(current_track_info));
         }
         Ok(())
     }
@@ -147,6 +150,20 @@ impl Playlist {
     }
 
     pub(crate) fn render(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
+        let table_area = Rect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: area.height - 3, // Adjust the height to leave space for the widget
+        };
+
+        let widget_area = Rect {
+            x: area.x,
+            y: area.y + area.height - 3, // Position the widget below the table
+            width: area.width,
+            height: 3, // Height for the widget
+        };
+
         let mut items = Vec::new();
         for index in 0..self.songs.len() {
             if let Some(song) = self.songs.get(index) {
@@ -203,8 +220,12 @@ impl Playlist {
                     .border_style(Style::default().fg(HIGHLIGHT_COLOR)),
             );
 
-        frame.render_widget(Clear, area);
-        frame.render_stateful_widget(table, area, &mut self.state);
+        frame.render_widget(Clear, table_area);
+        frame.render_stateful_widget(table, table_area, &mut self.state);
+
+        // Render the CurrentlyPlayingWidget
+        self.currently_playing_widget.render(frame, widget_area);
+
         Ok(())
     }
 
@@ -218,5 +239,39 @@ impl Playlist {
 
     pub fn is_playing(&self) -> bool {
         self.player.is_playing()
+    }
+}
+
+pub struct CurrentlyPlayingWidget {
+    track_info: Option<CurrentTrackInfo>,
+}
+
+impl CurrentlyPlayingWidget {
+    pub fn new(track_info: Option<CurrentTrackInfo>) -> Self {
+        Self { track_info }
+    }
+
+    pub fn render(&self, frame: &mut Frame, area: Rect) {
+        let text = if let Some(track_info) = &self.track_info {
+            format!(
+                "Now Playing: {} - {}",
+                track_info.title, track_info.artist
+            )
+        } else {
+            "No track playing".to_string()
+        };
+
+        let paragraph = Paragraph::new(text)
+            .block(
+                Block::default()
+                    .title("Currently Playing")
+                    .title_alignment(Alignment::Left)
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(HIGHLIGHT_COLOR)),
+            )
+            .alignment(Alignment::Left);
+
+        frame.render_widget(paragraph, area);
     }
 }
