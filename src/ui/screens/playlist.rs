@@ -152,14 +152,14 @@ impl Playlist {
             x: area.x,
             y: area.y,
             width: area.width,
-            height: area.height - 5, // Adjust the height to leave space for the widget
+            height: area.height - 6, // Adjust the height to leave space for the widget
         };
 
         let widget_area = Rect {
             x: area.x,
-            y: area.y + area.height - 5, // Position the widget below the table
+            y: area.y + area.height - 6, // Position the widget below the table
             width: area.width,
-            height: 5, // Height for the widget
+            height: 6, // Height for the widget
         };
 
         let mut items = Vec::new();

@@ -6,7 +6,7 @@ use symphonia::core::audio::{AudioBufferRef, RawSampleBuffer, SignalSpec};
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{SeekMode, SeekTo};
 use symphonia::core::sample::i24;
-use symphonia::core::units::Time;
+use symphonia::core::units::{Time, TimeBase};
 use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 
@@ -33,11 +33,32 @@ pub struct CurrentTrackInfo {
     pub title: String,
     pub artist: String,
     pub info: String,
+    pub elapsed_time: Arc<AtomicU64>,
+    pub total_duration: Time,
+    time_base: TimeBase,
 }
 
 impl CurrentTrackInfo {
     pub fn is_streaming(&self) -> bool {
         self.is_streaming.load(Ordering::Relaxed)
+    }
+
+    pub fn get_elapsed_time(&self) -> Time {
+        let elapsed = self.elapsed_time.load(Ordering::Relaxed);
+        self.time_base.calc_time(elapsed)
+    }
+
+    pub fn format_time(&self, time: Time) -> String {
+        let hours = time.seconds / (60 * 60);
+        let mins = (time.seconds % (60 * 60)) / 60;
+        let secs = time.seconds % 60;
+        match hours {
+            0 => match mins {
+                0 => format!("00:{:0>2}", secs),
+                _ => format!("{:0>2}:{:0>2}", mins, secs),
+            },
+            _ => format!("{}:{:0>2}:{:0>2}", hours, mins, secs),
+        }
     }
 }
 
@@ -234,6 +255,10 @@ impl Player {
         let report_streaming = Arc::clone(&is_streaming);
         let is_playing = self.is_playing.clone();
         let track = song.clone();
+        let elapsed_time = Arc::new(AtomicU64::new(0));
+        let elapsed_time_clone = Arc::clone(&elapsed_time);
+        let total_duration = track.duration;
+        let time_base = track.format.lock().await.tracks().get(0).unwrap().codec_params.time_base.unwrap_or(Default::default());
         self.streaming_handle = Some(tokio::spawn(async move {
             let mut format = track.format.lock().await;
             format.seek(
@@ -259,7 +284,6 @@ impl Player {
                             unimplemented!();
                         }
                         Err(Error::IoError(err)) => {
-                            // Error reading packet: IoError(Custom { kind: UnexpectedEof, error: "end of stream" })
                             match err.kind() {
                                 std::io::ErrorKind::UnexpectedEof => {
                                     break;
@@ -275,8 +299,8 @@ impl Player {
                             break;
                         }
                     };
-                    progress.store(
-                        progress.load(Ordering::Relaxed) + packet.dur,
+                    elapsed_time_clone.store(
+                        elapsed_time_clone.load(Ordering::Relaxed) + packet.dur,
                         Ordering::Relaxed,
                     );
                     let decoded = decoder.decode(&packet)?;
@@ -285,7 +309,6 @@ impl Player {
                     let sample_buffer = buffer.get_or_insert_with(|| {
                         StreamBuffer::new(adjusted_params.bits_per_sample, frames, *spec)
                     });
-                    //sample_buffer.clear();
                     if track.sample != adjusted_params.samplerate {
                         let resampled_sender = resampler.get_or_insert_with(|| {
                             Resampler::new(
@@ -328,6 +351,9 @@ impl Player {
             title: song.title.clone(),
             artist: song.artist.clone(),
             info: song.info(),
+            elapsed_time,
+            total_duration,
+            time_base,
         })
     }
 }

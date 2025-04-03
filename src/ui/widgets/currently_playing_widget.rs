@@ -1,24 +1,48 @@
 use ratatui::{
     prelude::{Alignment, Rect, Span, Line},
     style::{Style, Modifier},
-    widgets::{Block, BorderType, Borders, Paragraph},
+    widgets::{Block, BorderType, Borders, Paragraph, Gauge},
     Frame,
 };
 
 use crate::player::CurrentTrackInfo;
 use crate::ui::HIGHLIGHT_COLOR;
+use std::time::{Duration, Instant};
+use symphonia::core::units::Time;
 
 pub struct CurrentlyPlayingWidget {
     track_info: Option<CurrentTrackInfo>,
+    last_update: Instant,
+    last_elapsed_time: Time,
 }
 
 impl CurrentlyPlayingWidget {
     pub fn new(track_info: Option<CurrentTrackInfo>) -> Self {
-        Self { track_info }
+        Self { 
+            track_info,
+            last_update: Instant::now(),
+            last_elapsed_time: Time::default(),
+        }
     }
 
-    pub fn render(&self, frame: &mut Frame, area: Rect) {
+    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
+        let now = Instant::now();
+        let elapsed = now.duration_since(self.last_update);
+        
+        if elapsed >= Duration::from_millis(100) {
+            self.last_update = now;
+            if let Some(track_info) = &self.track_info {
+                self.last_elapsed_time = track_info.get_elapsed_time();
+            }
+        }
+
         let text = if let Some(track_info) = &self.track_info {
+            let progress = if track_info.total_duration.seconds > 0 {
+                (self.last_elapsed_time.seconds as f64 / track_info.total_duration.seconds as f64) * 100.0
+            } else {
+                0.0
+            };
+
             vec![
                 Line::from(vec![
                     Span::styled("Title: ", Style::default().add_modifier(Modifier::BOLD)),
@@ -31,6 +55,15 @@ impl CurrentlyPlayingWidget {
                 Line::from(vec![
                     Span::styled("Info: ", Style::default().add_modifier(Modifier::BOLD)),
                     Span::raw(format!("{}", track_info.info)),
+                ]),
+                Line::from(vec![
+                    Span::raw(track_info.format_time(self.last_elapsed_time)),
+                    Span::raw(" ["),
+                    Span::raw("=".repeat((progress as usize).min(area.width as usize - 10))),
+                    Span::raw(">"),
+                    Span::raw(" ".repeat((100 - progress as usize).min(area.width as usize - 10))),
+                    Span::raw("] "),
+                    Span::raw(track_info.format_time(track_info.total_duration)),
                 ]),
             ]
         } else {
