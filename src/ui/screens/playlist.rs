@@ -3,8 +3,8 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::Result;
 use rand::{seq::SliceRandom, rng};
 use ratatui::{
-    prelude::{Alignment, Constraint, Rect},
-    style::Style,
+    prelude::{Alignment, Constraint, Rect, Span, Line},
+    style::{Style, Modifier},
     widgets::{Block, BorderType, Borders, Cell, Clear, Paragraph, Row, Table, TableState},
     Frame,
 };
@@ -154,14 +154,14 @@ impl Playlist {
             x: area.x,
             y: area.y,
             width: area.width,
-            height: area.height - 3, // Adjust the height to leave space for the widget
+            height: area.height - 4, // Adjust the height to leave space for the widget
         };
 
         let widget_area = Rect {
             x: area.x,
-            y: area.y + area.height - 3, // Position the widget below the table
+            y: area.y + area.height - 4, // Position the widget below the table
             width: area.width,
-            height: 3, // Height for the widget
+            height: 4, // Height for the widget
         };
 
         let mut items = Vec::new();
@@ -253,24 +253,30 @@ impl CurrentlyPlayingWidget {
 
     pub fn render(&self, frame: &mut Frame, area: Rect) {
         let text = if let Some(track_info) = &self.track_info {
-            format!(
-                "Now Playing: {} - {}",
-                track_info.title, track_info.artist
-            )
+            vec![
+                Line::from(vec![
+                    Span::styled("Title: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::raw(&track_info.title),
+                ]),
+                Line::from(vec![
+                    Span::styled("Artist: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::raw(&track_info.artist),
+                ]),
+            ]
         } else {
-            "No track playing".to_string()
+            vec![Line::from(Span::raw("No track playing"))]
         };
 
         let paragraph = Paragraph::new(text)
             .block(
                 Block::default()
                     .title("Currently Playing")
-                    .title_alignment(Alignment::Left)
+                    .title_alignment(Alignment::Center)
                     .borders(Borders::ALL)
                     .border_type(BorderType::Rounded)
                     .border_style(Style::default().fg(HIGHLIGHT_COLOR)),
             )
-            .alignment(Alignment::Left);
+            .alignment(Alignment::Center);
 
         frame.render_widget(paragraph, area);
     }
