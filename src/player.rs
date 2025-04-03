@@ -32,6 +32,7 @@ pub struct CurrentTrackInfo {
     is_streaming: Arc<AtomicBool>,
     pub title: String,
     pub artist: String,
+    pub info: String,
 }
 
 impl CurrentTrackInfo {
@@ -326,6 +327,7 @@ impl Player {
             is_streaming: report_streaming,
             title: song.title.clone(),
             artist: song.artist.clone(),
+            info: song.info(),
         })
     }
 }

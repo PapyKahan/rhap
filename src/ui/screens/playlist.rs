@@ -154,14 +154,14 @@ impl Playlist {
             x: area.x,
             y: area.y,
             width: area.width,
-            height: area.height - 4, // Adjust the height to leave space for the widget
+            height: area.height - 5, // Adjust the height to leave space for the widget
         };
 
         let widget_area = Rect {
             x: area.x,
-            y: area.y + area.height - 4, // Position the widget below the table
+            y: area.y + area.height - 5, // Position the widget below the table
             width: area.width,
-            height: 4, // Height for the widget
+            height: 5, // Height for the widget
         };
 
         let mut items = Vec::new();
@@ -261,6 +261,10 @@ impl CurrentlyPlayingWidget {
                 Line::from(vec![
                     Span::styled("Artist: ", Style::default().add_modifier(Modifier::BOLD)),
                     Span::raw(&track_info.artist),
+                ]),
+                Line::from(vec![
+                    Span::styled("Info: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::raw(format!("{}", track_info.info)),
                 ]),
             ]
         } else {
