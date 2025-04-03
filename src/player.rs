@@ -250,7 +250,6 @@ impl Player {
         self.current_device = Some(device);
         self.previous_stream = Some(data_sender);
         let stream = self.previous_stream.clone();
-        let progress = Arc::new(AtomicU64::new(0));
         let is_streaming = Arc::new(AtomicBool::new(true));
         let report_streaming = Arc::clone(&is_streaming);
         let is_playing = self.is_playing.clone();
