@@ -42,6 +42,9 @@ impl CurrentlyPlayingWidget {
             } else {
                 0.0
             };
+            let progress_bar_width = (area.width as usize).saturating_sub(20); // Adjust for padding and other elements
+            let filled_width = ((progress / 100.0) * progress_bar_width as f64).round() as usize;
+            let empty_width = progress_bar_width.saturating_sub(filled_width);
 
             vec![
                 Line::from(vec![
@@ -59,10 +62,10 @@ impl CurrentlyPlayingWidget {
                 Line::from(vec![
                     Span::raw(track_info.format_time(self.last_elapsed_time)),
                     Span::raw(" "),
-                    Span::styled("".repeat((progress as usize).min(area.width as usize - 10)), Style::default().fg(PROGRESSBAR_COLOR).add_modifier(Modifier::BOLD)),
+                      Span::styled("".repeat(filled_width), Style::default().fg(PROGRESSBAR_COLOR).add_modifier(Modifier::BOLD)),
                     Span::styled("", Style::default().fg(HIGHLIGHT_COLOR).add_modifier(Modifier::BOLD)),
-                    Span::styled("".repeat((100 - progress as usize).min(area.width as usize - 10)), Style::default().fg(ROW_COLOR).add_modifier(Modifier::BOLD)),
-                    Span::raw(" "),
+                    Span::styled("".repeat(empty_width), Style::default().fg(ROW_COLOR).add_modifier(Modifier::BOLD)),
+Span::raw(" "),
                     Span::raw(track_info.format_time(track_info.total_duration)),
                 ]),
             ]
