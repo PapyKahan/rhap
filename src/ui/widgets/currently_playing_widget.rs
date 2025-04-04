@@ -5,7 +5,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::{player::CurrentTrackInfo, ui::{ROW_ALTERNATE_COLOR, ROW_COLOR}};
+use crate::{player::CurrentTrackInfo, ui::{PROGRESSBAR_COLOR, ROW_COLOR}};
 use crate::ui::HIGHLIGHT_COLOR;
 use std::time::{Duration, Instant};
 use symphonia::core::units::Time;
@@ -59,7 +59,7 @@ impl CurrentlyPlayingWidget {
                 Line::from(vec![
                     Span::raw(track_info.format_time(self.last_elapsed_time)),
                     Span::raw(" "),
-                    Span::styled("".repeat((progress as usize).min(area.width as usize - 10)), Style::default().fg(ROW_ALTERNATE_COLOR).add_modifier(Modifier::BOLD)),
+                    Span::styled("".repeat((progress as usize).min(area.width as usize - 10)), Style::default().fg(PROGRESSBAR_COLOR).add_modifier(Modifier::BOLD)),
                     Span::styled("", Style::default().fg(HIGHLIGHT_COLOR).add_modifier(Modifier::BOLD)),
                     Span::styled("".repeat((100 - progress as usize).min(area.width as usize - 10)), Style::default().fg(ROW_COLOR).add_modifier(Modifier::BOLD)),
                     Span::raw(" "),
