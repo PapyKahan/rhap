@@ -238,5 +238,29 @@ impl Playlist {
     pub fn is_playing(&self) -> bool {
         self.player.is_playing()
     }
+
+    pub fn search(&self, query: &str) -> Option<usize> {
+        if query.is_empty() {
+            return None;
+        }
+
+        let query = query.to_lowercase();
+        for (index, song) in self.songs.iter().enumerate() {
+            let title = song.title.to_lowercase();
+            let artist = song.artist.to_lowercase();
+            
+            if title.contains(&query) || artist.contains(&query) {
+                return Some(index);
+            }
+        }
+        
+        None
+    }
+
+    pub fn select_index(&mut self, index: usize) {
+        if index < self.songs.len() {
+            self.state.select(Some(index));
+        }
+    }
 }
 
