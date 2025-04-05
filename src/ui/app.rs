@@ -60,17 +60,21 @@ impl App {
         Ok(())
     }
 
+    // Fonction auxiliaire pour quitter le mode recherche
+    fn exit_search_mode(&mut self) {
+        self.keyboard_manager.set_search_mode(false);
+        self.layers.pop();
+    }
+
     async fn handle_keyboard_event(&mut self, event: &KeyboardEvent) -> Result<()> {
         let default_screen = Screens::Default(self.playlist.clone());
         let current_screen = self.layers.last().unwrap_or(&default_screen);
         
         match current_screen {
             Screens::SearchWidget(search) => {
-                // When search widget is active, only handle search-related keys
                 match event {
                     KeyboardEvent::Escape => {
-                        // Exit search mode
-                        self.layers.pop();
+                        self.exit_search_mode();
                     },
                     KeyboardEvent::Backspace => {
                         // Handle backspace in search and get the new input string
@@ -115,8 +119,7 @@ impl App {
                         if let Some(index) = search_result {
                             self.playlist.borrow_mut().select_index(index);
                         }
-                        // Exit search mode
-                        self.layers.pop();
+                        self.exit_search_mode();
                     },
                     KeyboardEvent::Delete => {
                         // Gérer la touche Delete avec le même pattern
@@ -175,8 +178,9 @@ impl App {
                         return Ok(());
                     },
                     KeyboardEvent::Search => {
-                        // Activate search widget when '/' is pressed
+                        // Activer le widget de recherche
                         self.search_widget.borrow_mut().clear();
+                        self.keyboard_manager.set_search_mode(true);  // Activer le mode recherche
                         self.layers.push(Screens::SearchWidget(self.search_widget.clone()));
                     },
                     KeyboardEvent::DeviceSelector => {
