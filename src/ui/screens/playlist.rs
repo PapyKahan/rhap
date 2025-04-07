@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
-use rand::{seq::SliceRandom, rng};
+use rand::{rng, seq::SliceRandom};
 use ratatui::{
     prelude::{Alignment, Constraint, Rect},
     style::Style,
@@ -11,7 +11,12 @@ use ratatui::{
 use walkdir::WalkDir;
 
 use crate::{
-    musictrack::MusicTrack, player::{CurrentTrackInfo, Player}, ui::{widgets::CurrentlyPlayingWidget, HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_ALTERNATE_COLOR_COL, ROW_COLOR, ROW_COLOR_COL}
+    musictrack::MusicTrack,
+    player::{CurrentTrackInfo, Player},
+    ui::{
+        widgets::CurrentlyPlayingWidget, HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR,
+        ROW_ALTERNATE_COLOR_COL, ROW_COLOR, ROW_COLOR_COL,
+    },
 };
 
 pub struct Playlist {
@@ -59,7 +64,7 @@ impl Playlist {
             playing_track: None,
             playing_track_index: 0,
             automatically_play_next: true,
-            currently_playing_widget: CurrentlyPlayingWidget::new(None)
+            currently_playing_widget: CurrentlyPlayingWidget::new(None),
         })
     }
 
@@ -121,6 +126,7 @@ impl Playlist {
 
     pub async fn stop(&mut self) -> Result<()> {
         self.playing_track = None;
+        self.currently_playing_widget.clear();
         self.player.stop().await
     }
 
@@ -201,22 +207,25 @@ impl Playlist {
                 items.push(row);
             }
         }
-        let table = Table::new(items, &[
+        let table = Table::new(
+            items,
+            &[
                 Constraint::Length(1),
                 Constraint::Percentage(20),
                 Constraint::Percentage(60),
                 Constraint::Percentage(10),
                 Constraint::Percentage(10),
-            ])
-            .row_highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
-            .block(
-                Block::default()
-                    .title(format!("Playlist - {}", self.songs.len()))
-                    .title_alignment(Alignment::Left)
-                    .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
-                    .border_style(Style::default().fg(HIGHLIGHT_COLOR)),
-            );
+            ],
+        )
+        .row_highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
+        .block(
+            Block::default()
+                .title(format!("Playlist - {}", self.songs.len()))
+                .title_alignment(Alignment::Left)
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(HIGHLIGHT_COLOR)),
+        );
 
         frame.render_widget(Clear, table_area);
         frame.render_stateful_widget(table, table_area, &mut self.state);
@@ -248,12 +257,12 @@ impl Playlist {
         for (index, song) in self.songs.iter().enumerate() {
             let title = song.title.to_lowercase();
             let artist = song.artist.to_lowercase();
-            
+
             if title.contains(&query) || artist.contains(&query) {
                 return Some(index);
             }
         }
-        
+
         None
     }
 
@@ -263,4 +272,3 @@ impl Playlist {
         }
     }
 }
-
