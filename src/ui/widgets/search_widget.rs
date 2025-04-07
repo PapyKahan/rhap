@@ -1,7 +1,7 @@
 use ratatui::{
-    prelude::{Alignment, Rect},
+    prelude::Rect,
     style::Style,
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
+    widgets::{Clear, Paragraph},
     Frame,
 };
 
@@ -93,9 +93,9 @@ impl SearchWidget {
         frame.render_widget(paragraph, search_area);
         
         // Position cursor right after the '/' plus the current input position
-        frame.set_cursor(
+        frame.set_cursor_position((
             search_area.x + self.cursor_position as u16 + 1, // +1 for the '/' character
             search_area.y,
-        );
+        ));
     }
 }

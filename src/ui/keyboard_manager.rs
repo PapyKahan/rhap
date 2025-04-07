@@ -43,10 +43,6 @@ impl KeyboardManager {
     pub fn set_search_mode(&mut self, active: bool) {
         self.search_mode = active;
     }
-    
-    pub fn is_search_mode(&self) -> bool {
-        self.search_mode
-    }
 
     pub async fn handle_event(&self, event: Event) -> Result<()> {
         if let Event::Key(key) = event {
