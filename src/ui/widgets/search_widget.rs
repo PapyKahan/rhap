@@ -11,6 +11,7 @@ pub struct SearchWidget {
     input: String,
     cursor_position: usize,
     search_result_index: Option<usize>,
+    last_query: String, // Track the last query for next match functionality
 }
 
 impl SearchWidget {
@@ -19,6 +20,7 @@ impl SearchWidget {
             input: String::new(),
             cursor_position: 0,
             search_result_index: None,
+            last_query: String::new(),
         }
     }
 
@@ -71,6 +73,15 @@ impl SearchWidget {
 
     pub fn set_search_result(&mut self, index: Option<usize>) {
         self.search_result_index = index;
+        // Save the current input as the last query when a result is found
+        if index.is_some() {
+            self.last_query = self.input.clone();
+        }
+    }
+
+    // Add this method to get the last search query
+    pub fn last_query(&self) -> &str {
+        &self.last_query
     }
 
     pub fn render(&mut self, frame: &mut Frame, area: Rect) {

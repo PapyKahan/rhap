@@ -1,4 +1,4 @@
-use crossterm::event::{Event, KeyCode, KeyEventKind};
+use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 use tokio::sync::broadcast::{self, Sender};
 use anyhow::Result;
 
@@ -21,6 +21,7 @@ pub enum KeyboardEvent {
     Delete,
     Left,
     Right,
+    NextMatch, // New event type for CTRL+n
 }
 
 pub struct KeyboardManager {
@@ -58,7 +59,11 @@ impl KeyboardManager {
                         KeyCode::Left => Some(KeyboardEvent::Left),
                         KeyCode::Right => Some(KeyboardEvent::Right),
                         
-                        // Les caractères sont envoyés comme entrée de texte en mode recherche
+                        // Add CTRL+n support in search mode
+                        KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => 
+                            Some(KeyboardEvent::NextMatch),
+                        
+                        // Add this line to handle character inputs in search mode
                         KeyCode::Char(c) => Some(KeyboardEvent::Char(c)),
                         
                         // Autres touches ignorées en mode recherche
@@ -83,7 +88,13 @@ impl KeyboardManager {
                         KeyCode::Delete => Some(KeyboardEvent::Delete),
                         KeyCode::Left => Some(KeyboardEvent::Left),
                         KeyCode::Right => Some(KeyboardEvent::Right),
+                        
+                        // Also add CTRL+n support in normal mode
+                        KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => 
+                            Some(KeyboardEvent::NextMatch),
+                            
                         KeyCode::Char(c) => Some(KeyboardEvent::Char(c)),
+                        
                         _ => None,
                     }
                 };

@@ -200,6 +200,23 @@ impl App {
                     KeyboardEvent::Up => playlist.borrow_mut().select_previous(),
                     KeyboardEvent::Down => playlist.borrow_mut().select_next(),
                     KeyboardEvent::Enter => playlist.borrow_mut().play_selected().await?,
+                    KeyboardEvent::NextMatch => {
+                        // Get the last search query from search widget
+                        let query = self.search_widget.borrow().last_query().to_string();
+                        
+                        if !query.is_empty() {
+                            // Get current selected index as the starting point
+                                let current_index = playlist.borrow().selected_index();
+                                
+                                // Find the next match
+                            let next_match = playlist.borrow().search_next(current_index, &query);
+                            
+                            // If found, select that item
+                            if let Some(index) = next_match {
+                                playlist.borrow_mut().select_index(index);
+                            }
+                        }
+                    },
                     _ => {}
                 }
             }
