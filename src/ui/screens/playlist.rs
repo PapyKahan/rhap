@@ -158,14 +158,21 @@ impl Playlist {
             x: area.x,
             y: area.y,
             width: area.width,
-            height: area.height - 6, // Adjust the height to leave space for the widget
+            height: area.height - 7, // Reduced by 7 (6 for widget + 1 for placeholder)
         };
 
         let widget_area = Rect {
             x: area.x,
-            y: area.y + area.height - 6, // Position the widget below the table
+            y: area.y + area.height - 7, // Position the widget below the table
             width: area.width,
             height: 6, // Height for the widget
+        };
+
+        let placeholder_area = Rect {
+            x: area.x,
+            y: area.y + area.height - 1, // Position the placeholder at the very bottom
+            width: area.width,
+            height: 1, // Height of 1 line for the placeholder
         };
 
         let mut items = Vec::new();
@@ -232,6 +239,9 @@ impl Playlist {
 
         // Render the CurrentlyPlayingWidget
         self.currently_playing_widget.render(frame, widget_area);
+        
+        // Render a blank placeholder at the bottom
+        frame.render_widget(Clear, placeholder_area);
 
         Ok(())
     }
