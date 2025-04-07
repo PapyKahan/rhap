@@ -41,21 +41,21 @@ impl SearchWidget {
             self.input.remove(self.cursor_position);
         }
     }
-    
+
     // Nouvelle méthode pour gérer la touche Delete
     pub fn handle_delete(&mut self) {
         if self.cursor_position < self.input.len() {
             self.input.remove(self.cursor_position);
         }
     }
-    
+
     // Déplacer le curseur vers la gauche
     pub fn move_cursor_left(&mut self) {
         if self.cursor_position > 0 {
             self.cursor_position -= 1;
         }
     }
-    
+
     // Déplacer le curseur vers la droite
     pub fn move_cursor_right(&mut self) {
         if self.cursor_position < self.input.len() {
@@ -83,23 +83,27 @@ impl SearchWidget {
         };
 
         // Create separate spans for icon and input text with different colors
-        let search_text = ratatui::text::Text::from(
-            ratatui::text::Line::from(vec![
-                ratatui::text::Span::styled(" ", Style::default().fg(HIGHLIGHT_COLOR)),
-                ratatui::text::Span::styled(&self.input, Style::default().fg(ratatui::style::Color::White)),
-            ])
-        );
-        
+        let search_text = ratatui::text::Text::from(ratatui::text::Line::from(vec![
+            ratatui::text::Span::styled("", Style::default().fg(HIGHLIGHT_COLOR)),
+            ratatui::text::Span::raw(" "), // Space between icon and input
+            ratatui::text::Span::styled(
+                &self.input,
+                Style::default().fg(ratatui::style::Color::White),
+            ),
+        ]));
+
         // Simple paragraph without borders for a vim-like look
         let paragraph = Paragraph::new(search_text);
 
         frame.render_widget(Clear, search_area);
         frame.render_widget(paragraph, search_area);
-        
+
+        // Position cursor right after the '/' plus the current input position
         // Position cursor right after the '/' plus the current input position
         frame.set_cursor_position((
-            search_area.x + self.cursor_position as u16 + 1, // +1 for the '/' character
+            search_area.x + self.cursor_position as u16 + 2, // +1 for '/' and +1 for space
             search_area.y,
         ));
     }
 }
+
