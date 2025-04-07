@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
-use rand::{seq::SliceRandom, rng};
+use rand::{rng, seq::SliceRandom};
 use ratatui::{
     prelude::{Alignment, Constraint, Rect},
     style::Style,
@@ -11,7 +11,12 @@ use ratatui::{
 use walkdir::WalkDir;
 
 use crate::{
-    musictrack::MusicTrack, player::{CurrentTrackInfo, Player}, ui::{widgets::CurrentlyPlayingWidget, HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_ALTERNATE_COLOR_COL, ROW_COLOR, ROW_COLOR_COL}
+    musictrack::MusicTrack,
+    player::{CurrentTrackInfo, Player},
+    ui::{
+        widgets::CurrentlyPlayingWidget, HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR,
+        ROW_ALTERNATE_COLOR_COL, ROW_COLOR, ROW_COLOR_COL,
+    },
 };
 
 pub struct Playlist {
@@ -59,7 +64,7 @@ impl Playlist {
             playing_track: None,
             playing_track_index: 0,
             automatically_play_next: true,
-            currently_playing_widget: CurrentlyPlayingWidget::new(None)
+            currently_playing_widget: CurrentlyPlayingWidget::new(None),
         })
     }
 
@@ -121,6 +126,7 @@ impl Playlist {
 
     pub async fn stop(&mut self) -> Result<()> {
         self.playing_track = None;
+        self.currently_playing_widget.clear();
         self.player.stop().await
     }
 
@@ -152,14 +158,21 @@ impl Playlist {
             x: area.x,
             y: area.y,
             width: area.width,
-            height: area.height - 6, // Adjust the height to leave space for the widget
+            height: area.height - 7, // Reduced by 7 (6 for widget + 1 for placeholder)
         };
 
         let widget_area = Rect {
             x: area.x,
-            y: area.y + area.height - 6, // Position the widget below the table
+            y: area.y + area.height - 7, // Position the widget below the table
             width: area.width,
             height: 6, // Height for the widget
+        };
+
+        let placeholder_area = Rect {
+            x: area.x,
+            y: area.y + area.height - 1, // Position the placeholder at the very bottom
+            width: area.width,
+            height: 1, // Height of 1 line for the placeholder
         };
 
         let mut items = Vec::new();
@@ -201,28 +214,34 @@ impl Playlist {
                 items.push(row);
             }
         }
-        let table = Table::new(items, &[
+        let table = Table::new(
+            items,
+            &[
                 Constraint::Length(1),
                 Constraint::Percentage(20),
                 Constraint::Percentage(60),
                 Constraint::Percentage(10),
                 Constraint::Percentage(10),
-            ])
-            .row_highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
-            .block(
-                Block::default()
-                    .title(format!("Playlist - {}", self.songs.len()))
-                    .title_alignment(Alignment::Left)
-                    .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
-                    .border_style(Style::default().fg(HIGHLIGHT_COLOR)),
-            );
+            ],
+        )
+        .row_highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
+        .block(
+            Block::default()
+                .title(format!("Playlist - {}", self.songs.len()))
+                .title_alignment(Alignment::Left)
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(HIGHLIGHT_COLOR)),
+        );
 
         frame.render_widget(Clear, table_area);
         frame.render_stateful_widget(table, table_area, &mut self.state);
 
         // Render the CurrentlyPlayingWidget
         self.currently_playing_widget.render(frame, widget_area);
+        
+        // Render a blank placeholder at the bottom
+        frame.render_widget(Clear, placeholder_area);
 
         Ok(())
     }
@@ -238,5 +257,109 @@ impl Playlist {
     pub fn is_playing(&self) -> bool {
         self.player.is_playing()
     }
-}
 
+    pub fn search(&self, query: &str) -> Option<usize> {
+        if query.is_empty() {
+            return None;
+        }
+
+        let query = query.to_lowercase();
+        for (index, song) in self.songs.iter().enumerate() {
+            let title = song.title.to_lowercase();
+            let artist = song.artist.to_lowercase();
+
+            if title.contains(&query) || artist.contains(&query) {
+                return Some(index);
+            }
+        }
+
+        None
+    }
+
+    pub fn search_next(&self, current_index: Option<usize>, query: &str) -> Option<usize> {
+        if query.is_empty() {
+            return None;
+        }
+
+        let query = query.to_lowercase();
+        let start_index = current_index.map(|idx| idx + 1).unwrap_or(0);
+        
+        // First, search from current position to end
+        for index in start_index..self.songs.len() {
+            if let Some(song) = self.songs.get(index) {
+                let title = song.title.to_lowercase();
+                let artist = song.artist.to_lowercase();
+
+                if title.contains(&query) || artist.contains(&query) {
+                    return Some(index);
+                }
+            }
+        }
+        
+        // If we didn't find anything and we started from a non-zero position,
+        // cycle around to the beginning
+        if start_index > 0 {
+            for index in 0..start_index {
+                if let Some(song) = self.songs.get(index) {
+                    let title = song.title.to_lowercase();
+                    let artist = song.artist.to_lowercase();
+
+                    if title.contains(&query) || artist.contains(&query) {
+                        return Some(index);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn search_prev(&self, current_index: Option<usize>, query: &str) -> Option<usize> {
+        if query.is_empty() {
+            return None;
+        }
+
+        let query = query.to_lowercase();
+        
+        // Get the current position or use the length of songs as starting point
+        // (to wrap around to the end when starting from the beginning)
+        let start_index = current_index.unwrap_or(0);
+        
+        // First, search backward from current position to beginning
+        for index in (0..start_index).rev() {
+            if let Some(song) = self.songs.get(index) {
+                let title = song.title.to_lowercase();
+                let artist = song.artist.to_lowercase();
+
+                if title.contains(&query) || artist.contains(&query) {
+                    return Some(index);
+                }
+            }
+        }
+        
+        // If we didn't find anything and we're not at the end,
+        // cycle around to the end of the list
+        for index in (start_index..self.songs.len()).rev() {
+            if let Some(song) = self.songs.get(index) {
+                let title = song.title.to_lowercase();
+                let artist = song.artist.to_lowercase();
+
+                if title.contains(&query) || artist.contains(&query) {
+                    return Some(index);
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn select_index(&mut self, index: usize) {
+        if index < self.songs.len() {
+            self.state.select(Some(index));
+        }
+    }
+    
+    pub fn selected_index(&self) -> Option<usize> {
+        self.state.selected()
+    }
+}

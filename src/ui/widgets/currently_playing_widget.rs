@@ -5,8 +5,11 @@ use ratatui::{
     Frame,
 };
 
-use crate::{player::CurrentTrackInfo, ui::{PROGRESSBAR_COLOR, ROW_COLOR}};
 use crate::ui::HIGHLIGHT_COLOR;
+use crate::{
+    player::CurrentTrackInfo,
+    ui::{PROGRESSBAR_COLOR, ROW_COLOR},
+};
 use std::time::{Duration, Instant};
 use symphonia::core::units::Time;
 
@@ -18,17 +21,21 @@ pub struct CurrentlyPlayingWidget {
 
 impl CurrentlyPlayingWidget {
     pub fn new(track_info: Option<CurrentTrackInfo>) -> Self {
-        Self { 
+        Self {
             track_info,
             last_update: Instant::now(),
             last_elapsed_time: Time::default(),
         }
     }
 
+    pub fn clear(&mut self) {
+        self.track_info = None;
+    }
+
     pub fn render(&mut self, frame: &mut Frame, area: Rect) {
         let now = Instant::now();
         let elapsed = now.duration_since(self.last_update);
-        
+
         if elapsed >= Duration::from_millis(100) {
             self.last_update = now;
             if let Some(track_info) = &self.track_info {
@@ -38,7 +45,8 @@ impl CurrentlyPlayingWidget {
 
         let text = if let Some(track_info) = &self.track_info {
             let progress = if track_info.total_duration.seconds > 0 {
-                (self.last_elapsed_time.seconds as f64 / track_info.total_duration.seconds as f64) * 100.0
+                (self.last_elapsed_time.seconds as f64 / track_info.total_duration.seconds as f64)
+                    * 100.0
             } else {
                 0.0
             };
@@ -62,10 +70,23 @@ impl CurrentlyPlayingWidget {
                 Line::from(vec![
                     Span::raw(track_info.format_time(self.last_elapsed_time)),
                     Span::raw(" "),
-                      Span::styled("".repeat(filled_width), Style::default().fg(PROGRESSBAR_COLOR).add_modifier(Modifier::BOLD)),
-                    Span::styled("", Style::default().fg(HIGHLIGHT_COLOR).add_modifier(Modifier::BOLD)),
-                    Span::styled("".repeat(empty_width), Style::default().fg(ROW_COLOR).add_modifier(Modifier::BOLD)),
-Span::raw(" "),
+                    Span::styled(
+                        "".repeat(filled_width),
+                        Style::default()
+                            .fg(PROGRESSBAR_COLOR)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        "",
+                        Style::default()
+                            .fg(HIGHLIGHT_COLOR)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        "".repeat(empty_width),
+                        Style::default().fg(ROW_COLOR).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(" "),
                     Span::raw(track_info.format_time(track_info.total_duration)),
                 ]),
             ]

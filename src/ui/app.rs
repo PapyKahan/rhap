@@ -1,5 +1,5 @@
 use super::{KeyboardEvent, KeyboardManager};
-use super::{screens::Playlist, utils::bottom_right_fixed_size, widgets::DeviceSelector};
+use super::{screens::Playlist, utils::bottom_right_fixed_size, widgets::{DeviceSelector, SearchWidget}};
 use crate::{audio::Host, player::Player};
 use anyhow::Result;
 use crossterm::event::{self};
@@ -12,12 +12,14 @@ use tokio::sync::broadcast;
 
 pub enum Screens {
     OutputSelector(Rc<RefCell<DeviceSelector>>),
+    SearchWidget(Rc<RefCell<SearchWidget>>),
     Default(Rc<RefCell<Playlist>>),
 }
 
 pub struct App {
     layers: Vec<Screens>,
     output_selector: Rc<RefCell<DeviceSelector>>,
+    search_widget: Rc<RefCell<SearchWidget>>,
     playlist: Rc<RefCell<Playlist>>,
     keyboard_manager: KeyboardManager,
     event_receiver: broadcast::Receiver<KeyboardEvent>,
@@ -31,6 +33,7 @@ impl App {
         Ok(Self {
             layers: vec![],
             output_selector: Rc::new(RefCell::new(DeviceSelector::new(host)?)),
+            search_widget: Rc::new(RefCell::new(SearchWidget::new())),
             playlist: Rc::new(RefCell::new(Playlist::new(path, player)?)),
             keyboard_manager,
             event_receiver,
@@ -49,57 +52,189 @@ impl App {
                 let area = bottom_right_fixed_size(40, 6, frame.area());
                 (*selector).borrow_mut().render(frame, area)?;
             }
+            Screens::SearchWidget(search) => {
+                (*search).borrow_mut().render(frame, frame.area());
+            }
             _ => (),
         }
         Ok(())
+    }
+
+    // Fonction auxiliaire pour quitter le mode recherche
+    fn exit_search_mode(&mut self) {
+        self.keyboard_manager.set_search_mode(false);
+        self.layers.pop();
     }
 
     async fn handle_keyboard_event(&mut self, event: &KeyboardEvent) -> Result<()> {
         let default_screen = Screens::Default(self.playlist.clone());
         let current_screen = self.layers.last().unwrap_or(&default_screen);
         
-        match event {
-            KeyboardEvent::Quit => {
-                if let Screens::Default(playlist) = current_screen {
-                    playlist.borrow_mut().stop().await?;
+        match current_screen {
+            Screens::SearchWidget(search) => {
+                match event {
+                    KeyboardEvent::Escape => {
+                        self.exit_search_mode();
+                    },
+                    KeyboardEvent::Backspace => {
+                        // Handle backspace in search and get the new input string
+                        {
+                            search.borrow_mut().handle_backspace();
+                        } // The mutable borrow ends here
+                        
+                        // Update search results with a new borrow
+                        let query = search.borrow().input().to_string(); // Clone the string to avoid borrowing issues
+                        
+                        // Now update the search results
+                        let index = if !query.is_empty() {
+                            self.playlist.borrow().search(&query)
+                        } else {
+                            None
+                        };
+                        
+                        {
+                            search.borrow_mut().set_search_result(index);
+                        }
+                    },
+                    KeyboardEvent::Char(c) => {
+                        // Add character to search input
+                        {
+                            search.borrow_mut().handle_input(*c);
+                        } // The mutable borrow ends here
+                        
+                        // Get a copy of the query
+                        let query = search.borrow().input().to_string();
+                        
+                        // Search for matching items
+                        let index = self.playlist.borrow().search(&query);
+                        
+                        // Update the search result
+                        {
+                            search.borrow_mut().set_search_result(index);
+                        }
+                    },
+                    KeyboardEvent::Enter => {
+                        // Same approach - get data first, then perform actions
+                        let search_result = search.borrow().search_result();
+                        if let Some(index) = search_result {
+                            self.playlist.borrow_mut().select_index(index);
+                        }
+                        self.exit_search_mode();
+                    },
+                    KeyboardEvent::Delete => {
+                        // Gérer la touche Delete avec le même pattern
+                        {
+                            search.borrow_mut().handle_delete();
+                        } // The mutable borrow ends here
+                        
+                        // Copier la requête
+                        let query = search.borrow().input().to_string();
+                        
+                        // Chercher les éléments correspondants
+                        let index = if !query.is_empty() {
+                            self.playlist.borrow().search(&query)
+                        } else {
+                            None
+                        };
+                        
+                        // Mettre à jour le résultat de recherche
+                        {
+                            search.borrow_mut().set_search_result(index);
+                        }
+                    },
+                    KeyboardEvent::Left => {
+                        search.borrow_mut().move_cursor_left();
+                    },
+                    KeyboardEvent::Right => {
+                        search.borrow_mut().move_cursor_right();
+                    },
+                    // Tous les autres événements clavier sont délibérément ignorés quand le widget de recherche est actif
+                    // pour éviter que les actions de la playlist ou d'autres widgets ne soient déclenchées
+                    _ => {}
                 }
-                return Ok(());
-            }
-            KeyboardEvent::DeviceSelector => {
-                self.output_selector.borrow_mut().refresh_device_list()?;
-                self.layers.push(Screens::OutputSelector(self.output_selector.clone()));
-            }
-            _ => {
-                match current_screen {
-                    Screens::OutputSelector(selector) => {
-                        match event {
-                            KeyboardEvent::Up => selector.borrow_mut().select_previous(),
-                            KeyboardEvent::Down => selector.borrow_mut().select_next(),
-                            KeyboardEvent::Enter => selector.borrow_mut().set_selected_device()?,
-                            KeyboardEvent::Quit => {
-                                self.layers.pop();
+            },
+            // Handle other screens as before
+            Screens::OutputSelector(selector) => {
+                match event {
+                    KeyboardEvent::Quit => {
+                        self.layers.pop();
+                    },
+                    KeyboardEvent::Up => selector.borrow_mut().select_previous(),
+                    KeyboardEvent::Down => selector.borrow_mut().select_next(),
+                    KeyboardEvent::Enter => {
+                        selector.borrow_mut().set_selected_device()?;
+                        self.layers.pop();
+                    },
+                    KeyboardEvent::Escape => {
+                        self.layers.pop();
+                    },
+                    _ => {}
+                }
+            },
+            Screens::Default(playlist) => {
+                match event {
+                    KeyboardEvent::Quit => {
+                        playlist.borrow_mut().stop().await?;
+                        return Ok(());
+                    },
+                    KeyboardEvent::Search => {
+                        // Activer le widget de recherche
+                        self.search_widget.borrow_mut().clear();
+                        self.keyboard_manager.set_search_mode(true);  // Activer le mode recherche
+                        self.layers.push(Screens::SearchWidget(self.search_widget.clone()));
+                    },
+                    KeyboardEvent::DeviceSelector => {
+                        self.output_selector.borrow_mut().refresh_device_list()?;
+                        self.layers.push(Screens::OutputSelector(self.output_selector.clone()));
+                    },
+                    KeyboardEvent::Play | KeyboardEvent::Pause => {
+                        if playlist.borrow_mut().is_playing() {
+                            playlist.borrow_mut().pause().await?;
+                        } else {
+                            playlist.borrow_mut().resume().await?;
+                        }
+                    },
+                    KeyboardEvent::Stop => playlist.borrow_mut().stop().await?,
+                    KeyboardEvent::Next => playlist.borrow_mut().next().await?,
+                    KeyboardEvent::Previous => playlist.borrow_mut().previous().await?,
+                    KeyboardEvent::Up => playlist.borrow_mut().select_previous(),
+                    KeyboardEvent::Down => playlist.borrow_mut().select_next(),
+                    KeyboardEvent::Enter => playlist.borrow_mut().play_selected().await?,
+                    KeyboardEvent::NextMatch => {
+                        // Get the last search query from search widget
+                        let query = self.search_widget.borrow().last_query().to_string();
+                        
+                        if !query.is_empty() {
+                            // Get current selected index as the starting point
+                                let current_index = playlist.borrow().selected_index();
+                                
+                                // Find the next match
+                            let next_match = playlist.borrow().search_next(current_index, &query);
+                            
+                            // If found, select that item
+                            if let Some(index) = next_match {
+                                playlist.borrow_mut().select_index(index);
                             }
-                            _ => {}
                         }
-                    }
-                    Screens::Default(playlist) => {
-                        match event {
-                            KeyboardEvent::Play | KeyboardEvent::Pause => {
-                                if playlist.borrow_mut().is_playing() {
-                                    playlist.borrow_mut().pause().await?;
-                                } else {
-                                    playlist.borrow_mut().resume().await?;
-                                }
-                            },
-                            KeyboardEvent::Stop => playlist.borrow_mut().stop().await?,
-                            KeyboardEvent::Next => playlist.borrow_mut().next().await?,
-                            KeyboardEvent::Previous => playlist.borrow_mut().previous().await?,
-                            KeyboardEvent::Up => playlist.borrow_mut().select_previous(),
-                            KeyboardEvent::Down => playlist.borrow_mut().select_next(),
-                            KeyboardEvent::Enter => playlist.borrow_mut().play_selected().await?,
-                            _ => {}
+                    },
+                    KeyboardEvent::PrevMatch => {
+                        // Get the last search query from search widget
+                        let query = self.search_widget.borrow().last_query().to_string();
+                        
+                        if !query.is_empty() {
+                            // Get current selected index as the starting point
+                            let current_index = playlist.borrow().selected_index();
+                            
+                            // Find the previous match
+                            let prev_match = playlist.borrow().search_prev(current_index, &query);
+                            
+                            // If found, select that item
+                            if let Some(index) = prev_match {
+                                playlist.borrow_mut().select_index(index);
+                            }
                         }
-                    }
+                    },
+                    _ => {}
                 }
             }
         }
