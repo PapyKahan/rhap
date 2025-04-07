@@ -5,8 +5,9 @@ use rand::{rng, seq::SliceRandom};
 use ratatui::{
     prelude::{Alignment, Constraint, Rect},
     style::Style,
-    widgets::{Block, BorderType, Borders, Cell, Clear, Row, Table, TableState},
+    widgets::{Block, BorderType, Borders, Cell, Clear, Row, Table, TableState, Scrollbar, ScrollbarState},
     Frame,
+    layout::{Layout, Direction, Constraint as LConstraint}
 };
 use walkdir::WalkDir;
 
@@ -154,12 +155,26 @@ impl Playlist {
     }
 
     pub(crate) fn render(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let table_area = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: area.height - 7, // Reduced by 7 (6 for widget + 1 for placeholder)
-        };
+        let table_and_scrollbar = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([LConstraint::Min(0), LConstraint::Length(1)])
+            .split(Rect {
+                x: area.x,
+                y: area.y,
+                width: area.width,
+                height: area.height - 7, // Reduced by 7 (6 for widget + 1 for placeholder)
+            });
+        
+        let table_area = table_and_scrollbar[0];
+        let scrollbar_area = table_and_scrollbar[1];
+
+        // Calculate scrollbar state based on selection and total items
+        let selected = self.state.selected().unwrap_or(0);
+        let max_items = self.songs.len().saturating_sub(1);
+        
+        let mut scrollbar_state = ScrollbarState::default()
+            .content_length(max_items)
+            .position(selected);
 
         let widget_area = Rect {
             x: area.x,
@@ -234,8 +249,22 @@ impl Playlist {
                 .border_style(Style::default().fg(HIGHLIGHT_COLOR)),
         );
 
+        // Render the table
         frame.render_widget(Clear, table_area);
         frame.render_stateful_widget(table, table_area, &mut self.state);
+        
+        // Render the scrollbar
+        frame.render_stateful_widget(
+            Scrollbar::default()
+                .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
+                .symbols(ratatui::symbols::scrollbar::VERTICAL)
+                .track_symbol(Some("│"))
+                .thumb_symbol("█")
+                .track_style(Style::default())
+                .thumb_style(Style::default().fg(HIGHLIGHT_COLOR)),
+            scrollbar_area,
+            &mut scrollbar_state
+        );
 
         // Render the CurrentlyPlayingWidget
         self.currently_playing_widget.render(frame, widget_area);
