@@ -21,7 +21,8 @@ pub enum KeyboardEvent {
     Delete,
     Left,
     Right,
-    NextMatch, // New event type for CTRL+n
+    NextMatch, 
+    PrevMatch,
 }
 
 pub struct KeyboardManager {
@@ -63,6 +64,10 @@ impl KeyboardManager {
                         KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => 
                             Some(KeyboardEvent::NextMatch),
                         
+                        // Add CTRL+p support in search mode
+                        KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => 
+                            Some(KeyboardEvent::PrevMatch),
+                        
                         // Add this line to handle character inputs in search mode
                         KeyCode::Char(c) => Some(KeyboardEvent::Char(c)),
                         
@@ -73,7 +78,7 @@ impl KeyboardManager {
                     // Comportement normal hors mode recherche
                     match key.code {
                         KeyCode::Enter => Some(KeyboardEvent::Enter),
-                        KeyCode::Char('p') => Some(KeyboardEvent::Play),
+                        KeyCode::Char('p') if !key.modifiers.contains(KeyModifiers::CONTROL) => Some(KeyboardEvent::Play),
                         KeyCode::Char(' ') => Some(KeyboardEvent::Pause),
                         KeyCode::Char('s') => Some(KeyboardEvent::Stop),
                         KeyCode::Char('l') => Some(KeyboardEvent::Next),
@@ -93,6 +98,10 @@ impl KeyboardManager {
                         KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => 
                             Some(KeyboardEvent::NextMatch),
                             
+                        // Also add CTRL+p support in normal mode
+                        KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => 
+                            Some(KeyboardEvent::PrevMatch),
+                        
                         KeyCode::Char(c) => Some(KeyboardEvent::Char(c)),
                         
                         _ => None,

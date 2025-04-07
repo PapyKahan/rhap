@@ -217,6 +217,23 @@ impl App {
                             }
                         }
                     },
+                    KeyboardEvent::PrevMatch => {
+                        // Get the last search query from search widget
+                        let query = self.search_widget.borrow().last_query().to_string();
+                        
+                        if !query.is_empty() {
+                            // Get current selected index as the starting point
+                            let current_index = playlist.borrow().selected_index();
+                            
+                            // Find the previous match
+                            let prev_match = playlist.borrow().search_prev(current_index, &query);
+                            
+                            // If found, select that item
+                            if let Some(index) = prev_match {
+                                playlist.borrow_mut().select_index(index);
+                            }
+                        }
+                    },
                     _ => {}
                 }
             }

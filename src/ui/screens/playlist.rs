@@ -314,6 +314,45 @@ impl Playlist {
         None
     }
 
+    pub fn search_prev(&self, current_index: Option<usize>, query: &str) -> Option<usize> {
+        if query.is_empty() {
+            return None;
+        }
+
+        let query = query.to_lowercase();
+        
+        // Get the current position or use the length of songs as starting point
+        // (to wrap around to the end when starting from the beginning)
+        let start_index = current_index.unwrap_or(0);
+        
+        // First, search backward from current position to beginning
+        for index in (0..start_index).rev() {
+            if let Some(song) = self.songs.get(index) {
+                let title = song.title.to_lowercase();
+                let artist = song.artist.to_lowercase();
+
+                if title.contains(&query) || artist.contains(&query) {
+                    return Some(index);
+                }
+            }
+        }
+        
+        // If we didn't find anything and we're not at the end,
+        // cycle around to the end of the list
+        for index in (start_index..self.songs.len()).rev() {
+            if let Some(song) = self.songs.get(index) {
+                let title = song.title.to_lowercase();
+                let artist = song.artist.to_lowercase();
+
+                if title.contains(&query) || artist.contains(&query) {
+                    return Some(index);
+                }
+            }
+        }
+
+        None
+    }
+
     pub fn select_index(&mut self, index: usize) {
         if index < self.songs.len() {
             self.state.select(Some(index));
