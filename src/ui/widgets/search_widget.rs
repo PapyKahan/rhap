@@ -82,12 +82,16 @@ impl SearchWidget {
             height: 1,                   // Just 1 line high like vim
         };
 
-        // Format search text with a '/' prefix like vim
-        let search_text = format!("/{}", self.input);
+        // Create separate spans for icon and input text with different colors
+        let search_text = ratatui::text::Text::from(
+            ratatui::text::Line::from(vec![
+                ratatui::text::Span::styled(" ", Style::default().fg(HIGHLIGHT_COLOR)),
+                ratatui::text::Span::styled(&self.input, Style::default().fg(ratatui::style::Color::White)),
+            ])
+        );
         
         // Simple paragraph without borders for a vim-like look
-        let paragraph = Paragraph::new(search_text)
-            .style(Style::default().fg(HIGHLIGHT_COLOR));
+        let paragraph = Paragraph::new(search_text);
 
         frame.render_widget(Clear, search_area);
         frame.render_widget(paragraph, search_area);
