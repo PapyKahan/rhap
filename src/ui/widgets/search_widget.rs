@@ -74,33 +74,28 @@ impl SearchWidget {
     }
 
     pub fn render(&mut self, frame: &mut Frame, area: Rect) {
-        // Create a smaller area for the search widget at the bottom of the screen
+        // Create a search area at the very bottom of the screen
         let search_area = Rect {
-            x: area.x + 5,
-            y: area.y + area.height - 6,
-            width: area.width - 10,
-            height: 3,
+            x: area.x,
+            y: area.y + area.height - 1, // Position at the very bottom line
+            width: area.width,           // Use full width
+            height: 1,                   // Just 1 line high like vim
         };
 
-        let search_block = Block::default()
-            .title("Search")
-            .title_alignment(Alignment::Center)
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(HIGHLIGHT_COLOR));
-
-        // Remove the slash prefix from display
-        let search_text = self.input.clone();
+        // Format search text with a '/' prefix like vim
+        let search_text = format!("/{}", self.input);
+        
+        // Simple paragraph without borders for a vim-like look
         let paragraph = Paragraph::new(search_text)
-            .block(search_block);
+            .style(Style::default().fg(HIGHLIGHT_COLOR));
 
         frame.render_widget(Clear, search_area);
         frame.render_widget(paragraph, search_area);
         
-        // Adjust cursor position (no need for +1 for '/' character anymore)
+        // Position cursor right after the '/' plus the current input position
         frame.set_cursor(
-            search_area.x + self.cursor_position as u16 + 1, // +1 for the border only
-            search_area.y + 1,
-        )
+            search_area.x + self.cursor_position as u16 + 1, // +1 for the '/' character
+            search_area.y,
+        );
     }
 }
