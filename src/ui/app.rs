@@ -60,7 +60,7 @@ impl App {
         Ok(())
     }
 
-    // Fonction auxiliaire pour quitter le mode recherche
+    // Helper function to exit search mode
     fn exit_search_mode(&mut self) {
         self.keyboard_manager.set_search_mode(false);
         self.layers.pop();
@@ -122,7 +122,7 @@ impl App {
                         self.exit_search_mode();
                     },
                     KeyboardEvent::Delete => {
-                        // Gérer la touche Delete avec le même pattern
+                        // Handle Delete key with the same pattern
                         {
                             search.borrow_mut().handle_delete();
                         } // The mutable borrow ends here
@@ -148,8 +148,8 @@ impl App {
                     KeyboardEvent::Right => {
                         search.borrow_mut().move_cursor_right();
                     },
-                    // Tous les autres événements clavier sont délibérément ignorés quand le widget de recherche est actif
-                    // pour éviter que les actions de la playlist ou d'autres widgets ne soient déclenchées
+                    // All other keyboard events are deliberately ignored when the search widget is active
+                    // to prevent actions from the playlist or other widgets from being triggered
                     _ => {}
                 }
             },
