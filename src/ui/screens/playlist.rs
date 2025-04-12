@@ -259,9 +259,13 @@ impl Playlist {
                 .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
                 .symbols(ratatui::symbols::scrollbar::VERTICAL)
                 .track_symbol(Some("│"))
-                .thumb_symbol("█")
-                .track_style(Style::default())
-                .thumb_style(Style::default().fg(HIGHLIGHT_COLOR)),
+                .begin_symbol(Some("│"))
+                .thumb_symbol("│")
+                .end_symbol(Some("│"))
+                .track_style(Style::default().fg(ROW_COLOR_COL))
+                .thumb_style(Style::default().fg(HIGHLIGHT_COLOR))
+                .begin_style(Style::default().fg(ROW_COLOR_COL))
+                .end_style(Style::default().fg(ROW_COLOR_COL)),
             scrollbar_area,
             &mut scrollbar_state
         );
