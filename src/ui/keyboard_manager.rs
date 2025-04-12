@@ -1,6 +1,6 @@
+use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 use tokio::sync::broadcast::{self, Sender};
-use anyhow::Result;
 
 #[derive(Debug, Clone)]
 pub enum KeyboardEvent {
@@ -21,27 +21,27 @@ pub enum KeyboardEvent {
     Delete,
     Left,
     Right,
-    NextMatch, 
+    NextMatch,
     PrevMatch,
 }
 
 pub struct KeyboardManager {
     sender: Sender<KeyboardEvent>,
     receiver: broadcast::Receiver<KeyboardEvent>,
-    search_mode: bool,  // Nouvel attribut pour suivre l'état du mode recherche
+    search_mode: bool, // New attribute to track search mode state
 }
 
 impl KeyboardManager {
     pub fn new() -> Self {
         let (sender, receiver) = broadcast::channel(100);
-        Self { 
-            sender, 
+        Self {
+            sender,
             receiver,
             search_mode: false,
         }
     }
 
-    // Ajouter des méthodes pour activer/désactiver le mode recherche
+    // Add methods to enable/disable search mode
     pub fn set_search_mode(&mut self, active: bool) {
         self.search_mode = active;
     }
@@ -50,35 +50,39 @@ impl KeyboardManager {
         if let Event::Key(key) = event {
             if key.kind == KeyEventKind::Press {
                 let keyboard_event = if self.search_mode {
-                    // En mode recherche, les caractères sont traités différemment mais les autres touches restent normales
+                    // In search mode, characters are processed differently but other keys remain normal
                     match key.code {
-                        // Ces touches conservent leur comportement spécial même en mode recherche
+                        // These keys maintain their special behavior even in search mode
                         KeyCode::Enter => Some(KeyboardEvent::Enter),
                         KeyCode::Esc => Some(KeyboardEvent::Escape),
                         KeyCode::Backspace => Some(KeyboardEvent::Backspace),
                         KeyCode::Delete => Some(KeyboardEvent::Delete),
                         KeyCode::Left => Some(KeyboardEvent::Left),
                         KeyCode::Right => Some(KeyboardEvent::Right),
-                        
+
                         // Add CTRL+n support in search mode
-                        KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => 
-                            Some(KeyboardEvent::NextMatch),
-                        
+                        KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            Some(KeyboardEvent::NextMatch)
+                        }
+
                         // Add CTRL+p support in search mode
-                        KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => 
-                            Some(KeyboardEvent::PrevMatch),
-                        
+                        KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            Some(KeyboardEvent::PrevMatch)
+                        }
+
                         // Add this line to handle character inputs in search mode
                         KeyCode::Char(c) => Some(KeyboardEvent::Char(c)),
-                        
-                        // Autres touches ignorées en mode recherche
+
+                        // Other keys ignored in search mode
                         _ => None,
                     }
                 } else {
-                    // Comportement normal hors mode recherche
+                    // Normal behavior outside search mode
                     match key.code {
                         KeyCode::Enter => Some(KeyboardEvent::Enter),
-                        KeyCode::Char('p') if !key.modifiers.contains(KeyModifiers::CONTROL) => Some(KeyboardEvent::Play),
+                        KeyCode::Char('p') if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            Some(KeyboardEvent::Play)
+                        }
                         KeyCode::Char(' ') => Some(KeyboardEvent::Pause),
                         KeyCode::Char('s') => Some(KeyboardEvent::Stop),
                         KeyCode::Char('l') => Some(KeyboardEvent::Next),
@@ -93,17 +97,19 @@ impl KeyboardManager {
                         KeyCode::Delete => Some(KeyboardEvent::Delete),
                         KeyCode::Left => Some(KeyboardEvent::Left),
                         KeyCode::Right => Some(KeyboardEvent::Right),
-                        
+
                         // Also add CTRL+n support in normal mode
-                        KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => 
-                            Some(KeyboardEvent::NextMatch),
-                            
+                        KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            Some(KeyboardEvent::NextMatch)
+                        }
+
                         // Also add CTRL+p support in normal mode
-                        KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => 
-                            Some(KeyboardEvent::PrevMatch),
-                        
+                        KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            Some(KeyboardEvent::PrevMatch)
+                        }
+
                         KeyCode::Char(c) => Some(KeyboardEvent::Char(c)),
-                        
+
                         _ => None,
                     }
                 };
@@ -120,3 +126,4 @@ impl KeyboardManager {
         self.receiver.resubscribe()
     }
 }
+

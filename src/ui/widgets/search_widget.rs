@@ -44,21 +44,21 @@ impl SearchWidget {
         }
     }
 
-    // Nouvelle méthode pour gérer la touche Delete
+    // New method to handle the Delete key
     pub fn handle_delete(&mut self) {
         if self.cursor_position < self.input.len() {
             self.input.remove(self.cursor_position);
         }
     }
 
-    // Déplacer le curseur vers la gauche
+    // Move cursor to the left
     pub fn move_cursor_left(&mut self) {
         if self.cursor_position > 0 {
             self.cursor_position -= 1;
         }
     }
 
-    // Déplacer le curseur vers la droite
+    // Move cursor to the right
     pub fn move_cursor_right(&mut self) {
         if self.cursor_position < self.input.len() {
             self.cursor_position += 1;
@@ -117,4 +117,3 @@ impl SearchWidget {
         ));
     }
 }
-
