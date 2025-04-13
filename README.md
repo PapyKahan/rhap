@@ -1,10 +1,8 @@
 # Rhap - Rust Handcrafted Audio Player
 
-Rhap is a terminal-based audio player written in Rust that provides a clean and efficient way to play your music from the command line. With a feature-rich TUI (Text-based User Interface), Rhap delivers a powerful audio playback experience without leaving your terminal.
-
 ## Summary
 
-Rhap (Rust Handcrafted Audio Player) is a lightweight, efficient music player designed for terminal environments. It leverages the WASAPI (Windows Audio Session API) for high-quality audio playback, supports various audio formats through the Symphonia library, and offers a feature-rich terminal user interface using Ratatui.
+Rhap (Rust Handcrafted Audio Player) is a simple terminal-based music player written in Rust. It uses WASAPI (Windows Audio Session API) for audio playback, supports common audio formats via the Symphonia library, and provides a basic terminal interface built with Ratatui.
 
 Key features include:
 - TUI-based music player with playlist management
