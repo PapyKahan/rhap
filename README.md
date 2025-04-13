@@ -120,10 +120,10 @@ rhap --high-priority-mode --path <MUSIC_DIRECTORY_OR_FILE>
 ## Dependencies
 
 Rhap relies on the following main libraries:
-- `symphonia`: Audio decoding and format support
-- `ratatui`: Terminal UI framework
-- `crossterm`: Terminal control and event handling
-- `rubato`: Audio resampling
-- `tokio`: Asynchronous runtime
-- `clap`: Command line argument parsing
-- `windows`: Windows API bindings for audio support
+- [`symphonia`](https://github.com/pdeljanov/symphonia): Audio decoding and format support
+- [`ratatui`](https://github.com/ratatui-org/ratatui): Terminal UI framework
+- [`crossterm`](https://github.com/crossterm-rs/crossterm): Terminal control and event handling
+- [`rubato`](https://github.com/HEnquist/rubato): Audio resampling
+- [`tokio`](https://github.com/tokio-rs/tokio): Asynchronous runtime
+- [`clap`](https://github.com/clap-rs/clap): Command line argument parsing
+- [`windows-rs`](https://github.com/microsoft/windows-rs): Windows API bindings for audio support
