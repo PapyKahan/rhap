@@ -5,16 +5,16 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.98"
-clap = { version = "4.5.36", features = ["derive"] }
+clap = { version = "4.5.37", features = ["derive"] }
 crossterm = "0.29.0"
 log = "0.4.27"
-rand = "0.9.0"
+rand = "0.9.1"
 rubato = { version = "0.16.2", features = ["fft_resampler", "realfft", "num-complex"] }
 symphonia = { version = "0.5.4", features = ["all-formats", "all-codecs", "opt-simd", "opt-simd-avx", "opt-simd-neon", "opt-simd-sse"] }
 tokio = { version = "1.44.2", features = ["full"] }
 walkdir = "2.5.0"
 num-integer = "0.1.46"
-rustfft = "6.2.0"
+rustfft = "6.3.0"
 
 [dependencies.ratatui]
 version = "0.29.0"
