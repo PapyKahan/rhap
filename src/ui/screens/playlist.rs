@@ -117,6 +117,20 @@ impl Playlist {
     }
 
     pub async fn previous(&mut self) -> Result<()> {
+        // Check if a track is currently playing
+        if let Some(current_track) = &self.playing_track {
+            // Get elapsed time in seconds
+            let elapsed_time = current_track.get_elapsed_time();
+            
+            // If the track has been playing for more than 5 seconds, restart it
+            if elapsed_time.seconds > 3 {
+                // Replay the current track
+                self.play().await?;
+                return Ok(());
+            }
+        }
+        
+        // Otherwise, move to the previous track
         self.playing_track_index = if self.playing_track_index == 0 {
             self.songs.len() - 1
         } else {
