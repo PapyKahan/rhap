@@ -9,7 +9,7 @@ use ratatui::{
     Frame,
     layout::{Layout, Direction, Constraint as LConstraint}
 };
-use walkdir::WalkDir;
+use glob::glob;
 
 use crate::{
     musictrack::MusicTrack,
@@ -34,18 +34,10 @@ impl Playlist {
     pub fn new(path: PathBuf, player: Player) -> Result<Self> {
         let mut songs = vec![];
         if path.is_dir() {
-            let mut files = WalkDir::new(path.clone())
-                .follow_links(true)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .filter(|e| {
-                    e.file_type().is_file()
-                        && e.file_name()
-                            .to_str()
-                            .map(|s| s.ends_with(".flac"))
-                            .unwrap_or(false)
-                })
-                .map(|e| e.path().to_str().unwrap().to_string())
+            let pattern = format!("{}/**/*.flac", path.display());
+            let mut files = glob(&pattern)?
+                .filter_map(|entry| entry.ok())
+                .map(|path| path.to_string_lossy().to_string())
                 .collect::<Vec<String>>();
             files.shuffle(&mut rng());
             for f in files {
