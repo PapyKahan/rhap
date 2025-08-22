@@ -18,7 +18,7 @@ use crate::audio::{DeviceTrait, HostTrait};
 struct Args {
     #[clap(short, long)]
     list: bool,
-    #[clap(short, long, default_value_t = false)]
+    #[clap(long, default_value_t = false)]
     high_priority_mode: bool,
     #[clap(short, long, required = true)]
     path: PathBuf,
@@ -26,6 +26,8 @@ struct Args {
     device: Option<u32>,
     #[clap(long, default_value_t = false)]
     pollmode: bool,
+    #[clap(short, long, default_value = "auto")]
+    backend: String,
 }
 
 #[tokio::main]
@@ -33,7 +35,7 @@ async fn main() -> Result<()> {
 
     let args = Args::parse();
     if args.list {
-        let host = Host::new("wasapi", args.high_priority_mode);
+        let host = Host::new(&args.backend, args.high_priority_mode);
         let devices = host.get_devices()?;
         let mut index = 0;
         for device in devices {
@@ -63,7 +65,7 @@ async fn main() -> Result<()> {
     });
 
     let mut terminal = ratatui::init();
-    let host = Host::new("wasapi", args.high_priority_mode);
+    let host = Host::new(&args.backend, args.high_priority_mode);
     let player = Player::new(host, args.device, args.pollmode)?;
     let mut app = App::new(host, player, args.path)?;
     app.run(&mut terminal).await?;

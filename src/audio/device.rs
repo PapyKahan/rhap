@@ -1,4 +1,8 @@
-use super::{api, Capabilities, StreamParams, StreamingData};
+use super::{Capabilities, StreamParams, StreamingData};
+#[cfg(windows)]
+use super::api;
+#[cfg(unix)]
+use super::api;
 use anyhow::{anyhow, Result};
 use tokio::sync::mpsc::Sender;
 
@@ -14,7 +18,10 @@ pub trait DeviceTrait: Send + Sync {
 
 pub enum Device {
     None,
+    #[cfg(windows)]
     Wasapi(api::wasapi::device::Device),
+    #[cfg(unix)]
+    Jack(api::jack::device::Device),
 }
 
 impl Device {
@@ -48,58 +55,72 @@ impl Device {
 
 impl DeviceTrait for Device {
     fn is_default(&self) -> Result<bool> {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return Ok(false),
-        };
-        device.is_default()
+        match self {
+            #[cfg(windows)]
+            Self::Wasapi(device) => device.is_default(),
+            #[cfg(unix)]
+            Self::Jack(device) => device.is_default(),
+            Self::None => Ok(false),
+        }
     }
 
     fn name(&self) -> Result<String> {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return Ok(String::from("none")),
-        };
-        device.name()
+        match self {
+            #[cfg(windows)]
+            Self::Wasapi(device) => device.name(),
+            #[cfg(unix)]
+            Self::Jack(device) => device.name(),
+            Self::None => Ok(String::from("none")),
+        }
     }
 
     fn get_capabilities(&self) -> Result<Capabilities> {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return Ok(Capabilities::default()),
-        };
-        device.get_capabilities()
+        match self {
+            #[cfg(windows)]
+            Self::Wasapi(device) => device.get_capabilities(),
+            #[cfg(unix)]
+            Self::Jack(device) => device.get_capabilities(),
+            Self::None => Ok(Capabilities::default()),
+        }
     }
 
     fn start(&mut self, params: &StreamParams) -> Result<Sender<StreamingData>> {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return Err(anyhow!("No host selected")),
-        };
-        device.start(params)
+        match self {
+            #[cfg(windows)]
+            Self::Wasapi(device) => device.start(params),
+            #[cfg(unix)]
+            Self::Jack(device) => device.start(params),
+            Self::None => Err(anyhow!("No host selected")),
+        }
     }
 
     fn pause(&mut self) -> Result<()> {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return Ok(()),
-        };
-        device.pause()
+        match self {
+            #[cfg(windows)]
+            Self::Wasapi(device) => device.pause(),
+            #[cfg(unix)]
+            Self::Jack(device) => device.pause(),
+            Self::None => Ok(()),
+        }
     }
 
     fn resume(&mut self) -> Result<()> {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return Ok(()),
-        };
-        device.resume()
+        match self {
+            #[cfg(windows)]
+            Self::Wasapi(device) => device.resume(),
+            #[cfg(unix)]
+            Self::Jack(device) => device.resume(),
+            Self::None => Ok(()),
+        }
     }
 
     fn stop(&mut self) -> Result<()> {
-        let device = match self {
-            Self::Wasapi(device) => device,
-            Self::None => return Ok(()),
-        };
-        device.stop()
+        match self {
+            #[cfg(windows)]
+            Self::Wasapi(device) => device.stop(),
+            #[cfg(unix)]
+            Self::Jack(device) => device.stop(),
+            Self::None => Ok(()),
+        }
     }
 }
