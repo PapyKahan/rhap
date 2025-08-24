@@ -12,7 +12,9 @@ use crate::audio::{StreamingData, BitsPerSample};
 #[cfg(unix)]
 pub struct JackClient {
     client: Option<Client>,
+    active_client: Option<jack::AsyncClient<(), JackProcessHandler>>,
     output_port: Option<Port<jack::AudioOut>>,
+    output_port_name: String,
     audio_buffer: Arc<StdMutex<VecDeque<f32>>>,
     sample_rate: u32,
     buffer_size: u32,
@@ -29,13 +31,16 @@ impl JackClient {
         let buffer_size = client.buffer_size();
         
         let output_port = client.register_port("output", jack::AudioOut::default())?;
+        let output_port_name = format!("{}:output", client_name);
         
         // Create a shared buffer for audio samples
         let audio_buffer = Arc::new(StdMutex::new(VecDeque::new()));
 
         Ok(Self {
             client: Some(client),
+            active_client: None,
             output_port: Some(output_port),
+            output_port_name,
             audio_buffer,
             sample_rate: sample_rate.try_into().unwrap(),
             buffer_size,
@@ -69,8 +74,35 @@ impl JackClient {
         let client = self.client.take()
             .ok_or_else(|| anyhow!("Client already taken"))?;
 
-        let _active_client = client.activate_async((), process_handler)?;
+        let active_client = client.activate_async((), process_handler)?;
         
+        // Store the active client to keep it alive
+        self.active_client = Some(active_client);
+        
+        // Connect output port to system playback ports
+        self.connect_to_system_playback()?;
+        
+        Ok(())
+    }
+    
+    fn connect_to_system_playback(&self) -> Result<()> {
+        if let Some(ref active_client) = self.active_client {
+            let client = active_client.as_client();
+            
+            // Get available playback ports (speakers/headphones)
+            let playback_ports = client.ports(Some("system:playback.*"), None, jack::PortFlags::IS_INPUT);
+            
+            if !playback_ports.is_empty() {
+                // Connect to the first available playback port (left channel)
+                let connection_result = client.connect_ports_by_name(&self.output_port_name, &playback_ports[0]);
+                if let Err(e) = connection_result {
+                    eprintln!("Warning: Could not connect to system playback port: {}", e);
+                    // Don't fail here, as JACK might still work with manual connections
+                }
+            } else {
+                eprintln!("Warning: No system playback ports found. You may need to manually connect in JACK.");
+            }
+        }
         Ok(())
     }
 
@@ -95,19 +127,20 @@ impl JackClient {
                             let frame_bytes: Vec<u8> = byte_buffer.drain(0..frame_size).collect();
                             
                             // Convert bytes to f32 sample (taking first channel only)
+                            // Note: Player uses to_ne_bytes(), so we should use from_ne_bytes()
                             let sample = match bits_per_sample {
                                 BitsPerSample::Bits16 => {
                                     let sample_bytes = [frame_bytes[0], frame_bytes[1]];
-                                    let sample_i16 = i16::from_le_bytes(sample_bytes);
+                                    let sample_i16 = i16::from_ne_bytes(sample_bytes);
                                     sample_i16 as f32 / i16::MAX as f32
                                 }
                                 BitsPerSample::Bits24 => {
                                     let bytes = [frame_bytes[0], frame_bytes[1], frame_bytes[2], 0u8];
-                                    let sample_i32 = i32::from_le_bytes(bytes);
+                                    let sample_i32 = i32::from_ne_bytes(bytes);
                                     (sample_i32 >> 8) as f32 / ((1 << 23) as f32)
                                 }
                                 BitsPerSample::Bits32 => {
-                                    f32::from_le_bytes([frame_bytes[0], frame_bytes[1], frame_bytes[2], frame_bytes[3]])
+                                    f32::from_ne_bytes([frame_bytes[0], frame_bytes[1], frame_bytes[2], frame_bytes[3]])
                                 }
                             };
                             
