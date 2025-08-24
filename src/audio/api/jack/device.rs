@@ -1,13 +1,9 @@
 use crate::audio::{DeviceTrait, Capabilities, StreamParams, StreamingData, SampleRate, BitsPerSample};
 use anyhow::{Result, anyhow};
-use tokio::sync::mpsc::{self, Sender, Receiver};
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::mpsc::{self, Sender};
 
 #[cfg(unix)]
 use super::api::JackClient;
-#[cfg(unix)]
-use ringbuf::{HeapProd, traits::Producer};
 
 pub struct Device {
     name: String,
@@ -73,26 +69,20 @@ impl DeviceTrait for Device {
                 return Err(anyhow!("Device is already started"));
             }
 
-            // Create JACK client
-            let mut jack_client = JackClient::new("rhap_player", self.high_priority_mode)?;
-            let producer = jack_client.get_producer();
-            
-            // Activate JACK client
-            jack_client.activate()?;
+            // Create JACK client with parameters
+            let mut jack_client = JackClient::new("rhap_player", self.high_priority_mode, params.channels, params.bits_per_sample)?;
             
             // Create channel for streaming data
             let (tx, rx) = mpsc::channel::<StreamingData>(8192);
             
-            // Start background task to pump data from channel to ring buffer
-            let streaming_task = tokio::spawn(Self::streaming_task(
-                rx,
-                producer,
-                params.channels,
-                params.bits_per_sample,
-            ));
+            // Start processing streaming data in background
+            let processing_task = jack_client.start_processing_data(rx);
+            
+            // Activate JACK client
+            jack_client.activate()?;
 
             self.jack_client = Some(jack_client);
-            self.streaming_task = Some(streaming_task);
+            self.streaming_task = Some(processing_task);
             self.sender = Some(tx.clone());
 
             Ok(tx)
@@ -135,88 +125,3 @@ impl DeviceTrait for Device {
     }
 }
 
-#[cfg(unix)]
-impl Device {
-    async fn streaming_task(
-        mut rx: Receiver<StreamingData>,
-        producer: Arc<Mutex<Option<HeapProd<f32>>>>,
-        channels: u8,
-        bits_per_sample: BitsPerSample,
-    ) {
-        let mut audio_buffer = Vec::new();
-        
-        while let Some(data) = rx.recv().await {
-            match data {
-                StreamingData::Data(byte) => {
-                    audio_buffer.push(byte);
-                    
-                    // Convert bytes to f32 samples when we have enough data
-                    let bytes_per_sample = (bits_per_sample as usize) / 8;
-                    let frame_size = bytes_per_sample * channels as usize;
-                    
-                    while audio_buffer.len() >= frame_size {
-                        // Convert bytes to f32 sample
-                        let sample = match bits_per_sample {
-                            BitsPerSample::Bits16 => {
-                                if audio_buffer.len() >= 2 {
-                                    let bytes = [audio_buffer.remove(0), audio_buffer.remove(0)];
-                                    let sample_i16 = i16::from_le_bytes(bytes);
-                                    sample_i16 as f32 / i16::MAX as f32
-                                } else {
-                                    break;
-                                }
-                            }
-                            BitsPerSample::Bits24 => {
-                                if audio_buffer.len() >= 3 {
-                                    let bytes = [
-                                        audio_buffer.remove(0),
-                                        audio_buffer.remove(0),
-                                        audio_buffer.remove(0),
-                                        0u8, // Pad to 32-bit
-                                    ];
-                                    let sample_i32 = i32::from_le_bytes(bytes);
-                                    (sample_i32 >> 8) as f32 / ((1 << 23) as f32)
-                                } else {
-                                    break;
-                                }
-                            }
-                            BitsPerSample::Bits32 => {
-                                if audio_buffer.len() >= 4 {
-                                    let bytes = [
-                                        audio_buffer.remove(0),
-                                        audio_buffer.remove(0),
-                                        audio_buffer.remove(0),
-                                        audio_buffer.remove(0),
-                                    ];
-                                    let sample_f32 = f32::from_le_bytes(bytes);
-                                    sample_f32
-                                } else {
-                                    break;
-                                }
-                            }
-                        };
-                        
-                        // Send sample to ring buffer (handle multi-channel by taking first channel for now)
-                        if let Ok(mut producer_guard) = producer.try_lock() {
-                            if let Some(ref mut producer_rb) = *producer_guard {
-                                let _ = producer_rb.try_push(sample);
-                            }
-                        }
-                        
-                        // Skip other channels for now (mono output)
-                        for _ in 1..channels {
-                            for _ in 0..bytes_per_sample {
-                                if !audio_buffer.is_empty() {
-                                    audio_buffer.remove(0);
-                                }
-                            }
-                        }
-                    }
-                }
-                StreamingData::EndOfStream => {
-                    break;
-                }
-            }
-        }
-    }
-}
