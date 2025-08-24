@@ -110,9 +110,16 @@ impl JackClient {
         let audio_buffer = self.audio_buffer.clone();
         let bits_per_sample = self.bits_per_sample;
         let channels = self.channels;
+        let buffer_size = self.buffer_size as usize;
         
         tokio::spawn(async move {
             let mut byte_buffer = Vec::new();
+            let mut converted_samples = Vec::new();
+            let bytes_per_sample = (bits_per_sample as usize) / 8;
+            let frame_size = bytes_per_sample * channels as usize;
+            
+            // Target buffer size - aim for roughly 4 Jack periods worth of samples
+            let target_samples = buffer_size * 4;
             
             while let Some(streaming_data) = receiver.recv().await {
                 match streaming_data {
@@ -120,9 +127,6 @@ impl JackClient {
                         byte_buffer.push(byte);
                         
                         // Convert accumulated bytes to f32 samples when we have enough data
-                        let bytes_per_sample = (bits_per_sample as usize) / 8;
-                        let frame_size = bytes_per_sample * channels as usize;
-                        
                         while byte_buffer.len() >= frame_size {
                             let frame_bytes: Vec<u8> = byte_buffer.drain(0..frame_size).collect();
                             
@@ -144,13 +148,32 @@ impl JackClient {
                                 }
                             };
                             
-                            // Add sample to audio buffer
+                            converted_samples.push(sample);
+                            
+                            // Batch transfer samples to audio buffer when we have enough
+                            if converted_samples.len() >= target_samples {
+                                if let Ok(mut buffer) = audio_buffer.try_lock() {
+                                    buffer.extend(converted_samples.drain(..));
+                                }
+                            }
+                        }
+                        
+                        // Also transfer remaining samples periodically to prevent starvation
+                        if !converted_samples.is_empty() && converted_samples.len() >= buffer_size {
                             if let Ok(mut buffer) = audio_buffer.try_lock() {
-                                buffer.push_back(sample);
+                                buffer.extend(converted_samples.drain(..));
                             }
                         }
                     }
-                    StreamingData::EndOfStream => break,
+                    StreamingData::EndOfStream => {
+                        // Transfer any remaining samples
+                        if !converted_samples.is_empty() {
+                            if let Ok(mut buffer) = audio_buffer.try_lock() {
+                                buffer.extend(converted_samples.drain(..));
+                            }
+                        }
+                        break;
+                    }
                 }
             }
         })

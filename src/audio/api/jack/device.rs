@@ -39,15 +39,26 @@ impl DeviceTrait for Device {
     fn get_capabilities(&self) -> Result<Capabilities> {
         #[cfg(unix)]
         {
-            // JACK capabilities depend on the server configuration
-            // We'll provide common sample rates and bit depths
+            // Get actual JACK server sample rate
+            let temp_client = JackClient::new("rhap_temp", false, 2, BitsPerSample::Bits32)?;
+            let server_sample_rate = temp_client.sample_rate();
+            
+            // Convert server sample rate to SampleRate enum
+            let sample_rate = match server_sample_rate {
+                44100 => SampleRate::Rate44100Hz,
+                48000 => SampleRate::Rate48000Hz,
+                96000 => SampleRate::Rate96000Hz,
+                192000 => SampleRate::Rate192000Hz,
+                _ => {
+                    // Default to 48kHz if unknown rate
+                    eprintln!("Warning: Unknown JACK sample rate {}, defaulting to 48kHz", server_sample_rate);
+                    SampleRate::Rate48000Hz
+                }
+            };
+            
+            // JACK only supports its server sample rate, but can handle various bit depths
             Ok(Capabilities {
-                sample_rates: vec![
-                    SampleRate::Rate44100Hz,
-                    SampleRate::Rate48000Hz,
-                    SampleRate::Rate96000Hz,
-                    SampleRate::Rate192000Hz,
-                ],
+                sample_rates: vec![sample_rate],
                 bits_per_samples: vec![
                     BitsPerSample::Bits16,
                     BitsPerSample::Bits24,
