@@ -68,31 +68,75 @@ where
         match input {
             AudioBufferRef::S32(buffer) => {
                 copy_samples_vec(buffer, &mut self.input);
-                self.resampler
-                    .process_into_buffer(&self.input, &mut self.output, None)?;
-
-                self.input.iter_mut().for_each(|channel| {
-                    channel.drain(0..self.frames);
-                });
-
-                self.interleaved_output
-                    .resize(self.channels * self.output[0].len(), O::MID);
-
-                self.interleaved_output
-                    .chunks_exact_mut(self.channels)
-                    .enumerate()
-                    .for_each(|(i, frame)| {
-                        frame.iter_mut().enumerate().for_each(|(ch, s)| {
-                            *s = self.output[ch][i].into_sample();
-                        })
-                    });
+                self.process_and_interleave()?;
+            }
+            AudioBufferRef::S24(buffer) => {
+                copy_samples_vec(buffer, &mut self.input);
+                self.process_and_interleave()?;
+            }
+            AudioBufferRef::S16(buffer) => {
+                copy_samples_vec(buffer, &mut self.input);
+                self.process_and_interleave()?;
+            }
+            AudioBufferRef::F32(buffer) => {
+                copy_samples_vec(buffer, &mut self.input);
+                self.process_and_interleave()?;
+            }
+            AudioBufferRef::F64(buffer) => {
+                copy_samples_vec(buffer, &mut self.input);
+                self.process_and_interleave()?;
+            }
+            AudioBufferRef::U8(buffer) => {
+                copy_samples_vec(buffer, &mut self.input);
+                self.process_and_interleave()?;
+            }
+            AudioBufferRef::U16(buffer) => {
+                copy_samples_vec(buffer, &mut self.input);
+                self.process_and_interleave()?;
+            }
+            AudioBufferRef::U24(buffer) => {
+                copy_samples_vec(buffer, &mut self.input);
+                self.process_and_interleave()?;
+            }
+            AudioBufferRef::U32(buffer) => {
+                copy_samples_vec(buffer, &mut self.input);
+                self.process_and_interleave()?;
             }
             _ => {
-                error!("Unsupported sample format");
+                error!("Unsupported sample format variant");
+                return Err(anyhow::anyhow!("Unsupported sample format"));
             }
         }
 
         Ok(&self.interleaved_output)
+    }
+
+    /// Helper method to process audio through resampler and interleave output
+    fn process_and_interleave(&mut self) -> Result<()> {
+        // Process through resampler
+        self.resampler
+            .process_into_buffer(&self.input, &mut self.output, None)?;
+
+        // Clean up input buffer
+        self.input.iter_mut().for_each(|channel| {
+            channel.drain(0..self.frames);
+        });
+
+        // Resize output buffer for interleaved data
+        self.interleaved_output
+            .resize(self.channels * self.output[0].len(), O::MID);
+
+        // Interleave channels
+        self.interleaved_output
+            .chunks_exact_mut(self.channels)
+            .enumerate()
+            .for_each(|(i, frame)| {
+                frame.iter_mut().enumerate().for_each(|(ch, s)| {
+                    *s = self.output[ch][i].into_sample();
+                })
+            });
+
+        Ok(())
     }
 }
 

@@ -14,7 +14,10 @@ pub trait DeviceTrait: Send + Sync {
 
 pub enum Device {
     None,
+    #[cfg(target_os = "windows")]
     Wasapi(api::wasapi::device::Device),
+    #[cfg(target_os = "linux")]
+    Alsa(api::alsa::device::Device),
 }
 
 impl Device {
@@ -49,7 +52,10 @@ impl Device {
 impl DeviceTrait for Device {
     fn is_default(&self) -> Result<bool> {
         let device = match self {
+            #[cfg(target_os = "windows")]
             Self::Wasapi(device) => device,
+            #[cfg(target_os = "linux")]
+            Self::Alsa(device) => device,
             Self::None => return Ok(false),
         };
         device.is_default()
@@ -57,7 +63,10 @@ impl DeviceTrait for Device {
 
     fn name(&self) -> Result<String> {
         let device = match self {
+            #[cfg(target_os = "windows")]
             Self::Wasapi(device) => device,
+            #[cfg(target_os = "linux")]
+            Self::Alsa(device) => device,
             Self::None => return Ok(String::from("none")),
         };
         device.name()
@@ -65,7 +74,10 @@ impl DeviceTrait for Device {
 
     fn get_capabilities(&self) -> Result<Capabilities> {
         let device = match self {
+            #[cfg(target_os = "windows")]
             Self::Wasapi(device) => device,
+            #[cfg(target_os = "linux")]
+            Self::Alsa(device) => device,
             Self::None => return Ok(Capabilities::default()),
         };
         device.get_capabilities()
@@ -73,7 +85,10 @@ impl DeviceTrait for Device {
 
     fn start(&mut self, params: &StreamParams) -> Result<Sender<StreamingData>> {
         let device = match self {
+            #[cfg(target_os = "windows")]
             Self::Wasapi(device) => device,
+            #[cfg(target_os = "linux")]
+            Self::Alsa(device) => device,
             Self::None => return Err(anyhow!("No host selected")),
         };
         device.start(params)
@@ -81,7 +96,10 @@ impl DeviceTrait for Device {
 
     fn pause(&mut self) -> Result<()> {
         let device = match self {
+            #[cfg(target_os = "windows")]
             Self::Wasapi(device) => device,
+            #[cfg(target_os = "linux")]
+            Self::Alsa(device) => device,
             Self::None => return Ok(()),
         };
         device.pause()
@@ -89,7 +107,10 @@ impl DeviceTrait for Device {
 
     fn resume(&mut self) -> Result<()> {
         let device = match self {
+            #[cfg(target_os = "windows")]
             Self::Wasapi(device) => device,
+            #[cfg(target_os = "linux")]
+            Self::Alsa(device) => device,
             Self::None => return Ok(()),
         };
         device.resume()
@@ -97,7 +118,10 @@ impl DeviceTrait for Device {
 
     fn stop(&mut self) -> Result<()> {
         let device = match self {
+            #[cfg(target_os = "windows")]
             Self::Wasapi(device) => device,
+            #[cfg(target_os = "linux")]
+            Self::Alsa(device) => device,
             Self::None => return Ok(()),
         };
         device.stop()

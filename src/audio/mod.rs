@@ -49,6 +49,7 @@ impl From<usize> for BitsPerSample {
     }
 }
 
+#[derive(Debug)]
 pub struct Capabilities {
     pub sample_rates: Vec<SampleRate>,
     pub bits_per_samples: Vec<BitsPerSample>,
