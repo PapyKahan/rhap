@@ -20,6 +20,7 @@ pub struct AlsaPcm {
     period_size: u32,
     buffer_size: u32,
     requested_format: Format, // Track what was originally requested
+    conversion_buffer: Vec<u8>, // Buffer for handling incomplete frames during conversion
 }
 
 #[cfg(target_os = "linux")]
@@ -224,20 +225,22 @@ impl AlsaPcm {
             period_size: actual_period_size as u32,
             buffer_size: actual_buffer_size as u32,
             requested_format: sample_format, // Store what was originally requested
+            conversion_buffer: Vec::new(), // Initialize empty conversion buffer
         })
     }
 
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<()> {
         match self.format {
             Format::S16LE => {
-                let io = self.pcm.io_i16()
-                    .map_err(|e| anyhow!("Failed to get PCM IO i16: {}", e))?;
-
                 // Convert data based on what was requested vs what we have
                 let samples = if self.requested_format == Format::S243LE {
                     // We requested 24-bit but got 16-bit - convert incoming 24-bit data
                     log_to_file_only("ALSA", &format!("Converting {} bytes of 24-bit audio data to 16-bit for output", data.len()));
-                    self.convert_24bit_to_16bit(data)?
+                    log_to_file_only("ALSA", &format!("Buffer size before: {} bytes", self.conversion_buffer.len()));
+
+                    // Add incoming data to conversion buffer and convert complete frames
+                    self.conversion_buffer.extend_from_slice(data);
+                    self.convert_buffered_24bit_to_16bit()?
                 } else if self.requested_format == Format::S32LE {
                     // We requested 32-bit but got 16-bit - convert incoming 32-bit data
                     log_to_file_only("ALSA", &format!("Converting {} bytes of 32-bit audio data to 16-bit for output", data.len()));
@@ -249,6 +252,9 @@ impl AlsaPcm {
                         .map(|chunk| i16::from_le_bytes([chunk[0], chunk[1]]))
                         .collect()
                 };
+
+                let io = self.pcm.io_i16()
+                    .map_err(|e| anyhow!("Failed to get PCM IO i16: {}", e))?;
 
                 let frames_to_write = samples.len() / self.channels as usize;
                 let samples_written = io.writei(&samples)
@@ -368,6 +374,59 @@ impl AlsaPcm {
                 }
             }
         }
+
+        Ok(samples)
+    }
+
+    /// Convert buffered 24-bit data to 16-bit, handling frame alignment
+    fn convert_buffered_24bit_to_16bit(&mut self) -> Result<Vec<i16>> {
+        let bytes_per_sample_24 = 3;
+        let bytes_per_frame = self.channels as usize * bytes_per_sample_24;
+
+        // Only convert complete frames
+        let complete_frames = self.conversion_buffer.len() / bytes_per_frame;
+        let bytes_to_convert = complete_frames * bytes_per_frame;
+
+        log_to_file_only("ALSA", &format!("Buffer: {} bytes, complete frames: {}, bytes to convert: {}, remainder: {}",
+            self.conversion_buffer.len(), complete_frames, bytes_to_convert,
+            self.conversion_buffer.len() - bytes_to_convert));
+
+        if complete_frames == 0 {
+            return Ok(Vec::new()); // Not enough data for a complete frame
+        }
+
+        let mut samples = Vec::with_capacity(complete_frames * self.channels as usize);
+
+        for frame in 0..complete_frames {
+            for channel in 0..self.channels {
+                let sample_offset = (frame * self.channels as usize + channel as usize) * bytes_per_sample_24;
+
+                if sample_offset + bytes_per_sample_24 <= self.conversion_buffer.len() {
+                    // Convert 24-bit little-endian to i32
+                    let value = ((self.conversion_buffer[sample_offset + 2] as i32) << 16) |
+                                ((self.conversion_buffer[sample_offset + 1] as i32) << 8) |
+                                (self.conversion_buffer[sample_offset] as i32);
+
+                    // Sign extend for negative values (24-bit to 32-bit)
+                    let value_24 = if self.conversion_buffer[sample_offset + 2] >= 0x80 {
+                        value | -16777216i32  // 0xFF000000
+                    } else {
+                        value
+                    };
+
+                    // Convert 24-bit to 16-bit by shifting right 8 bits
+                    // This preserves the dynamic range while fitting in 16-bit
+                    let value_16 = (value_24 >> 8).clamp(i16::MIN as i32, i16::MAX as i32) as i16;
+                    samples.push(value_16);
+                }
+            }
+        }
+
+        // Remove the converted data from buffer, keeping remainder for next time
+        self.conversion_buffer.drain(0..bytes_to_convert);
+
+        log_to_file_only("ALSA", &format!("Converted {} samples, buffer now has {} bytes remaining",
+            samples.len(), self.conversion_buffer.len()));
 
         Ok(samples)
     }
