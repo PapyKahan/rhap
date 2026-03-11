@@ -28,7 +28,10 @@ impl MusicTrack {
     pub fn new(path: String) -> Result<Self> {
         let source = std::fs::File::open(path.clone())?;
         let mss = MediaSourceStream::new(Box::new(source), Default::default());
-        let hint = Hint::new();
+        let mut hint = Hint::new();
+        if let Some(ext) = std::path::Path::new(&path).extension().and_then(|e| e.to_str()) {
+            hint.with_extension(ext);
+        }
         let meta_opts = Default::default();
         let fmt_opts = Default::default();
         let probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts)?;
