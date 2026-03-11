@@ -28,6 +28,20 @@ struct Args {
     pollmode: bool,
 }
 
+/// Convert a WSL `/mnt/<drive>/...` path to a Windows `<DRIVE>:\...` path.
+fn wsl_path_to_windows(path: PathBuf) -> PathBuf {
+    let path_str = path.to_string_lossy();
+    if let Some(rest) = path_str.strip_prefix("/mnt/") {
+        if let Some((drive, remainder)) = rest.split_once('/') {
+            if drive.len() == 1 && drive.chars().next().is_some_and(|c| c.is_ascii_alphabetic()) {
+                let win_path = format!("{}:\\{}", drive.to_uppercase(), remainder.replace('/', "\\"));
+                return PathBuf::from(win_path);
+            }
+        }
+    }
+    path
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
 
@@ -65,7 +79,8 @@ async fn main() -> Result<()> {
     let mut terminal = ratatui::init();
     let host = Host::new("wasapi", args.high_priority_mode);
     let player = Player::new(host, args.device, args.pollmode)?;
-    let mut app = App::new(host, player, args.path)?;
+    let path = wsl_path_to_windows(args.path);
+    let mut app = App::new(host, player, path)?;
     app.run(&mut terminal).await?;
     ratatui::restore();
 
