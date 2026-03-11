@@ -18,7 +18,7 @@ use crate::audio::{DeviceTrait, HostTrait};
 struct Args {
     #[clap(short, long)]
     list: bool,
-    #[clap(short, long, default_value_t = false)]
+    #[clap(short = 'H', long, default_value_t = false)]
     high_priority_mode: bool,
     #[clap(short, long, required = true)]
     path: PathBuf,

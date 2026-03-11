@@ -41,7 +41,10 @@ impl Playlist {
                 .collect::<Vec<String>>();
             files.shuffle(&mut rng());
             for f in files {
-                songs.push(Arc::new(MusicTrack::new(f)?));
+                match MusicTrack::new(f) {
+                    Ok(track) => songs.push(Arc::new(track)),
+                    Err(_) => continue,
+                }
             }
         } else if path.is_file() {
             songs.push(Arc::new(MusicTrack::new(
