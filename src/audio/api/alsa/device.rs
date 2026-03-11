@@ -17,6 +17,7 @@ use super::alsa_api::AlsaPcm;
 #[cfg(target_os = "linux")]
 pub struct Device {
     name: String,
+    description: String,
     is_default: bool,
     pcm: Arc<Mutex<Option<AlsaPcm>>>,
     is_playing: Arc<AtomicBool>,
@@ -25,9 +26,10 @@ pub struct Device {
 
 #[cfg(target_os = "linux")]
 impl Device {
-    pub fn new(name: String, is_default: bool) -> Self {
+    pub fn new(name: String, is_default: bool, description: String) -> Self {
         Self {
             name,
+            description,
             is_default,
             pcm: Arc::new(Mutex::new(None)),
             is_playing: Arc::new(AtomicBool::new(false)),
@@ -77,7 +79,11 @@ impl DeviceTrait for Device {
     }
 
     fn name(&self) -> Result<String> {
-        Ok(self.name.clone())
+        if !self.description.is_empty() {
+            Ok(self.description.clone())
+        } else {
+            Ok(self.name.clone())
+        }
     }
 
     fn get_capabilities(&self) -> Result<Capabilities> {
