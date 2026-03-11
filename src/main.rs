@@ -47,7 +47,19 @@ fn setup_logging() -> Result<()> {
     Ok(())
 }
 
-
+/// Convert a WSL `/mnt/<drive>/...` path to a Windows `<DRIVE>:\...` path.
+fn wsl_path_to_windows(path: PathBuf) -> PathBuf {
+    let path_str = path.to_string_lossy();
+    if let Some(rest) = path_str.strip_prefix("/mnt/") {
+        if let Some((drive, remainder)) = rest.split_once('/') {
+            if drive.len() == 1 && drive.chars().next().is_some_and(|c| c.is_ascii_alphabetic()) {
+                let win_path = format!("{}:\\{}", drive.to_uppercase(), remainder.replace('/', "\\"));
+                return PathBuf::from(win_path);
+            }
+        }
+    }
+    path
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -99,7 +111,7 @@ async fn main() -> Result<()> {
 
     // Test device initialization if requested
     if args.test_device {
-        log_to_file_only("INFO", "=== Testing ALSA Device Initialization ===");
+        log_to_file_only("INFO", "=== Testing Device Initialization ===");
 
         let host = Host::new(&host_name, args.high_priority_mode);
 
@@ -116,8 +128,8 @@ async fn main() -> Result<()> {
         let capabilities = device.get_capabilities()?;
         log_to_file_only("INFO", &format!("Device capabilities: {:?}", capabilities));
 
-        // Test with a 24-bit 44.1kHz stream directly (simulating the user's issue)
-        log_to_file_only("INFO", "Testing with 24-bit 44.1kHz stream (simulating user issue)");
+        // Test with a 24-bit 44.1kHz stream directly
+        log_to_file_only("INFO", "Testing with 24-bit 44.1kHz stream");
 
         let stream_params = audio::StreamParams {
             channels: 2,
@@ -133,57 +145,20 @@ async fn main() -> Result<()> {
         match device.start(&stream_params) {
             Ok(tx) => {
                 log_to_file_only("INFO", "Device started successfully");
-
-                // First, let's see what format ALSA actually ended up with
-                // We'll create a simple test to check the format
-                log_to_file_only("INFO", "Testing ALSA format by creating appropriate audio data...");
-
-                // Now we'll create 24-bit data to test the automatic conversion to 16-bit
-                let frames = 1024;
-                let samples_per_frame = 2; // stereo
-                let bytes_per_sample = 3; // 24-bit
-                let mut test_data = Vec::with_capacity(frames * samples_per_frame * bytes_per_sample);
-
-                for frame in 0..frames {
-                    // Generate a simple sine wave at 24-bit
-                    let amplitude = 8388607.0; // 2^23 - 1 for 24-bit
-                    let frequency = 440.0; // A4 note
-                    let phase = (frame as f32 / 44100.0) * frequency * 2.0 * std::f32::consts::PI;
-                    let sample_value = (amplitude * phase.sin()) as i32;
-
-                    // Ensure it's in 24-bit range
-                    let sample_value = sample_value.max(-8388608).min(8388607);
-
-                    // Convert to 24-bit little-endian bytes
-                    let left_sample = sample_value;
-                    let right_sample = sample_value;
-
-                    // Left channel (3 bytes)
-                    test_data.push((left_sample & 0xFF) as u8);
-                    test_data.push(((left_sample >> 8) & 0xFF) as u8);
-                    test_data.push(((left_sample >> 16) & 0xFF) as u8);
-
-                    // Right channel (3 bytes)
-                    test_data.push((right_sample & 0xFF) as u8);
-                    test_data.push(((right_sample >> 8) & 0xFF) as u8);
-                    test_data.push(((right_sample >> 16) & 0xFF) as u8);
-                }
-
-                log_to_file_only("INFO", &format!("Created {} bytes of test 24-bit audio data", test_data.len()));
-
-                // Send the test audio data byte by byte
-                log_to_file_only("INFO", &format!("Sending {} bytes of test audio data...", test_data.len()));
+                // Send a tiny bit of silence to verify it works
+                let frames = 100;
+                let samples_per_frame = 2; 
+                let bytes_per_sample = 3; 
+                let test_data = vec![0u8; frames * samples_per_frame * bytes_per_sample];
+                
                 for byte in test_data {
                     if let Err(e) = tx.send(audio::StreamingData::Data(byte)).await {
                         log_to_file_only("ERROR", &format!("Failed to send audio byte: {}", e));
                         break;
                     }
                 }
-                log_to_file_only("INFO", "Test audio data sent successfully");
-
-                // Send end of stream
                 let _ = tx.send(audio::StreamingData::EndOfStream).await;
-                log_to_file_only("INFO", "End of stream sent - test complete");
+                log_to_file_only("INFO", "Test complete");
             }
             Err(e) => {
                 log_to_file_only("ERROR", &format!("Failed to start device: {}", e));
@@ -202,44 +177,17 @@ async fn main() -> Result<()> {
     });
 
     log_to_file_only("INFO", &format!("Initializing Rhap with audio backend: {}", host_name));
-    log_to_file_only("INFO", &format!("Music path: {:?}", args.path));
+    
+    let path = if host_name == "wasapi" && cfg!(target_os = "linux") {
+        wsl_path_to_windows(args.path)
+    } else {
+        args.path
+    };
+    
+    log_to_file_only("INFO", &format!("Music path: {:?}", path));
 
     let mut terminal = ratatui::init();
     let host = Host::new(&host_name, args.high_priority_mode);
-
-    // Test if we can access the path first
-    if args.path.exists() {
-        if args.path.is_dir() {
-            log_to_file_only("INFO", &format!("Music directory: {}", args.path.display()));
-            // List files in directory
-            if let Ok(entries) = std::fs::read_dir(&args.path) {
-                log_to_file_only("INFO", "Files found in directory:");
-                for entry in entries.take(10) { // Limit to first 10 files
-                    if let Ok(entry) = entry {
-                        log_to_file_only("INFO", &format!("  - {}", entry.path().display()));
-                    }
-                }
-            }
-        } else {
-            log_to_file_only("INFO", &format!("Music file: {}", args.path.display()));
-            // Check file type
-            if let Ok(metadata) = std::fs::metadata(&args.path) {
-                log_to_file_only("INFO", &format!("File size: {} bytes", metadata.len()));
-            }
-            // Try to determine file type
-            if let Ok(output) = std::process::Command::new("file")
-                .arg(&args.path)
-                .output()
-            {
-                if let Ok(file_info) = String::from_utf8(output.stdout) {
-                    log_to_file_only("INFO", &format!("File type: {}", file_info.trim()));
-                }
-            }
-        }
-    } else {
-        log_to_file_only("ERROR", &format!("Path does not exist: {}", args.path.display()));
-        return Err(anyhow::anyhow!("Path does not exist: {}", args.path.display()));
-    }
 
     log_to_file_only("INFO", "Creating player...");
     let player = Player::new(host.clone(), args.device, args.pollmode)
@@ -250,7 +198,7 @@ async fn main() -> Result<()> {
     log_to_file_only("INFO", "Player created successfully");
 
     log_to_file_only("INFO", "Creating app...");
-    let mut app = App::new(host, player, args.path)
+    let mut app = App::new(host, player, path)
         .map_err(|e| {
             log_to_file_only("ERROR", &format!("Failed to create app: {}", e));
             e
@@ -265,7 +213,6 @@ async fn main() -> Result<()> {
         })?;
     log_to_file_only("INFO", "UI completed successfully");
 
-    log_to_file_only("INFO", "Restoring terminal...");
     ratatui::restore();
     log_to_file_only("INFO", "=== Rhap Finished Successfully ===");
 

@@ -237,6 +237,7 @@ impl Player {
     }
 
     pub async fn play(&mut self, song: Arc<MusicTrack>) -> Result<CurrentTrackInfo> {
+        let playback = song.open_for_playback()?;
         let streamparams = StreamParams {
             samplerate: song.sample,
             channels: song.channels as u8,
@@ -253,13 +254,12 @@ impl Player {
         let is_streaming = Arc::new(AtomicBool::new(true));
         let report_streaming = Arc::clone(&is_streaming);
         let is_playing = self.is_playing.clone();
-        let track = song.clone();
         let elapsed_time = Arc::new(AtomicU64::new(0));
         let elapsed_time_clone = Arc::clone(&elapsed_time);
-        let total_duration = track.duration;
-        let time_base = track.format.lock().await.tracks().get(0).unwrap().codec_params.time_base.unwrap_or(Default::default());
+        let total_duration = song.duration;
+        let time_base = playback.format.lock().await.tracks().get(0).unwrap().codec_params.time_base.unwrap_or(Default::default());
         self.streaming_handle = Some(tokio::spawn(async move {
-            let mut format = track.format.lock().await;
+            let mut format = playback.format.lock().await;
             format.seek(
                 SeekMode::Accurate,
                 SeekTo::Time {
@@ -267,7 +267,7 @@ impl Player {
                     track_id: None,
                 },
             )?;
-            let mut decoder = track.decoder.lock().await;
+            let mut decoder = playback.decoder.lock().await;
             decoder.reset();
             is_playing.store(true, Ordering::Relaxed);
             if let Some(streamer) = stream {
@@ -308,7 +308,7 @@ impl Player {
                     let sample_buffer = buffer.get_or_insert_with(|| {
                         StreamBuffer::new(adjusted_params.bits_per_sample, frames, *spec)
                     });
-                    if track.sample != adjusted_params.samplerate {
+                    if streamparams.samplerate != adjusted_params.samplerate {
                         let resampled_sender = resampler.get_or_insert_with(|| {
                             Resampler::new(
                                 streamparams.bits_per_sample,

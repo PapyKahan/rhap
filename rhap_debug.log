@@ -1,0 +1,2861 @@
+=== Rhap Debug Log Started at 1773261009 ===
+[INFO] === Rhap Starting ===
+[INFO] Using audio backend: alsa
+[INFO] Initializing Rhap with audio backend: alsa
+[INFO] Music path: "/home/kahan/Music/"
+[INFO] Creating player...
+[INFO] Player created successfully
+[INFO] Creating app...
+[INFO] App created successfully
+[INFO] Starting UI...
+[ALSA] Initializing device: default (channels: 2, rate: 44100, bits: 16)
+[ALSA] Requesting format: S16LE for 16-bit audio
+[ALSA] Setting access mode: RWInterleaved
+[ALSA] Attempting to set format: S16LE for 16-bit audio
+[ALSA] Format set successfully
+[ALSA] Setting channels: 2
+[ALSA] Setting sample rate: 44100
+[ALSA] Setting period_size: 1024, buffer_size: 4096
+[ALSA] Applying hardware parameters...
+[ALSA] Hardware parameters applied successfully
+[ALSA] Hardware parameters - Rate: 44100, Channels: 2, Format: S16LE, Period: 1024, Buffer: 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [252, 255, 252, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [254, 255, 2, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [2, 0, 254, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [5, 255, 127, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [121, 2, 12, 27]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [211, 233, 196, 6]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [105, 249, 69, 247]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [55, 26, 16, 9]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [14, 231, 109, 252]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [9, 248, 183, 18]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [56, 3, 230, 248]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [142, 244, 52, 226]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [204, 3, 211, 252]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [234, 239, 102, 242]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [226, 254, 79, 254]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [32, 251, 36, 4]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [241, 255, 245, 6]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [167, 2, 104, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [212, 255, 244, 254]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [25, 0, 90, 252]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [133, 0, 158, 254]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [82, 245, 103, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [134, 248, 194, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [166, 14, 15, 246]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [48, 247, 184, 10]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [133, 3, 62, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [129, 16, 21, 8]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [151, 0, 236, 249]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [38, 253, 146, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [206, 251, 210, 253]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [237, 253, 199, 6]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [233, 244, 95, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [172, 6, 191, 4]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [41, 5, 78, 4]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [118, 251, 66, 249]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [146, 250, 57, 3]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [72, 251, 113, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [149, 6, 192, 9]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [181, 252, 58, 246]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [138, 5, 213, 249]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [17, 3, 115, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [99, 251, 74, 253]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [197, 251, 143, 6]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [96, 0, 160, 245]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [18, 15, 96, 6]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [120, 253, 170, 252]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [171, 250, 138, 250]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [170, 1, 109, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [177, 2, 78, 252]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [189, 5, 46, 6]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [114, 251, 144, 253]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [143, 254, 162, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [102, 252, 134, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [166, 255, 0, 253]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [116, 3, 254, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [194, 252, 210, 249]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [235, 250, 161, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [78, 3, 11, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [254, 251, 42, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [120, 1, 26, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [140, 254, 243, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [98, 255, 206, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [50, 4, 127, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [172, 252, 138, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [248, 254, 201, 253]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [89, 0, 18, 254]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] End of stream processed
+[ALSA] Initializing device: default (channels: 2, rate: 44100, bits: 16)
+[ALSA] Requesting format: S16LE for 16-bit audio
+[ALSA] Setting access mode: RWInterleaved
+[ALSA] Attempting to set format: S16LE for 16-bit audio
+[ALSA] Format set successfully
+[ALSA] Setting channels: 2
+[ALSA] Setting sample rate: 44100
+[ALSA] Setting period_size: 1024, buffer_size: 4096
+[ALSA] Applying hardware parameters...
+[ALSA] Hardware parameters applied successfully
+[ALSA] Hardware parameters - Rate: 44100, Channels: 2, Format: S16LE, Period: 1024, Buffer: 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [188, 254, 165, 254]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [64, 1, 69, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [158, 41, 56, 24]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [110, 18, 238, 22]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [206, 15, 42, 237]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [171, 39, 157, 9]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [79, 250, 207, 228]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [57, 254, 21, 248]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [107, 225, 157, 213]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [137, 8, 65, 28]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [117, 3, 214, 227]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [39, 225, 246, 212]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [215, 1, 68, 9]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [189, 202, 214, 245]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [156, 2, 58, 19]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [209, 33, 4, 39]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [188, 151, 131, 146]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [137, 179, 235, 169]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [114, 144, 232, 138]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [4, 253, 105, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [12, 2, 112, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [246, 74, 215, 55]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [245, 4, 166, 242]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [198, 255, 207, 6]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [161, 60, 16, 49]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [62, 244, 36, 245]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [47, 244, 74, 254]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [26, 227, 8, 235]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [136, 240, 157, 240]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [188, 228, 92, 250]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [53, 205, 11, 178]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [170, 11, 251, 37]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [101, 8, 247, 11]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [106, 225, 227, 233]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [77, 13, 241, 22]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [79, 18, 132, 28]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [208, 213, 240, 227]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] End of stream processed
+[ALSA] Initializing device: default (channels: 2, rate: 44100, bits: 16)
+[ALSA] Requesting format: S16LE for 16-bit audio
+[ALSA] Setting access mode: RWInterleaved
+[ALSA] Attempting to set format: S16LE for 16-bit audio
+[ALSA] Format set successfully
+[ALSA] Setting channels: 2
+[ALSA] Setting sample rate: 44100
+[ALSA] Setting period_size: 1024, buffer_size: 4096
+[ALSA] Applying hardware parameters...
+[ALSA] Hardware parameters applied successfully
+[ALSA] Hardware parameters - Rate: 44100, Channels: 2, Format: S16LE, Period: 1024, Buffer: 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 255, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 1, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [1, 0, 255, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 1, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [254, 255, 2, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [254, 255, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 254, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [8, 0, 254, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [2, 0, 252, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [252, 255, 251, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [254, 255, 3, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [254, 255, 248, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [4, 0, 253, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [9, 0, 250, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [8, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [243, 255, 1, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [249, 255, 13, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [252, 255, 4, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [5, 0, 245, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [154, 0, 233, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [106, 248, 172, 248]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [127, 245, 107, 6]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [52, 16, 193, 5]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [248, 6, 126, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [196, 252, 48, 247]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [87, 238, 132, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [96, 7, 195, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [3, 9, 55, 4]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [183, 4, 222, 248]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [141, 241, 59, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [106, 253, 243, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [53, 8, 208, 4]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [166, 7, 61, 252]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [151, 249, 218, 253]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [46, 247, 13, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [75, 4, 156, 3]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [37, 7, 63, 254]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [92, 0, 225, 251]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [78, 247, 57, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [182, 255, 88, 3]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [215, 5, 169, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 4, 194, 252]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [66, 250, 124, 254]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [171, 251, 186, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [185, 3, 7, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [8, 5, 80, 254]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [118, 254, 51, 253]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [191, 250, 89, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [10, 0, 68, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] End of stream processed
+[ALSA] Initializing device: default (channels: 2, rate: 44100, bits: 16)
+[ALSA] Requesting format: S16LE for 16-bit audio
+[ALSA] Setting access mode: RWInterleaved
+[ALSA] Attempting to set format: S16LE for 16-bit audio
+[ALSA] Format set successfully
+[ALSA] Setting channels: 2
+[ALSA] Setting sample rate: 44100
+[ALSA] Setting period_size: 1024, buffer_size: 4096
+[ALSA] Applying hardware parameters...
+[ALSA] Hardware parameters applied successfully
+[ALSA] Hardware parameters - Rate: 44100, Channels: 2, Format: S16LE, Period: 1024, Buffer: 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [1, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [255, 255, 255, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [253, 255, 253, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [175, 249, 243, 223]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [93, 244, 109, 244]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [161, 229, 200, 239]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [171, 39, 254, 89]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [226, 251, 17, 228]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [139, 1, 0, 219]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [252, 56, 208, 7]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [3, 22, 246, 13]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [88, 20, 237, 14]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [204, 24, 210, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [145, 4, 24, 3]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [117, 17, 139, 5]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [27, 5, 89, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [131, 246, 144, 247]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [18, 244, 232, 252]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [14, 26, 183, 36]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [216, 253, 180, 252]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [216, 248, 73, 249]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [181, 12, 253, 14]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [211, 3, 5, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [109, 250, 235, 250]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [61, 7, 32, 6]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [17, 0, 131, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [213, 250, 3, 244]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [25, 3, 145, 4]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [139, 3, 97, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [250, 241, 250, 242]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [44, 23, 4, 223]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [121, 242, 122, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [88, 4, 244, 238]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [71, 3, 173, 251]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [77, 255, 208, 11]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Processing 4096 bytes as 16-bit audio data
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [178, 252, 30, 6]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] End of stream processed
+[ALSA] Initializing device: default (channels: 2, rate: 44100, bits: 24)
+[ALSA] Requesting format: S243LE for 24-bit audio
+[ALSA] Setting access mode: RWInterleaved
+[ALSA] Attempting to set format: S243LE for 24-bit audio
+[ALSA] Format set successfully
+[ALSA] Setting channels: 2
+[ALSA] Setting sample rate: 44100
+[ALSA] Setting period_size: 1024, buffer_size: 4096
+[ALSA] Applying hardware parameters...
+[ALSA] Hardware parameters applied successfully
+[ALSA] Hardware parameters - Rate: 44100, Channels: 2, Format: S243LE, Period: 1024, Buffer: 4096
+[ALSA] Testing IO interface for 24-bit format...
+[ALSA] 24-bit IO interface test failed: ALSA function 'io_xx' failed with error 'Operation not supported (95)'
+[ALSA] Attempting fallback to 16-bit format...
+[ALSA] 16-bit fallback IO interface test passed
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [254, 255, 67, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [255, 113, 254, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [175, 254, 255, 84]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [255, 255, 204, 253]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [255, 97, 255, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [163, 253, 255, 233]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [255, 255, 218, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [255, 244, 1, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [198, 3, 0, 202]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [230, 255, 232, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 48, 9, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [131, 4, 0, 83]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [14, 0, 168, 10]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [2, 20, 141, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [49, 131, 255, 38]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [167, 255, 241, 22]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 109, 49, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [161, 47, 0, 156]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [1, 255, 102, 93]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 177, 72, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [68, 236, 254, 92]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [50, 1, 53, 96]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [1, 17, 89, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [216, 3, 255, 14]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [165, 255, 222, 23]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 67, 230, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [244, 49, 1, 187]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [5, 1, 167, 69]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 63, 162, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [92, 17, 1, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [168, 254, 154, 171]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [253, 213, 199, 254]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [131, 164, 255, 196]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [73, 2, 82, 24]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [255, 188, 22, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [121, 245, 251, 210]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [246, 254, 248, 62]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [1, 92, 79, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [26, 232, 2, 162]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] End of stream processed
+[ALSA] Initializing device: default (channels: 2, rate: 48000, bits: 24)
+[ALSA] Requesting format: S243LE for 24-bit audio
+[ALSA] Setting access mode: RWInterleaved
+[ALSA] Attempting to set format: S243LE for 24-bit audio
+[ALSA] Format set successfully
+[ALSA] Setting channels: 2
+[ALSA] Setting sample rate: 48000
+[ALSA] Setting period_size: 1024, buffer_size: 4096
+[ALSA] Applying hardware parameters...
+[ALSA] Hardware parameters applied successfully
+[ALSA] Hardware parameters - Rate: 48000, Channels: 2, Format: S243LE, Period: 1024, Buffer: 4096
+[ALSA] Testing IO interface for 24-bit format...
+[ALSA] 24-bit IO interface test failed: ALSA function 'io_xx' failed with error 'Operation not supported (95)'
+[ALSA] Attempting fallback to 16-bit format...
+[ALSA] 16-bit fallback IO interface test passed
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 0, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [255, 255, 2, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [1, 0, 0, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 4, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 3, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [1, 0, 0, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [255, 255, 1, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [255, 1, 0, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [252, 255, 255, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [15, 0, 222, 189]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [11, 180, 53, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [14, 103, 251, 181]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [136, 6, 111, 96]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [2, 171, 219, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [94, 156, 61, 79]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [222, 254, 88, 110]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [217, 22, 242, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [236, 69, 193, 188]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [173, 3, 48, 95]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [242, 42, 147, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [78, 170, 0, 150]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [104, 250, 56, 34]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [250, 150, 15, 254]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [12, 126, 180, 218]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [168, 253, 90, 14]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [4, 85, 61, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [202, 234, 245, 131]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [63, 5, 251, 32]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [14, 23, 146, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [106, 232, 20, 157]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [42, 3, 158, 133]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [255, 192, 250, 253]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [195, 179, 247, 162]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [161, 255, 14, 191]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [236, 219, 226, 252]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [57, 49, 224, 167]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [42, 253, 245, 19]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [4, 150, 154, 255]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [148, 178, 29, 9]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [252, 0, 124, 7]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [247, 113, 146, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [1, 185, 206, 106]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [18, 1, 76, 17]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [1, 235, 91, 1]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [23, 1, 2, 160]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [15, 255, 126, 169]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [204, 226, 59, 251]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [200, 83, 250, 146]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [209, 0, 69, 113]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [0, 0, 43, 3]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [37, 255, 7, 12]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [221, 2, 152, 78]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [29, 190, 240, 4]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [15, 38, 252, 38]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [192, 2, 151, 27]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [11, 114, 163, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [61, 162, 11, 160]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [185, 254, 251, 215]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [224, 255, 94, 251]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [171, 245, 14, 168]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [224, 5, 186, 8]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [41, 186, 176, 3]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [83, 234, 25, 165]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [40, 255, 150, 100]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [237, 38, 230, 254]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [189, 110, 240, 105]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [51, 5, 129, 191]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [247, 186, 253, 254]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [98, 187, 20, 131]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [166, 254, 153, 138]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [6, 226, 91, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [217, 19, 19, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [236, 255, 36, 135]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [5, 26, 2, 0]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [29, 119, 21, 37]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [37, 3, 246, 223]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [5, 54, 253, 250]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [209, 20, 247, 120]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [179, 0, 30, 195]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [21, 121, 56, 7]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [22, 133, 66, 228]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [10, 80, 116, 206]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [32, 122, 125, 85]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [88, 143, 207, 8]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [90, 67, 97, 144]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [75, 248, 253, 127]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [41, 79, 88, 102]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 4 bytes
+[ALSA] Buffer: 4100 bytes, complete frames: 683, bytes to convert: 4098, remainder: 2
+[ALSA] Converted 1366 samples, buffer now has 2 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [229, 80, 223, 126]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 2 bytes
+[ALSA] Buffer: 4098 bytes, complete frames: 683, bytes to convert: 4098, remainder: 0
+[ALSA] Converted 1366 samples, buffer now has 0 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [185, 84, 188, 2]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] Converting 4096 bytes of 24-bit audio data to 16-bit for output
+[ALSA] Buffer size before: 0 bytes
+[ALSA] Buffer: 4096 bytes, complete frames: 682, bytes to convert: 4092, remainder: 4
+[ALSA] Converted 1364 samples, buffer now has 4 bytes remaining
+[ALSA] DEBUG Writing 4096 bytes successfully
+[ALSA] DEBUG First 4 bytes: [81, 124, 205, 183]
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 3000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 4000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 1000 bytes, waiting for 4096
+[ALSA] DEBUG Buffered 2000 bytes, waiting for 4096
+[ALSA] End of stream processed
+[INFO] UI completed successfully
+[INFO] === Rhap Finished Successfully ===

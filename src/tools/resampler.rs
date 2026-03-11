@@ -1,6 +1,7 @@
 use anyhow::Result;
 use log::error;
-use rubato::{FftFixedIn, Resampler};
+use audioadapter_buffers::direct::SequentialSliceOfVecs;
+use rubato::{Fft, FixedSync, Resampler};
 use symphonia::core::{
     audio::{AudioBuffer, AudioBufferRef, Signal},
     conv::{FromSample, IntoSample},
@@ -10,7 +11,7 @@ use symphonia::core::{
 use crate::audio::BitsPerSample;
 
 pub struct RubatoResampler<O> {
-    resampler: FftFixedIn<f64>,
+    resampler: Fft<f64>,
     input: Vec<Vec<f64>>,
     output: Vec<Vec<f64>>,
     interleaved_output: Vec<O>,
@@ -32,11 +33,19 @@ where
         frames: usize,
         channels: usize,
     ) -> Result<Self> {
-        let resampler =
-            rubato::FftFixedIn::<f64>::new(from_samplerate, to_samplerate, frames, 1, channels)?;
+        let resampler = rubato::Fft::<f64>::new(
+            from_samplerate,
+            to_samplerate,
+            frames,
+            1,
+            channels,
+            FixedSync::Input,
+        )?;
 
-        let output = resampler.output_buffer_allocate(true);
-        let input = resampler.input_buffer_allocate(true);
+        let output_frames = resampler.output_frames_max();
+        let input_frames = resampler.input_frames_max();
+        let output = vec![vec![0.0f64; output_frames]; channels];
+        let input = vec![vec![0.0f64; input_frames]; channels];
         let interleaved_output = Vec::<O>::with_capacity(frames * channels);
 
         Ok(Self {
@@ -54,38 +63,21 @@ where
     pub fn resample(&mut self, input: &AudioBufferRef<'_>) -> Result<&[O]> {
         if input.frames() != self.frames {
             self.frames = input.frames();
-            self.resampler = rubato::FftFixedIn::<f64>::new(
+            self.resampler = rubato::Fft::<f64>::new(
                 self.from_samplerate,
                 self.to_samplerate,
                 self.frames,
                 1,
                 self.channels,
+                FixedSync::Input,
             )
             .unwrap();
-            self.output = self.resampler.output_buffer_allocate(true);
-            self.input = self.resampler.input_buffer_allocate(true);
+            let output_frames = self.resampler.output_frames_max();
+            let input_frames = self.resampler.input_frames_max();
+            self.output = vec![vec![0.0f64; output_frames]; self.channels];
+            self.input = vec![vec![0.0f64; input_frames]; self.channels];
         }
         match input {
-            AudioBufferRef::S32(buffer) => {
-                copy_samples_vec(buffer, &mut self.input);
-                self.process_and_interleave()?;
-            }
-            AudioBufferRef::S24(buffer) => {
-                copy_samples_vec(buffer, &mut self.input);
-                self.process_and_interleave()?;
-            }
-            AudioBufferRef::S16(buffer) => {
-                copy_samples_vec(buffer, &mut self.input);
-                self.process_and_interleave()?;
-            }
-            AudioBufferRef::F32(buffer) => {
-                copy_samples_vec(buffer, &mut self.input);
-                self.process_and_interleave()?;
-            }
-            AudioBufferRef::F64(buffer) => {
-                copy_samples_vec(buffer, &mut self.input);
-                self.process_and_interleave()?;
-            }
             AudioBufferRef::U8(buffer) => {
                 copy_samples_vec(buffer, &mut self.input);
                 self.process_and_interleave()?;
@@ -102,6 +94,26 @@ where
                 copy_samples_vec(buffer, &mut self.input);
                 self.process_and_interleave()?;
             }
+            AudioBufferRef::S16(buffer) => {
+                copy_samples_vec(buffer, &mut self.input);
+                self.process_and_interleave()?;
+            }
+            AudioBufferRef::S24(buffer) => {
+                copy_samples_vec(buffer, &mut self.input);
+                self.process_and_interleave()?;
+            }
+            AudioBufferRef::S32(buffer) => {
+                copy_samples_vec(buffer, &mut self.input);
+                self.process_and_interleave()?;
+            }
+            AudioBufferRef::F32(buffer) => {
+                copy_samples_vec(buffer, &mut self.input);
+                self.process_and_interleave()?;
+            }
+            AudioBufferRef::F64(buffer) => {
+                copy_samples_vec(buffer, &mut self.input);
+                self.process_and_interleave()?;
+            }
             _ => {
                 error!("Unsupported sample format variant");
                 return Err(anyhow::anyhow!("Unsupported sample format"));
@@ -113,9 +125,21 @@ where
 
     /// Helper method to process audio through resampler and interleave output
     fn process_and_interleave(&mut self) -> Result<()> {
-        // Process through resampler
-        self.resampler
-            .process_into_buffer(&self.input, &mut self.output, None)?;
+        let input_adapter = SequentialSliceOfVecs::new(
+            &self.input,
+            self.channels,
+            self.frames,
+        )?;
+        let mut output_adapter = SequentialSliceOfVecs::new_mut(
+            &mut self.output,
+            self.channels,
+            self.resampler.output_frames_max(),
+        )?;
+        let (_in_frames, out_frames) = self.resampler.process_into_buffer(
+            &input_adapter,
+            &mut output_adapter,
+            None,
+        )?;
 
         // Clean up input buffer
         self.input.iter_mut().for_each(|channel| {
@@ -124,7 +148,7 @@ where
 
         // Resize output buffer for interleaved data
         self.interleaved_output
-            .resize(self.channels * self.output[0].len(), O::MID);
+            .resize(self.channels * out_frames, O::MID);
 
         // Interleave channels
         self.interleaved_output
