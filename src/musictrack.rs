@@ -14,8 +14,7 @@ use tokio::sync::Mutex;
 use crate::audio::{BitsPerSample, SampleRate};
 
 pub struct MusicTrack {
-    pub format: Arc<Mutex<Box<dyn FormatReader>>>,
-    pub decoder: Arc<Mutex<Box<dyn Decoder>>>,
+    pub path: String,
     pub sample: SampleRate,
     pub channels: usize,
     pub bits_per_sample: BitsPerSample,
@@ -25,6 +24,7 @@ pub struct MusicTrack {
 }
 
 impl MusicTrack {
+    /// Scan metadata only — does not create a decoder or retain the file handle.
     pub fn new(path: String) -> Result<Self> {
         let source = std::fs::File::open(path.clone())?;
         let mss = MediaSourceStream::new(Box::new(source), Default::default());
@@ -55,35 +55,51 @@ impl MusicTrack {
             .tags()
             .iter()
             .find(|e| e.std_key == Some(StandardTagKey::Artist))
-            .unwrap()
-            .value
-            .to_string();
+            .map(|t| t.value.to_string())
+            .unwrap_or_else(|| "Unknown Artist".to_string());
         let title = metadata
             .tags()
             .iter()
             .find(|e| e.std_key == Some(StandardTagKey::TrackTitle))
-            .unwrap()
-            .value
-            .to_string();
+            .map(|t| t.value.to_string())
+            .unwrap_or_else(|| "Unknown Title".to_string());
         let duration = track
             .codec_params
             .time_base
             .unwrap_or(Default::default())
             .calc_time(track.codec_params.n_frames.unwrap_or(0));
 
-        // Create a decoder for the track.
-        let decoder = symphonia::default::get_codecs()
-            .make(&track.codec_params, &DecoderOptions { verify: true })?;
-
         Ok(Self {
-            format: Arc::new(Mutex::new(format)),
-            decoder: Arc::new(Mutex::new(decoder)),
+            path,
             sample: SampleRate::from(samplerate as usize),
             channels,
             bits_per_sample: BitsPerSample::from(bits_per_sample as usize),
             title,
             artist,
             duration,
+        })
+    }
+
+    /// Open the file for playback — creates the FormatReader and Decoder on demand.
+    pub fn open_for_playback(&self) -> Result<PlaybackHandle> {
+        let source = std::fs::File::open(self.path.clone())?;
+        let mss = MediaSourceStream::new(Box::new(source), Default::default());
+        let mut hint = Hint::new();
+        if let Some(ext) = std::path::Path::new(&self.path).extension().and_then(|e| e.to_str()) {
+            hint.with_extension(ext);
+        }
+        let meta_opts = Default::default();
+        let fmt_opts = Default::default();
+        let probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts)?;
+
+        let format = probed.format;
+        let track = format.tracks().get(0).unwrap().clone();
+        let decoder = symphonia::default::get_codecs()
+            .make(&track.codec_params, &DecoderOptions { verify: false })?;
+
+        Ok(PlaybackHandle {
+            format: Arc::new(Mutex::new(format)),
+            decoder: Arc::new(Mutex::new(decoder)),
         })
     }
 
@@ -113,4 +129,9 @@ impl MusicTrack {
             }
         }
     }
+}
+
+pub struct PlaybackHandle {
+    pub format: Arc<Mutex<Box<dyn FormatReader>>>,
+    pub decoder: Arc<Mutex<Box<dyn Decoder>>>,
 }

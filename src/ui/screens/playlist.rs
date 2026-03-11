@@ -2,6 +2,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use rand::{rng, seq::SliceRandom};
+use rayon::prelude::*;
 use ratatui::{
     prelude::{Alignment, Constraint, Rect},
     style::Style,
@@ -35,17 +36,17 @@ impl Playlist {
         let mut songs = vec![];
         if path.is_dir() {
             let pattern = format!("{}/**/*.flac", path.display());
-            let mut files = glob(&pattern)?
+            let files: Vec<String> = glob(&pattern)?
                 .filter_map(|entry| entry.ok())
                 .map(|path| path.to_string_lossy().to_string())
-                .collect::<Vec<String>>();
-            files.shuffle(&mut rng());
-            for f in files {
-                match MusicTrack::new(f) {
-                    Ok(track) => songs.push(Arc::new(track)),
-                    Err(_) => continue,
-                }
-            }
+                .collect();
+            let mut loaded: Vec<Arc<MusicTrack>> = files
+                .par_iter()
+                .filter_map(|f| MusicTrack::new(f.clone()).ok())
+                .map(Arc::new)
+                .collect();
+            loaded.shuffle(&mut rng());
+            songs = loaded;
         } else if path.is_file() {
             songs.push(Arc::new(MusicTrack::new(
                 path.into_os_string().into_string().unwrap(),
