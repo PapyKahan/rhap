@@ -327,10 +327,7 @@ impl Player {
                                 break;
                             }
                         };
-                        elapsed_time_clone.store(
-                            elapsed_time_clone.load(Ordering::Relaxed) + packet.dur,
-                            Ordering::Relaxed,
-                        );
+                        elapsed_time_clone.fetch_add(packet.dur, Ordering::Relaxed);
                         let decoded = decoder.decode(&packet)?;
                         let spec = decoded.spec();
                         let frames = decoded.capacity();

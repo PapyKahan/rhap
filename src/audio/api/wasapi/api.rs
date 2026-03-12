@@ -101,6 +101,9 @@ pub struct AudioClient {
     eventhandle: Option<EventHandle>,
 }
 
+// SAFETY: IAudioClient and IAudioRenderClient are COM pointers initialized in MTA
+// (COINIT_MULTITHREADED). The audio output thread calls com_initialize() before
+// using the client. AudioClient is moved into the audio thread, not shared.
 unsafe impl Send for AudioClient {}
 unsafe impl Sync for AudioClient {}
 

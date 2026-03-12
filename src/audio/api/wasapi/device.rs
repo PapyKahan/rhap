@@ -58,6 +58,9 @@ impl Device {
     }
 }
 
+// SAFETY: IMMDevice is a COM pointer initialized in MTA (COINIT_MULTITHREADED).
+// MTA COM objects can be safely called from any thread. Device is moved between
+// threads but not shared concurrently.
 unsafe impl Send for Device {}
 unsafe impl Sync for Device {}
 
@@ -76,52 +79,42 @@ impl DeviceTrait for Device {
         let mut sample_rates = Vec::new();
         let mut bits_per_samples = Vec::new();
 
-        let default_capabilities = Capabilities::all_possible();
+        let all = Capabilities::all_possible();
 
         com_initialize();
-        for bits_per_sample in default_capabilities.bits_per_samples {
-            let default_capabilities = Capabilities::all_possible();
-            for samplerate in default_capabilities.sample_rates {
+        // Create one AudioClient — only inner_client is used for IsFormatSupported
+        let dummy_params = StreamParams {
+            samplerate: all.sample_rates[0],
+            bits_per_sample: all.bits_per_samples[0],
+            channels: 2,
+            exclusive: true,
+            pollmode: false,
+        };
+        let client = self.get_client(&dummy_params)?;
+        let sharemode = ShareMode::Exclusive;
+
+        for bits_per_sample in &all.bits_per_samples {
+            for samplerate in &all.sample_rates {
                 let params = StreamParams {
-                    samplerate,
-                    bits_per_sample,
+                    samplerate: *samplerate,
+                    bits_per_sample: *bits_per_sample,
                     channels: 2,
                     exclusive: true,
                     pollmode: false,
                 };
-                let client = self.get_client(&params)?;
                 let wave_format = params.create_wave_format();
-                let sharemode = match params.exclusive {
-                    true => ShareMode::Exclusive,
-                    false => ShareMode::Shared,
-                };
-                match sharemode {
-                    ShareMode::Exclusive => {
-                        if let Ok(_) = client.is_supported(wave_format, &sharemode) {
-                            if !bits_per_samples.contains(&bits_per_sample) {
-                                bits_per_samples.push(bits_per_sample);
-                            };
-                            if !sample_rates.contains(&samplerate) {
-                                sample_rates.push(samplerate);
-                            };
-                        }
+                if client.is_supported(wave_format, &sharemode).is_ok() {
+                    if !bits_per_samples.contains(bits_per_sample) {
+                        bits_per_samples.push(*bits_per_sample);
                     }
-                    ShareMode::Shared => match client.is_supported(wave_format, &sharemode) {
-                        Ok(_) => {
-                            if !bits_per_samples.contains(&bits_per_sample) {
-                                bits_per_samples.push(bits_per_sample);
-                            };
-                            if !sample_rates.contains(&samplerate) {
-                                sample_rates.push(samplerate);
-                            };
-                        }
-                        Err(_) => {}
-                    },
+                    if !sample_rates.contains(samplerate) {
+                        sample_rates.push(*samplerate);
+                    }
                 }
             }
         }
 
-        Ok(crate::audio::Capabilities {
+        Ok(Capabilities {
             sample_rates,
             bits_per_samples,
         })
