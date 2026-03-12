@@ -261,7 +261,10 @@ impl AudioClient {
                     // Some of the possible errors. See the documentation for the full list and descriptions.
                     // https://docs.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize
                     match e.code() {
-                        E_INVALIDARG => error!("IAudioClient::Initialize: Invalid argument"),
+                        E_INVALIDARG => {
+                            error!("IAudioClient::Initialize: Invalid argument");
+                            return Err(anyhow!("IAudioClient::Initialize: Invalid argument"));
+                        }
                         AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED => {
                             debug!("IAudioClient::Initialize: Unaligned buffer, trying to adjust the period.");
                             // Try to recover following the example in the docs.
@@ -295,23 +298,23 @@ impl AudioClient {
                         }
                         AUDCLNT_E_DEVICE_IN_USE => {
                             error!("IAudioClient::Initialize: The device is already in use");
-                            panic!("IAudioClient::Initialize: The device is already in use");
+                            return Err(anyhow!("IAudioClient::Initialize: The device is already in use"));
                         }
                         AUDCLNT_E_UNSUPPORTED_FORMAT => {
-                            error!("IAudioClient::Initialize The device does not support the audio format");
-                            panic!("IAudioClient::Initialize The device does not support the audio format");
+                            error!("IAudioClient::Initialize: The device does not support the audio format");
+                            return Err(anyhow!("IAudioClient::Initialize: The device does not support the audio format"));
                         }
                         AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED => {
                             error!("IAudioClient::Initialize: Exclusive mode is not allowed");
-                            panic!("IAudioClient::Initialize: Exclusive mode is not allowed");
+                            return Err(anyhow!("IAudioClient::Initialize: Exclusive mode is not allowed"));
                         }
                         AUDCLNT_E_ENDPOINT_CREATE_FAILED => {
                             error!("IAudioClient::Initialize: Failed to create endpoint");
-                            panic!("IAudioClient::Initialize: Failed to create endpoint");
+                            return Err(anyhow!("IAudioClient::Initialize: Failed to create endpoint"));
                         }
                         _ => {
                             error!("IAudioClient::Initialize: Other error, HRESULT: {:#010x}, info: {:?}", e.code().0, e.message());
-                            panic!("IAudioClient::Initialize: Other error, HRESULT: {:#010x}, info: {:?}", e.code().0, e.message());
+                            return Err(anyhow!("IAudioClient::Initialize: Other error, HRESULT: {:#010x}, info: {:?}", e.code().0, e.message()));
                         }
                     };
                 }

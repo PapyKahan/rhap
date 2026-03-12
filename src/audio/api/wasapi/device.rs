@@ -194,7 +194,6 @@ impl DeviceTrait for Device {
                                     client.write(&drain_buf)?;
                                     if !client_started {
                                         client.start()?;
-                                        client_started = true;
                                     }
                                     client.wait_for_buffer()?;
                                 }
@@ -212,7 +211,6 @@ impl DeviceTrait for Device {
         Ok(AudioPipeline {
             producer,
             end_of_stream,
-            buffer_size_bytes: wasapi_buffer_bytes,
         })
     }
 

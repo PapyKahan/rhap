@@ -7,7 +7,6 @@ use std::sync::Arc;
 pub struct AudioPipeline {
     pub producer: HeapProd<u8>,
     pub end_of_stream: Arc<AtomicBool>,
-    pub buffer_size_bytes: usize,
 }
 
 pub trait DeviceTrait: Send + Sync {

@@ -312,7 +312,8 @@ impl Player {
                         let packet = match format.next_packet() {
                             Ok(packet) => packet,
                             Err(Error::ResetRequired) => {
-                                unimplemented!();
+                                decoder.reset();
+                                continue;
                             }
                             Err(Error::IoError(err)) => {
                                 match err.kind() {
