@@ -42,7 +42,7 @@ impl MusicTrack {
             .channels
             .unwrap_or(Layout::Stereo.into_channels())
             .count();
-        let bits_per_sample = track.codec_params.bits_per_sample.unwrap_or(16) as u8;
+        let bits_per_sample = track.codec_params.bits_per_sample.unwrap_or(16) as u16;
 
         let metadata = match format.metadata().skip_to_latest() {
             Some(metadata) => metadata.clone(),
@@ -69,9 +69,9 @@ impl MusicTrack {
 
         Ok(Self {
             path,
-            sample: SampleRate::from(samplerate as usize),
+            sample: SampleRate(samplerate),
             channels,
-            bits_per_sample: BitsPerSample::from(bits_per_sample as usize),
+            bits_per_sample: BitsPerSample(bits_per_sample),
             title,
             artist,
             duration,
@@ -102,11 +102,7 @@ impl MusicTrack {
     }
 
     pub fn info(&self) -> String {
-        format!(
-            "{}bits - {}KHz",
-            self.bits_per_sample as usize,
-            (self.sample as usize) as f32 / 1000.0
-        )
+        format!("{} - {}", self.bits_per_sample, self.sample)
     }
 
     pub fn formated_duration(&self) -> String {

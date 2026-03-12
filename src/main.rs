@@ -59,10 +59,10 @@ async fn main() -> Result<()> {
                 device.name()?
             );
             if let Some(bitrate) = capabilities.bits_per_samples.last() {
-                println!("    Max bits per sample: {}bits", *bitrate as usize);
+                println!("    Max bits per sample: {}", bitrate);
             }
             if let Some(rate) = capabilities.sample_rates.last() {
-                println!("    Max sample rate: {}Hz", *rate as usize);
+                println!("    Max sample rate: {}", rate);
             }
             index = index + 1;
         }

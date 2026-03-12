@@ -27,7 +27,7 @@ impl StreamParams {
     fn create_wave_format(&self) -> WaveFormat {
         WaveFormat::new(
             self.bits_per_sample,
-            self.samplerate as usize,
+            self.samplerate,
             self.channels as usize,
         )
     }
@@ -76,11 +76,11 @@ impl DeviceTrait for Device {
         let mut sample_rates = Vec::new();
         let mut bits_per_samples = Vec::new();
 
-        let default_capabilities = Capabilities::default();
+        let default_capabilities = Capabilities::all_possible();
 
         com_initialize();
         for bits_per_sample in default_capabilities.bits_per_samples {
-            let default_capabilities = Capabilities::default();
+            let default_capabilities = Capabilities::all_possible();
             for samplerate in default_capabilities.sample_rates {
                 let params = StreamParams {
                     samplerate,

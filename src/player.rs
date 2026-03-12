@@ -70,16 +70,11 @@ pub enum StreamBuffer {
 
 impl StreamBuffer {
     pub fn new(bits_per_sample: BitsPerSample, duration: usize, spec: SignalSpec) -> Self {
-        match bits_per_sample {
-            BitsPerSample::Bits16 => {
-                StreamBuffer::I16(RawSampleBuffer::<i16>::new(duration as u64, spec))
-            }
-            BitsPerSample::Bits24 => {
-                StreamBuffer::I24(RawSampleBuffer::<i24>::new(duration as u64, spec))
-            }
-            BitsPerSample::Bits32 => {
-                StreamBuffer::F32(RawSampleBuffer::<f32>::new(duration as u64, spec))
-            }
+        match bits_per_sample.0 {
+            16 => StreamBuffer::I16(RawSampleBuffer::<i16>::new(duration as u64, spec)),
+            24 => StreamBuffer::I24(RawSampleBuffer::<i24>::new(duration as u64, spec)),
+            32 => StreamBuffer::F32(RawSampleBuffer::<f32>::new(duration as u64, spec)),
+            other => panic!("Unsupported bits per sample for stream buffer: {}", other),
         }
     }
 
@@ -115,8 +110,8 @@ impl Resampler {
         frames: usize,
         channels: usize,
     ) -> Result<Self> {
-        match output_bits_per_sample {
-            BitsPerSample::Bits16 => Ok(Resampler::I16(
+        match output_bits_per_sample.0 {
+            16 => Ok(Resampler::I16(
                 RubatoResampler::<i16>::new(
                     input_sample_rate,
                     output_samplerate,
@@ -127,7 +122,7 @@ impl Resampler {
                 )?,
                 Vec::new(),
             )),
-            BitsPerSample::Bits24 => Ok(Resampler::I24(
+            24 => Ok(Resampler::I24(
                 RubatoResampler::<i24>::new(
                     input_sample_rate,
                     output_samplerate,
@@ -138,7 +133,7 @@ impl Resampler {
                 )?,
                 Vec::new(),
             )),
-            BitsPerSample::Bits32 => Ok(Resampler::F32(
+            32 => Ok(Resampler::F32(
                 RubatoResampler::<f32>::new(
                     input_sample_rate,
                     output_samplerate,
@@ -149,6 +144,7 @@ impl Resampler {
                 )?,
                 Vec::new(),
             )),
+            other => Err(anyhow::anyhow!("Unsupported bits per sample for resampler: {}", other)),
         }
     }
 
@@ -347,8 +343,8 @@ impl Player {
                                 Resampler::new(
                                     streamparams.bits_per_sample,
                                     adjusted_params.bits_per_sample,
-                                    streamparams.samplerate as usize,
-                                    adjusted_params.samplerate as usize,
+                                    streamparams.samplerate.0 as usize,
+                                    adjusted_params.samplerate.0 as usize,
                                     frames,
                                     adjusted_params.channels as usize,
                                 )

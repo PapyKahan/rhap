@@ -5,47 +5,25 @@ pub(crate) mod device;
 pub use host::{HostTrait, Host};
 pub use device::{DeviceTrait, Device};
 
-#[repr(usize)]
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum SampleRate {
-    Rate44100Hz = 44100,
-    Rate48000Hz = 48000,
-    Rate88200Hz = 88200,
-    Rate96000Hz = 96000,
-    Rate176400Hz = 176400,
-    Rate192000Hz = 192000,
-}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SampleRate(pub u32);
 
-impl From<usize> for SampleRate {
-    fn from(value: usize) -> Self {
-        match value {
-            44100 => SampleRate::Rate44100Hz,
-            48000 => SampleRate::Rate48000Hz,
-            88200 => SampleRate::Rate88200Hz,
-            96000 => SampleRate::Rate96000Hz,
-            176400 => SampleRate::Rate176400Hz,
-            192000 => SampleRate::Rate192000Hz,
-            _ => panic!("Invalid sample rate"),
+impl std::fmt::Display for SampleRate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.0 % 1000 == 0 {
+            write!(f, "{}kHz", self.0 / 1000)
+        } else {
+            write!(f, "{:.1}kHz", self.0 as f64 / 1000.0)
         }
     }
 }
 
-#[repr(usize)]
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum BitsPerSample {
-    Bits16 = 16,
-    Bits24 = 24,
-    Bits32 = 32,
-}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct BitsPerSample(pub u16);
 
-impl From<usize> for BitsPerSample {
-    fn from(value: usize) -> Self {
-        match value {
-            16 => BitsPerSample::Bits16,
-            24 => BitsPerSample::Bits24,
-            32 => BitsPerSample::Bits32,
-            _ => panic!("Invalid bits per sample"),
-        }
+impl std::fmt::Display for BitsPerSample {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}bit", self.0)
     }
 }
 
@@ -55,20 +33,27 @@ pub struct Capabilities {
 }
 
 impl Capabilities {
-    pub fn default() -> Self {
+    pub fn all_possible() -> Self {
         Self {
             sample_rates: vec![
-                SampleRate::Rate44100Hz,
-                SampleRate::Rate48000Hz,
-                SampleRate::Rate88200Hz,
-                SampleRate::Rate96000Hz,
-                SampleRate::Rate176400Hz,
-                SampleRate::Rate192000Hz,
+                SampleRate(8000),
+                SampleRate(11025),
+                SampleRate(16000),
+                SampleRate(22050),
+                SampleRate(44100),
+                SampleRate(48000),
+                SampleRate(88200),
+                SampleRate(96000),
+                SampleRate(176400),
+                SampleRate(192000),
+                SampleRate(352800),
+                SampleRate(384000),
+                SampleRate(768000),
             ],
             bits_per_samples: vec![
-                BitsPerSample::Bits16,
-                BitsPerSample::Bits24,
-                BitsPerSample::Bits32,
+                BitsPerSample(16),
+                BitsPerSample(24),
+                BitsPerSample(32),
             ],
         }
     }
@@ -82,5 +67,3 @@ pub struct StreamParams {
     pub exclusive: bool,
     pub pollmode: bool,
 }
-
-

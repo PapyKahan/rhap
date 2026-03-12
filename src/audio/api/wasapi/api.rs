@@ -45,7 +45,7 @@ use windows::{
     },
 };
 
-use crate::audio::{BitsPerSample, StreamParams};
+use crate::audio::{BitsPerSample, SampleRate, StreamParams};
 
 //const REFTIMES_PER_MILLISEC: u64 = 10000;
 //const REFTIMES_PER_SEC: u64 = 10000000;
@@ -447,32 +447,26 @@ impl AudioRenderClient {
 pub struct WaveFormat(WAVEFORMATEXTENSIBLE);
 
 impl WaveFormat {
-    pub(crate) fn new(bits_per_sample: BitsPerSample, samplerate: usize, channels: usize) -> Self {
-        let blockalign = channels * bits_per_sample as usize / 8;
-        let byterate = samplerate * blockalign;
-
-        let valid_bits_per_sample = match bits_per_sample {
-            BitsPerSample::Bits16 => 16,
-            BitsPerSample::Bits24 => 24,
-            BitsPerSample::Bits32 => 32,
-        };
+    pub(crate) fn new(bits_per_sample: BitsPerSample, samplerate: SampleRate, channels: usize) -> Self {
+        let blockalign = channels * bits_per_sample.0 as usize / 8;
+        let byterate = samplerate.0 as usize * blockalign;
 
         let wave_format = WAVEFORMATEX {
             cbSize: 22,
             nAvgBytesPerSec: byterate as u32,
             nBlockAlign: blockalign as u16,
             nChannels: channels as u16,
-            nSamplesPerSec: samplerate as u32,
-            wBitsPerSample: bits_per_sample as u16,
+            nSamplesPerSec: samplerate.0,
+            wBitsPerSample: bits_per_sample.0,
             wFormatTag: WAVE_FORMAT_EXTENSIBLE as u16,
         };
         let sample = WAVEFORMATEXTENSIBLE_0 {
-            wValidBitsPerSample: valid_bits_per_sample,
+            wValidBitsPerSample: bits_per_sample.0,
         };
-        let subformat = match bits_per_sample {
-            BitsPerSample::Bits16 => KSDATAFORMAT_SUBTYPE_PCM,
-            BitsPerSample::Bits24 => KSDATAFORMAT_SUBTYPE_PCM,
-            BitsPerSample::Bits32 => KSDATAFORMAT_SUBTYPE_IEEE_FLOAT,
+        let subformat = if bits_per_sample.0 == 32 {
+            KSDATAFORMAT_SUBTYPE_IEEE_FLOAT
+        } else {
+            KSDATAFORMAT_SUBTYPE_PCM
         };
         // https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-waveformatextensible
         let mask = match channels {
@@ -493,8 +487,8 @@ impl WaveFormat {
 
     /// convert from [WAVEFORMATEX](https://docs.microsoft.com/en-us/previous-versions/dd757713(v=vs.85)) structure
     fn from_waveformatex(wavefmt: WAVEFORMATEX) -> Result<Self> {
-        let bits_per_sample = BitsPerSample::from(wavefmt.wBitsPerSample as usize);
-        let samplerate = wavefmt.nSamplesPerSec as usize;
+        let bits_per_sample = BitsPerSample(wavefmt.wBitsPerSample);
+        let samplerate = SampleRate(wavefmt.nSamplesPerSec);
         let channels = wavefmt.nChannels as usize;
         Ok(WaveFormat::new(bits_per_sample, samplerate, channels))
     }
@@ -518,7 +512,7 @@ impl From<&StreamParams> for WaveFormat {
     fn from(value: &StreamParams) -> Self {
         WaveFormat::new(
             value.bits_per_sample,
-            value.samplerate as usize,
+            value.samplerate,
             value.channels as usize,
         )
     }

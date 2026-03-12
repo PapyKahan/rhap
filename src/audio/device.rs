@@ -73,7 +73,7 @@ impl DeviceTrait for Device {
     fn get_capabilities(&self) -> Result<Capabilities> {
         let device = match self {
             Self::Wasapi(device) => device,
-            Self::None => return Ok(Capabilities::default()),
+            Self::None => return Ok(Capabilities::all_possible()),
         };
         device.get_capabilities()
     }
