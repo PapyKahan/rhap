@@ -93,72 +93,72 @@ impl Playlist {
         self.state.select(Some(i));
     }
 
-    pub async fn play(&mut self) -> Result<()> {
-        self.player.stop().await?;
+    pub fn play(&mut self) -> Result<()> {
+        self.player.stop()?;
         if let Some(song) = self.songs.get(self.playing_track_index) {
-            let current_track_info = self.player.play(song.clone()).await?;
+            let current_track_info = self.player.play(song.clone())?;
             self.playing_track = Some(current_track_info.clone());
             self.currently_playing_widget = CurrentlyPlayingWidget::new(Some(current_track_info));
         }
         Ok(())
     }
 
-    pub async fn next(&mut self) -> Result<()> {
+    pub fn next(&mut self) -> Result<()> {
         self.playing_track_index = if self.playing_track_index + 1 > self.songs.len() - 1 {
             0
         } else {
             self.playing_track_index + 1
         };
-        self.play().await
+        self.play()
     }
 
-    pub async fn previous(&mut self) -> Result<()> {
+    pub fn previous(&mut self) -> Result<()> {
         // Check if a track is currently playing
         if let Some(current_track) = &self.playing_track {
             // Get elapsed time in seconds
             let elapsed_time = current_track.get_elapsed_time();
-            
+
             // If the track has been playing for more than 5 seconds, restart it
             if elapsed_time.seconds > 3 {
                 // Replay the current track
-                self.play().await?;
+                self.play()?;
                 return Ok(());
             }
         }
-        
+
         // Otherwise, move to the previous track
         self.playing_track_index = if self.playing_track_index == 0 {
             self.songs.len() - 1
         } else {
             self.playing_track_index - 1
         };
-        self.play().await
+        self.play()
     }
 
-    pub async fn stop(&mut self) -> Result<()> {
+    pub fn stop(&mut self) -> Result<()> {
         self.playing_track = None;
         self.currently_playing_widget.clear();
-        self.player.stop().await
+        self.player.stop()
     }
 
-    pub async fn pause(&mut self) -> Result<()> {
+    pub fn pause(&mut self) -> Result<()> {
         self.player.pause()?;
         Ok(())
     }
 
-    pub async fn resume(&mut self) -> Result<()> {
+    pub fn resume(&mut self) -> Result<()> {
         if self.playing_track.is_some() {
             self.player.resume()?;
         } else {
-            self.play_selected().await?;
+            self.play_selected()?;
         }
         Ok(())
     }
 
-    pub async fn run(&mut self) -> Result<()> {
+    pub fn run(&mut self) -> Result<()> {
         if let Some(current_track) = self.playing_track.clone() {
             if !current_track.is_streaming() && self.automatically_play_next {
-                self.next().await?;
+                self.next()?;
             }
         }
         Ok(())
@@ -289,10 +289,10 @@ impl Playlist {
         Ok(())
     }
 
-    pub async fn play_selected(&mut self) -> Result<()> {
+    pub fn play_selected(&mut self) -> Result<()> {
         if let Some(index) = self.state.selected() {
             self.playing_track_index = index;
-            self.play().await?;
+            self.play()?;
         }
         Ok(())
     }

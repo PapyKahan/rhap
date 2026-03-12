@@ -176,7 +176,7 @@ impl App {
             Screens::Default(playlist) => {
                 match event {
                     KeyboardEvent::Quit => {
-                        playlist.borrow_mut().stop().await?;
+                        playlist.borrow_mut().stop()?;
                         return Ok(());
                     }
                     KeyboardEvent::Search => {
@@ -193,17 +193,17 @@ impl App {
                     }
                     KeyboardEvent::Play | KeyboardEvent::Pause => {
                         if playlist.borrow_mut().is_playing() {
-                            playlist.borrow_mut().pause().await?;
+                            playlist.borrow_mut().pause()?;
                         } else {
-                            playlist.borrow_mut().resume().await?;
+                            playlist.borrow_mut().resume()?;
                         }
                     }
-                    KeyboardEvent::Stop => playlist.borrow_mut().stop().await?,
-                    KeyboardEvent::Next => playlist.borrow_mut().next().await?,
-                    KeyboardEvent::Previous => playlist.borrow_mut().previous().await?,
+                    KeyboardEvent::Stop => playlist.borrow_mut().stop()?,
+                    KeyboardEvent::Next => playlist.borrow_mut().next()?,
+                    KeyboardEvent::Previous => playlist.borrow_mut().previous()?,
                     KeyboardEvent::Up => playlist.borrow_mut().select_previous(),
                     KeyboardEvent::Down => playlist.borrow_mut().select_next(),
-                    KeyboardEvent::Enter => playlist.borrow_mut().play_selected().await?,
+                    KeyboardEvent::Enter => playlist.borrow_mut().play_selected()?,
                     KeyboardEvent::NextMatch => {
                         // Get the last search query from search widget
                         let query = self.search_widget.borrow().last_query().to_string();
@@ -279,7 +279,7 @@ impl App {
             let current_screen = self.layers.last().unwrap_or(&default_screen);
             match current_screen {
                 Screens::Default(playlist) => {
-                    playlist.borrow_mut().run().await?;
+                    playlist.borrow_mut().run()?;
                 }
                 _ => {}
             }

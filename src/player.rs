@@ -1,17 +1,18 @@
 use anyhow::Result;
 use log::error;
+use ringbuf::HeapProd;
+use ringbuf::traits::Producer;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use symphonia::core::audio::{AudioBufferRef, RawSampleBuffer, SignalSpec};
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{SeekMode, SeekTo};
 use symphonia::core::sample::i24;
 use symphonia::core::units::{Time, TimeBase};
-use tokio::sync::mpsc::Sender;
-use tokio::task::JoinHandle;
 
 use crate::audio::{
-    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams, StreamingData,
+    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams,
 };
 use crate::musictrack::MusicTrack;
 use crate::tools::resampler::RubatoResampler;
@@ -21,8 +22,7 @@ pub struct Player {
     host: Host,
     device_id: Option<u32>,
     pollmode: bool,
-    previous_stream: Option<Sender<StreamingData>>,
-    streaming_handle: Option<JoinHandle<Result<()>>>,
+    streaming_handle: Option<std::thread::JoinHandle<Result<()>>>,
     is_playing: Arc<AtomicBool>,
     is_paused: Arc<AtomicBool>,
 }
@@ -101,9 +101,9 @@ impl StreamBuffer {
 }
 
 enum Resampler {
-    I16(RubatoResampler<i16>),
-    I24(RubatoResampler<i24>),
-    F32(RubatoResampler<f32>),
+    I16(RubatoResampler<i16>, Vec<u8>),
+    I24(RubatoResampler<i24>, Vec<u8>),
+    F32(RubatoResampler<f32>, Vec<u8>),
 }
 
 impl Resampler {
@@ -116,65 +116,89 @@ impl Resampler {
         channels: usize,
     ) -> Result<Self> {
         match output_bits_per_sample {
-            BitsPerSample::Bits16 => Ok(Resampler::I16(RubatoResampler::<i16>::new(
-                input_sample_rate,
-                output_samplerate,
-                input_bits_per_sample,
-                output_bits_per_sample,
-                frames,
-                channels,
-            )?)),
-            BitsPerSample::Bits24 => Ok(Resampler::I24(RubatoResampler::<i24>::new(
-                input_sample_rate,
-                output_samplerate,
-                input_bits_per_sample,
-                output_bits_per_sample,
-                frames,
-                channels,
-            )?)),
-            BitsPerSample::Bits32 => Ok(Resampler::F32(RubatoResampler::<f32>::new(
-                input_sample_rate,
-                output_samplerate,
-                input_bits_per_sample,
-                output_bits_per_sample,
-                frames,
-                channels,
-            )?)),
+            BitsPerSample::Bits16 => Ok(Resampler::I16(
+                RubatoResampler::<i16>::new(
+                    input_sample_rate,
+                    output_samplerate,
+                    input_bits_per_sample,
+                    output_bits_per_sample,
+                    frames,
+                    channels,
+                )?,
+                Vec::new(),
+            )),
+            BitsPerSample::Bits24 => Ok(Resampler::I24(
+                RubatoResampler::<i24>::new(
+                    input_sample_rate,
+                    output_samplerate,
+                    input_bits_per_sample,
+                    output_bits_per_sample,
+                    frames,
+                    channels,
+                )?,
+                Vec::new(),
+            )),
+            BitsPerSample::Bits32 => Ok(Resampler::F32(
+                RubatoResampler::<f32>::new(
+                    input_sample_rate,
+                    output_samplerate,
+                    input_bits_per_sample,
+                    output_bits_per_sample,
+                    frames,
+                    channels,
+                )?,
+                Vec::new(),
+            )),
         }
     }
 
-    pub async fn send_resampled_data(
+    pub fn resample_to_bytes(
         &mut self,
         streambuffer: &AudioBufferRef<'_>,
-        streamer: &Sender<StreamingData>,
-    ) -> Result<()> {
+    ) -> Result<&[u8]> {
         match self {
-            Resampler::I16(resampler) => {
+            Resampler::I16(resampler, byte_buf) => {
                 let output = resampler.resample(streambuffer)?;
-                for i in output.iter() {
-                    for j in i.to_ne_bytes().iter() {
-                        streamer.send(StreamingData::Data(*j)).await?
-                    }
+                byte_buf.clear();
+                byte_buf.reserve(output.len() * 2);
+                for sample in output.iter() {
+                    byte_buf.extend_from_slice(&sample.to_ne_bytes());
                 }
+                Ok(byte_buf)
             }
-            Resampler::I24(resampler) => {
+            Resampler::I24(resampler, byte_buf) => {
                 let output = resampler.resample(streambuffer)?;
-                for i in output.iter() {
-                    for j in i.to_ne_bytes().iter() {
-                        streamer.send(StreamingData::Data(*j)).await?
-                    }
+                byte_buf.clear();
+                byte_buf.reserve(output.len() * 3);
+                for sample in output.iter() {
+                    byte_buf.extend_from_slice(&sample.to_ne_bytes());
                 }
+                Ok(byte_buf)
             }
-            Resampler::F32(resampler) => {
+            Resampler::F32(resampler, byte_buf) => {
                 let output = resampler.resample(streambuffer)?;
-                for i in output.iter() {
-                    for j in i.to_ne_bytes().iter() {
-                        streamer.send(StreamingData::Data(*j)).await?
-                    }
+                byte_buf.clear();
+                byte_buf.reserve(output.len() * 4);
+                for sample in output.iter() {
+                    byte_buf.extend_from_slice(&sample.to_ne_bytes());
                 }
+                Ok(byte_buf)
             }
         }
-        Ok(())
+    }
+}
+
+fn write_all_blocking(producer: &mut HeapProd<u8>, data: &[u8], is_playing: &AtomicBool) {
+    let mut offset = 0;
+    while offset < data.len() {
+        if !is_playing.load(Ordering::Relaxed) {
+            return;
+        }
+        let n = producer.push_slice(&data[offset..]);
+        offset += n;
+        if offset < data.len() {
+            std::thread::sleep(Duration::from_micros(500));
+        }
     }
 }
 
@@ -185,25 +209,20 @@ impl Player {
             host,
             device_id,
             pollmode,
-            previous_stream: None,
             streaming_handle: None,
             is_playing: Arc::new(AtomicBool::new(false)),
             is_paused: Arc::new(AtomicBool::new(false)),
         })
     }
 
-    pub async fn stop(&mut self) -> Result<()> {
-        self.is_playing.store(false, Ordering::Relaxed);
+    pub fn stop(&mut self) -> Result<()> {
+        self.is_playing.store(false, Ordering::Release);
         self.is_paused.store(false, Ordering::Relaxed);
+        if let Some(handle) = self.streaming_handle.take() {
+            let _ = handle.join();
+        }
         if let Some(mut device) = self.current_device.take() {
             device.stop()?;
-        }
-        if let Some(stream) = self.previous_stream.take() {
-            stream.closed().await;
-            drop(stream);
-        }
-        if let Some(handle) = self.streaming_handle.take() {
-            handle.abort();
         }
         Ok(())
     }
@@ -236,8 +255,10 @@ impl Player {
         self.is_paused.load(Ordering::Relaxed)
     }
 
-    pub async fn play(&mut self, song: Arc<MusicTrack>) -> Result<CurrentTrackInfo> {
-        let playback = song.open_for_playback()?;
+    pub fn play(&mut self, song: Arc<MusicTrack>) -> Result<CurrentTrackInfo> {
+        self.stop()?;
+
+        let mut playback = song.open_for_playback()?;
         let streamparams = StreamParams {
             samplerate: song.sample,
             channels: song.channels as u8,
@@ -247,103 +268,106 @@ impl Player {
         };
         let mut device = self.host.create_device(self.device_id)?;
         let adjusted_params = device.adjust_stream_params(&streamparams)?;
-        let data_sender = device.start(&adjusted_params)?;
+
+        let time_base = playback.format.tracks().get(0).unwrap().codec_params.time_base.unwrap_or(Default::default());
+
+        let pipeline = device.start(&adjusted_params)?;
         self.current_device = Some(device);
-        self.previous_stream = Some(data_sender);
-        let stream = self.previous_stream.clone();
+
         let is_streaming = Arc::new(AtomicBool::new(true));
         let report_streaming = Arc::clone(&is_streaming);
-        let is_playing = self.is_playing.clone();
+        let is_playing = Arc::clone(&self.is_playing);
         let elapsed_time = Arc::new(AtomicU64::new(0));
         let elapsed_time_clone = Arc::clone(&elapsed_time);
         let total_duration = song.duration;
-        let time_base = playback.format.lock().await.tracks().get(0).unwrap().codec_params.time_base.unwrap_or(Default::default());
-        self.streaming_handle = Some(tokio::spawn(async move {
-            let mut format = playback.format.lock().await;
-            format.seek(
-                SeekMode::Accurate,
-                SeekTo::Time {
-                    time: Time::default(),
-                    track_id: None,
-                },
-            )?;
-            let mut decoder = playback.decoder.lock().await;
-            decoder.reset();
-            is_playing.store(true, Ordering::Relaxed);
-            if let Some(streamer) = stream {
-                let mut buffer: Option<StreamBuffer> = None;
-                let mut resampler: Option<Resampler> = None;
-                loop {
-                    if !is_playing.load(Ordering::Relaxed) {
-                        break;
-                    }
-                    let packet = match format.next_packet() {
-                        Ok(packet) => packet,
-                        Err(Error::ResetRequired) => {
-                            unimplemented!();
+
+        let mut producer = pipeline.producer;
+        let end_of_stream = pipeline.end_of_stream;
+        let is_playing_for_write = Arc::clone(&is_playing);
+
+        self.is_playing.store(true, Ordering::Release);
+
+        self.streaming_handle = Some(
+            std::thread::Builder::new()
+                .name("rhap-decoder".into())
+                .spawn(move || -> Result<()> {
+                    let format = &mut playback.format;
+                    format.seek(
+                        SeekMode::Accurate,
+                        SeekTo::Time {
+                            time: Time::default(),
+                            track_id: None,
+                        },
+                    )?;
+                    let decoder = &mut playback.decoder;
+                    decoder.reset();
+
+                    let mut buffer: Option<StreamBuffer> = None;
+                    let mut resampler: Option<Resampler> = None;
+
+                    loop {
+                        if !is_playing.load(Ordering::Relaxed) {
+                            break;
                         }
-                        Err(Error::IoError(err)) => {
-                            match err.kind() {
-                                std::io::ErrorKind::UnexpectedEof => {
-                                    break;
-                                }
-                                _ => {
-                                    error!("Error reading packet: {:?}", err);
-                                    break;
+                        let packet = match format.next_packet() {
+                            Ok(packet) => packet,
+                            Err(Error::ResetRequired) => {
+                                unimplemented!();
+                            }
+                            Err(Error::IoError(err)) => {
+                                match err.kind() {
+                                    std::io::ErrorKind::UnexpectedEof => {
+                                        break;
+                                    }
+                                    _ => {
+                                        error!("Error reading packet: {:?}", err);
+                                        break;
+                                    }
                                 }
                             }
-                        }
-                        Err(err) => {
-                            error!("Error reading packet: {:?}", err);
-                            break;
-                        }
-                    };
-                    elapsed_time_clone.store(
-                        elapsed_time_clone.load(Ordering::Relaxed) + packet.dur,
-                        Ordering::Relaxed,
-                    );
-                    let decoded = decoder.decode(&packet)?;
-                    let spec = decoded.spec();
-                    let frames = decoded.capacity();
-                    let sample_buffer = buffer.get_or_insert_with(|| {
-                        StreamBuffer::new(adjusted_params.bits_per_sample, frames, *spec)
-                    });
-                    if streamparams.samplerate != adjusted_params.samplerate {
-                        let resampled_sender = resampler.get_or_insert_with(|| {
-                            Resampler::new(
-                                streamparams.bits_per_sample,
-                                adjusted_params.bits_per_sample,
-                                streamparams.samplerate as usize,
-                                adjusted_params.samplerate as usize,
-                                frames,
-                                adjusted_params.channels as usize,
-                            )
-                            .unwrap()
-                        });
-                        if resampled_sender
-                            .send_resampled_data(&decoded, &streamer)
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    } else {
-                        sample_buffer.copy_interleaved_ref(decoded);
-                        for i in sample_buffer.as_bytes().iter() {
-                            if streamer.send(StreamingData::Data(*i)).await.is_err() {
+                            Err(err) => {
+                                error!("Error reading packet: {:?}", err);
                                 break;
                             }
+                        };
+                        elapsed_time_clone.store(
+                            elapsed_time_clone.load(Ordering::Relaxed) + packet.dur,
+                            Ordering::Relaxed,
+                        );
+                        let decoded = decoder.decode(&packet)?;
+                        let spec = decoded.spec();
+                        let frames = decoded.capacity();
+                        let sample_buffer = buffer.get_or_insert_with(|| {
+                            StreamBuffer::new(adjusted_params.bits_per_sample, frames, *spec)
+                        });
+
+                        if streamparams.samplerate != adjusted_params.samplerate {
+                            let resampled = resampler.get_or_insert_with(|| {
+                                Resampler::new(
+                                    streamparams.bits_per_sample,
+                                    adjusted_params.bits_per_sample,
+                                    streamparams.samplerate as usize,
+                                    adjusted_params.samplerate as usize,
+                                    frames,
+                                    adjusted_params.channels as usize,
+                                )
+                                .unwrap()
+                            });
+                            let bytes = resampled.resample_to_bytes(&decoded)?;
+                            write_all_blocking(&mut producer, bytes, &is_playing_for_write);
+                        } else {
+                            sample_buffer.copy_interleaved_ref(decoded);
+                            let bytes = sample_buffer.as_bytes();
+                            write_all_blocking(&mut producer, bytes, &is_playing_for_write);
                         }
                     }
-                }
-                streamer.send(StreamingData::EndOfStream).await?;
-                streamer.closed().await;
-            }
 
-            is_streaming.store(false, Ordering::Relaxed);
-            is_playing.store(false, Ordering::Relaxed);
-            Ok::<(), anyhow::Error>(())
-        }));
+                    end_of_stream.store(true, Ordering::Release);
+                    is_streaming.store(false, Ordering::Relaxed);
+                    is_playing.store(false, Ordering::Relaxed);
+                    Ok::<(), anyhow::Error>(())
+                })?,
+        );
 
         Ok(CurrentTrackInfo {
             is_streaming: report_streaming,
@@ -356,4 +380,3 @@ impl Player {
         })
     }
 }
-

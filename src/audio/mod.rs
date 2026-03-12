@@ -83,9 +83,4 @@ pub struct StreamParams {
     pub pollmode: bool,
 }
 
-#[derive(Copy, Clone)]
-pub enum StreamingData {
-    Data(u8),
-    EndOfStream
-}
 

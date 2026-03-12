@@ -1,5 +1,4 @@
 use anyhow::Result;
-use std::sync::Arc;
 use symphonia::core::{
     audio::Layout,
     codecs::{Decoder, DecoderOptions},
@@ -9,7 +8,6 @@ use symphonia::core::{
     probe::Hint,
     units::Time,
 };
-use tokio::sync::Mutex;
 
 use crate::audio::{BitsPerSample, SampleRate};
 
@@ -98,8 +96,8 @@ impl MusicTrack {
             .make(&track.codec_params, &DecoderOptions { verify: false })?;
 
         Ok(PlaybackHandle {
-            format: Arc::new(Mutex::new(format)),
-            decoder: Arc::new(Mutex::new(decoder)),
+            format,
+            decoder,
         })
     }
 
@@ -132,6 +130,6 @@ impl MusicTrack {
 }
 
 pub struct PlaybackHandle {
-    pub format: Arc<Mutex<Box<dyn FormatReader>>>,
-    pub decoder: Arc<Mutex<Box<dyn Decoder>>>,
+    pub format: Box<dyn FormatReader>,
+    pub decoder: Box<dyn Decoder>,
 }

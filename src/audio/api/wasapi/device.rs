@@ -1,5 +1,6 @@
 use anyhow::Result;
-use tokio::sync::mpsc::{channel, Sender};
+use ringbuf::HeapRb;
+use ringbuf::traits::{Consumer, Observer, Split};
 use windows::Win32::{
     Devices::FunctionDiscovery::PKEY_DeviceInterface_FriendlyName,
     Media::Audio::IMMDevice,
@@ -7,16 +8,19 @@ use windows::Win32::{
 };
 
 use super::api::{com_initialize, AudioClient, ShareMode, ThreadPriority, WaveFormat};
-use crate::audio::{Capabilities, DeviceTrait, StreamParams, StreamingData};
+use crate::audio::{Capabilities, DeviceTrait, StreamParams};
+use crate::audio::device::AudioPipeline;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
 pub struct Device {
     default_device_id: String,
     inner_device: IMMDevice,
-    stream_thread_handle: Option<tokio::task::JoinHandle<Result<()>>>,
+    stream_thread_handle: Option<std::thread::JoinHandle<Result<()>>>,
     high_priority_mode: bool,
     is_paused: Arc<AtomicBool>,
+    is_playing: Arc<AtomicBool>,
 }
 
 impl StreamParams {
@@ -41,6 +45,7 @@ impl Device {
             stream_thread_handle: Option::None,
             high_priority_mode,
             is_paused: Arc::new(AtomicBool::new(false)),
+            is_playing: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -122,50 +127,93 @@ impl DeviceTrait for Device {
         })
     }
 
-    fn start(&mut self, params: &StreamParams) -> Result<Sender<StreamingData>> {
+    fn start(&mut self, params: &StreamParams) -> Result<AudioPipeline> {
         self.stop()?;
-        let buffer = params.channels as usize
-            * ((params.bits_per_sample as usize * params.samplerate as usize) / 8 as usize);
-        let (data_tx, mut data_rx) = channel::<StreamingData>(buffer);
 
         let mut client = self.get_client(params)?;
         client.initialize()?;
-        let high_priority_mode = self.high_priority_mode;
-        let is_paused = self.is_paused.clone();
+        let wasapi_buffer_bytes = client.get_available_buffer_size()?;
 
-        self.stream_thread_handle = Some(tokio::spawn(async move {
-            let _thread_priority = ThreadPriority::new(high_priority_mode)?;
-            let mut client_started = false;
-            let mut buffer = vec![];
-            let mut available_buffer_size = client.get_available_buffer_size()?;
-            while let Some(streaming_data) = data_rx.recv().await {
-                if is_paused.load(Ordering::Relaxed) {
-                    client.stop()?;
-                    while is_paused.load(Ordering::Relaxed) {
-                        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-                    }
-                    client.start()?;
-                }
-                match streaming_data {
-                    StreamingData::Data(data) => {
-                        buffer.push(data);
-                        if buffer.len() == available_buffer_size {
-                            client.write(buffer.as_slice())?;
-                            if !client_started {
-                                client.start()?;
-                                client_started = true;
+        let ring = HeapRb::<u8>::new(wasapi_buffer_bytes * 4);
+        let (producer, mut consumer) = ring.split();
+
+        let end_of_stream = Arc::new(AtomicBool::new(false));
+        let eos_clone = Arc::clone(&end_of_stream);
+
+        self.is_playing.store(true, Ordering::Release);
+        let is_playing = Arc::clone(&self.is_playing);
+        let is_paused = Arc::clone(&self.is_paused);
+        let high_priority_mode = self.high_priority_mode;
+
+        self.stream_thread_handle = Some(
+            std::thread::Builder::new()
+                .name("rhap-audio-out".into())
+                .spawn(move || -> Result<()> {
+                    com_initialize();
+                    let _thread_priority = ThreadPriority::new(high_priority_mode)?;
+                    let mut client_started = false;
+                    let mut buffer = vec![0u8; wasapi_buffer_bytes];
+
+                    loop {
+                        if !is_playing.load(Ordering::Relaxed) {
+                            break;
+                        }
+
+                        if is_paused.load(Ordering::Relaxed) {
+                            client.stop()?;
+                            while is_paused.load(Ordering::Relaxed) {
+                                if !is_playing.load(Ordering::Relaxed) {
+                                    return Ok(());
+                                }
+                                std::thread::sleep(Duration::from_millis(10));
                             }
-                            client.wait_for_buffer()?;
-                            available_buffer_size = client.get_available_buffer_size()?;
-                            buffer.clear();
+                            client.start()?;
+                        }
+
+                        let available = consumer.occupied_len();
+
+                        if available >= wasapi_buffer_bytes {
+                            let n = consumer.pop_slice(&mut buffer);
+                            if n > 0 {
+                                client.write(&buffer[..n])?;
+                                if !client_started {
+                                    client.start()?;
+                                    client_started = true;
+                                }
+                                client.wait_for_buffer()?;
+                            }
+                        } else if eos_clone.load(Ordering::Acquire) {
+                            // Drain remaining data
+                            let remaining = consumer.occupied_len();
+                            if remaining > 0 {
+                                let mut drain_buf = vec![0u8; remaining];
+                                let n = consumer.pop_slice(&mut drain_buf);
+                                if n > 0 {
+                                    // Pad to full buffer size for WASAPI
+                                    drain_buf.resize(wasapi_buffer_bytes, 0);
+                                    client.write(&drain_buf)?;
+                                    if !client_started {
+                                        client.start()?;
+                                        client_started = true;
+                                    }
+                                    client.wait_for_buffer()?;
+                                }
+                            }
+                            break;
+                        } else {
+                            std::thread::sleep(Duration::from_micros(500));
                         }
                     }
-                    StreamingData::EndOfStream => break,
-                };
-            }
-            client.stop()
-        }));
-        Ok(data_tx)
+
+                    client.stop()
+                })?,
+        );
+
+        Ok(AudioPipeline {
+            producer,
+            end_of_stream,
+            buffer_size_bytes: wasapi_buffer_bytes,
+        })
     }
 
     fn pause(&mut self) -> Result<()> {
@@ -179,8 +227,9 @@ impl DeviceTrait for Device {
     }
 
     fn stop(&mut self) -> Result<()> {
+        self.is_playing.store(false, Ordering::Release);
         if let Some(handle) = self.stream_thread_handle.take() {
-            handle.abort();
+            let _ = handle.join();
         }
         Ok(())
     }

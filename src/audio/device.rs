@@ -1,12 +1,20 @@
-use super::{api, Capabilities, StreamParams, StreamingData};
+use super::{api, Capabilities, StreamParams};
 use anyhow::{anyhow, Result};
-use tokio::sync::mpsc::Sender;
+use ringbuf::HeapProd;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+
+pub struct AudioPipeline {
+    pub producer: HeapProd<u8>,
+    pub end_of_stream: Arc<AtomicBool>,
+    pub buffer_size_bytes: usize,
+}
 
 pub trait DeviceTrait: Send + Sync {
     fn is_default(&self) -> Result<bool>;
     fn name(&self) -> Result<String>;
     fn get_capabilities(&self) -> Result<Capabilities>;
-    fn start(&mut self, params: &StreamParams) -> Result<Sender<StreamingData>>;
+    fn start(&mut self, params: &StreamParams) -> Result<AudioPipeline>;
     fn pause(&mut self) -> Result<()>;
     fn resume(&mut self) -> Result<()>;
     fn stop(&mut self) -> Result<()>;
@@ -71,7 +79,7 @@ impl DeviceTrait for Device {
         device.get_capabilities()
     }
 
-    fn start(&mut self, params: &StreamParams) -> Result<Sender<StreamingData>> {
+    fn start(&mut self, params: &StreamParams) -> Result<AudioPipeline> {
         let device = match self {
             Self::Wasapi(device) => device,
             Self::None => return Err(anyhow!("No host selected")),

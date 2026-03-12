@@ -17,6 +17,7 @@ num-integer = "0.1.46"
 rustfft = "6.4.1"
 rayon = "1.11.0"
 audioadapter-buffers = "2.0"
+ringbuf = "0.4"
 
 [dependencies.ratatui]
 version = "0.30.0"
