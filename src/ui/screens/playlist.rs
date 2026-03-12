@@ -14,7 +14,7 @@ use glob::glob;
 
 use crate::{
     musictrack::MusicTrack,
-    player::{CurrentTrackInfo, Player},
+    player::{format_time, CurrentTrackInfo, Player},
     ui::{
         widgets::CurrentlyPlayingWidget, HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR,
         ROW_ALTERNATE_COLOR_COL, ROW_COLOR, ROW_COLOR_COL,
@@ -235,7 +235,7 @@ impl Playlist {
                     } else {
                         ROW_ALTERNATE_COLOR_COL
                     })),
-                    Cell::from(song.formated_duration()),
+                    Cell::from(format_time(song.duration)),
                 ])
                 .height(1)
                 .style(Style::default().bg(if items.len() % 2 == 0 {

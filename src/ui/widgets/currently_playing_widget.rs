@@ -7,7 +7,7 @@ use ratatui::{
 
 use crate::ui::HIGHLIGHT_COLOR;
 use crate::{
-    player::CurrentTrackInfo,
+    player::{format_time, CurrentTrackInfo},
     ui::{PROGRESSBAR_COLOR, ROW_COLOR},
 };
 use std::time::{Duration, Instant};
@@ -68,7 +68,7 @@ impl CurrentlyPlayingWidget {
                     Span::raw(format!("{}", track_info.info)),
                 ]),
                 Line::from(vec![
-                    Span::raw(track_info.format_time(self.last_elapsed_time)),
+                    Span::raw(format_time(self.last_elapsed_time)),
                     Span::raw(" "),
                     Span::styled(
                         "".repeat(filled_width),
@@ -87,7 +87,7 @@ impl CurrentlyPlayingWidget {
                         Style::default().fg(ROW_COLOR).add_modifier(Modifier::BOLD),
                     ),
                     Span::raw(" "),
-                    Span::raw(track_info.format_time(track_info.total_duration)),
+                    Span::raw(format_time(track_info.total_duration)),
                 ]),
             ]
         } else {

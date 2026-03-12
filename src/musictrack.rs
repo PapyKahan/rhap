@@ -105,24 +105,6 @@ impl MusicTrack {
         format!("{} - {}", self.bits_per_sample, self.sample)
     }
 
-    pub fn formated_duration(&self) -> String {
-        let hours = self.duration.seconds / (60 * 60);
-        let mins = (self.duration.seconds % (60 * 60)) / 60;
-        let secs = (self.duration.seconds % 60) + self.duration.frac as u64;
-        match hours {
-            0 => match mins {
-                0 => {
-                    format!("00:{:0>2}", secs)
-                }
-                _ => {
-                    format!("{:0>2}:{:0>2}", mins, secs)
-                }
-            },
-            _ => {
-                format!("{}:{:0>2}:{:0>2}", hours, mins, secs)
-            }
-        }
-    }
 }
 
 pub struct PlaybackHandle {

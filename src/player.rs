@@ -38,6 +38,19 @@ pub struct CurrentTrackInfo {
     time_base: TimeBase,
 }
 
+pub fn format_time(time: Time) -> String {
+    let hours = time.seconds / (60 * 60);
+    let mins = (time.seconds % (60 * 60)) / 60;
+    let secs = time.seconds % 60;
+    match hours {
+        0 => match mins {
+            0 => format!("00:{:0>2}", secs),
+            _ => format!("{:0>2}:{:0>2}", mins, secs),
+        },
+        _ => format!("{}:{:0>2}:{:0>2}", hours, mins, secs),
+    }
+}
+
 impl CurrentTrackInfo {
     pub fn is_streaming(&self) -> bool {
         self.is_streaming.load(Ordering::Relaxed)
@@ -46,19 +59,6 @@ impl CurrentTrackInfo {
     pub fn get_elapsed_time(&self) -> Time {
         let elapsed = self.elapsed_time.load(Ordering::Relaxed);
         self.time_base.calc_time(elapsed)
-    }
-
-    pub fn format_time(&self, time: Time) -> String {
-        let hours = time.seconds / (60 * 60);
-        let mins = (time.seconds % (60 * 60)) / 60;
-        let secs = time.seconds % 60;
-        match hours {
-            0 => match mins {
-                0 => format!("00:{:0>2}", secs),
-                _ => format!("{:0>2}:{:0>2}", mins, secs),
-            },
-            _ => format!("{}:{:0>2}:{:0>2}", hours, mins, secs),
-        }
     }
 }
 
