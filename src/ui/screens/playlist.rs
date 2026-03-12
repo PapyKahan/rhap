@@ -35,11 +35,18 @@ impl Playlist {
     pub fn new(path: PathBuf, player: Player) -> Result<Self> {
         let mut songs = vec![];
         if path.is_dir() {
-            let pattern = format!("{}/**/*.flac", path.display());
-            let files: Vec<String> = glob(&pattern)?
-                .filter_map(|entry| entry.ok())
-                .map(|path| path.to_string_lossy().to_string())
-                .collect();
+            const AUDIO_EXTENSIONS: &[&str] = &[
+                "flac", "mp3", "wav", "ogg", "m4a", "aac", "opus", "mp4", "mka", "webm", "caf",
+            ];
+            let mut files: Vec<String> = Vec::new();
+            for ext in AUDIO_EXTENSIONS {
+                let pattern = format!("{}/**/*.{}", path.display(), ext);
+                files.extend(
+                    glob(&pattern)?
+                        .filter_map(|entry| entry.ok())
+                        .map(|path| path.to_string_lossy().to_string()),
+                );
+            }
             let mut loaded: Vec<Arc<MusicTrack>> = files
                 .par_iter()
                 .filter_map(|f| MusicTrack::new(f.clone()).ok())
