@@ -2,6 +2,7 @@ use anyhow::Result;
 use audio::Host;
 use clap::Parser;
 use player::Player;
+use simplelog::{Config, LevelFilter, WriteLogger};
 use std::path::PathBuf;
 use ui::App;
 
@@ -44,6 +45,13 @@ fn wsl_path_to_windows(path: PathBuf) -> PathBuf {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+
+    let log_path = std::env::temp_dir().join("rhap.log");
+    let _ = WriteLogger::init(
+        LevelFilter::Warn,
+        Config::default(),
+        std::fs::File::create(log_path).expect("failed to create log file"),
+    );
 
     let args = Args::parse();
     if args.list {

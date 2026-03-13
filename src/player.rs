@@ -216,7 +216,11 @@ impl Player {
         self.is_playing.store(false, Ordering::Release);
         self.is_paused.store(false, Ordering::Relaxed);
         if let Some(handle) = self.streaming_handle.take() {
-            let _ = handle.join();
+            match handle.join() {
+                Ok(Err(e)) => error!("Decoder thread error: {:#}", e),
+                Err(_) => error!("Decoder thread panicked"),
+                Ok(Ok(())) => {}
+            }
         }
         if let Some(mut device) = self.current_device.take() {
             device.stop()?;
@@ -312,65 +316,58 @@ impl Player {
                     let mut buffer: Option<StreamBuffer> = None;
                     let mut resampler: Option<Resampler> = None;
 
-                    loop {
-                        if !is_playing.load(Ordering::Relaxed) {
-                            break;
-                        }
-                        let packet = match format.next_packet() {
-                            Ok(packet) => packet,
-                            Err(Error::ResetRequired) => {
-                                decoder.reset();
-                                continue;
-                            }
-                            Err(Error::IoError(err)) => {
-                                match err.kind() {
-                                    std::io::ErrorKind::UnexpectedEof => {
-                                        break;
-                                    }
-                                    _ => {
-                                        error!("Error reading packet: {:?}", err);
-                                        break;
-                                    }
-                                }
-                            }
-                            Err(err) => {
-                                error!("Error reading packet: {:?}", err);
+                    let result: Result<()> = (|| {
+                        loop {
+                            if !is_playing.load(Ordering::Relaxed) {
                                 break;
                             }
-                        };
-                        elapsed_time_clone.fetch_add(packet.dur, Ordering::Relaxed);
-                        let decoded = decoder.decode(&packet)?;
-                        let spec = decoded.spec();
-                        let frames = decoded.capacity();
-                        let sample_buffer = buffer.get_or_insert_with(|| {
-                            StreamBuffer::new(adjusted_params.bits_per_sample, frames, *spec)
-                        });
-
-                        if streamparams.samplerate != adjusted_params.samplerate {
-                            let resampled = resampler.get_or_insert_with(|| {
-                                Resampler::new(
-                                    streamparams.bits_per_sample,
-                                    adjusted_params.bits_per_sample,
-                                    streamparams.samplerate.0 as usize,
-                                    adjusted_params.samplerate.0 as usize,
-                                    frames,
-                                    adjusted_params.channels as usize,
-                                )
-                                .unwrap()
+                            let packet = match format.next_packet() {
+                                Ok(packet) => packet,
+                                Err(Error::ResetRequired) => {
+                                    decoder.reset();
+                                    continue;
+                                }
+                                Err(Error::IoError(err)) => match err.kind() {
+                                    std::io::ErrorKind::UnexpectedEof => break,
+                                    _ => return Err(anyhow::anyhow!("Error reading packet: {:?}", err)),
+                                },
+                                Err(err) => return Err(anyhow::anyhow!("Error reading packet: {:?}", err)),
+                            };
+                            elapsed_time_clone.fetch_add(packet.dur, Ordering::Relaxed);
+                            let decoded = decoder.decode(&packet)?;
+                            let spec = decoded.spec();
+                            let frames = decoded.capacity();
+                            let sample_buffer = buffer.get_or_insert_with(|| {
+                                StreamBuffer::new(adjusted_params.bits_per_sample, frames, *spec)
                             });
-                            let bytes = resampled.resample_to_bytes(&decoded)?;
-                            write_all_blocking(&mut producer, bytes, &is_playing_for_write);
-                        } else {
-                            sample_buffer.copy_interleaved_ref(decoded);
-                            let bytes = sample_buffer.as_bytes();
-                            write_all_blocking(&mut producer, bytes, &is_playing_for_write);
+
+                            if streamparams.samplerate != adjusted_params.samplerate {
+                                if resampler.is_none() {
+                                    resampler = Some(Resampler::new(
+                                        streamparams.bits_per_sample,
+                                        adjusted_params.bits_per_sample,
+                                        streamparams.samplerate.0 as usize,
+                                        adjusted_params.samplerate.0 as usize,
+                                        frames,
+                                        adjusted_params.channels as usize,
+                                    )?);
+                                }
+                                let resampled = resampler.as_mut().unwrap();
+                                let bytes = resampled.resample_to_bytes(&decoded)?;
+                                write_all_blocking(&mut producer, bytes, &is_playing_for_write);
+                            } else {
+                                sample_buffer.copy_interleaved_ref(decoded);
+                                let bytes = sample_buffer.as_bytes();
+                                write_all_blocking(&mut producer, bytes, &is_playing_for_write);
+                            }
                         }
-                    }
+                        Ok(())
+                    })();
 
                     end_of_stream.store(true, Ordering::Release);
                     is_streaming.store(false, Ordering::Relaxed);
                     is_playing.store(false, Ordering::Relaxed);
-                    Ok::<(), anyhow::Error>(())
+                    result
                 })?,
         );
 

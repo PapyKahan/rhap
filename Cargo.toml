@@ -8,6 +8,7 @@ anyhow = "1.0.102"
 clap = { version = "4.5.60", features = ["derive"] }
 crossterm = "0.29.0"
 log = "0.4.29"
+simplelog = "0.12"
 rand = "0.10.0"
 rubato = { version = "1.0.1", features = ["fft_resampler", "realfft", "num-complex"] }
 symphonia = { version = "0.5.5", features = ["all-formats", "all-codecs", "opt-simd", "opt-simd-avx", "opt-simd-neon", "opt-simd-sse"] }
