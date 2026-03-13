@@ -9,7 +9,7 @@ use windows::Win32::{
 
 use super::api::{com_initialize, AudioClient, ShareMode, ThreadPriority, WaveFormat};
 use crate::audio::{Capabilities, DeviceTrait, StreamParams};
-use crate::audio::device::AudioPipeline;
+use crate::audio::device::{AudioPipeline, BufferSignal};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -133,6 +133,9 @@ impl DeviceTrait for Device {
         let end_of_stream = Arc::new(AtomicBool::new(false));
         let eos_clone = Arc::clone(&end_of_stream);
 
+        let signal = Arc::new(BufferSignal::new());
+        let signal_clone = Arc::clone(&signal);
+
         self.is_playing.store(true, Ordering::Release);
         let is_playing = Arc::clone(&self.is_playing);
         let is_paused = Arc::clone(&self.is_paused);
@@ -168,6 +171,7 @@ impl DeviceTrait for Device {
                         if available >= wasapi_buffer_bytes {
                             let n = consumer.pop_slice(&mut buffer);
                             if n > 0 {
+                                signal_clone.notify();
                                 client.write(&buffer[..n])?;
                                 if !client_started {
                                     client.start()?;
@@ -182,6 +186,7 @@ impl DeviceTrait for Device {
                                 let mut drain_buf = vec![0u8; remaining];
                                 let n = consumer.pop_slice(&mut drain_buf);
                                 if n > 0 {
+                                    signal_clone.notify();
                                     // Pad to full buffer size for WASAPI
                                     drain_buf.resize(wasapi_buffer_bytes, 0);
                                     client.write(&drain_buf)?;
@@ -193,7 +198,7 @@ impl DeviceTrait for Device {
                             }
                             break;
                         } else {
-                            std::thread::sleep(Duration::from_micros(500));
+                            signal_clone.wait_timeout(Duration::from_millis(5));
                         }
                     }
 
@@ -204,6 +209,7 @@ impl DeviceTrait for Device {
         Ok(AudioPipeline {
             producer,
             end_of_stream,
+            signal,
         })
     }
 

@@ -2,11 +2,36 @@ use super::{api, Capabilities, StreamParams};
 use anyhow::{anyhow, Result};
 use ringbuf::HeapProd;
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex};
+use std::time::Duration;
+
+pub struct BufferSignal {
+    mutex: Mutex<()>,
+    condvar: Condvar,
+}
+
+impl BufferSignal {
+    pub fn new() -> Self {
+        Self {
+            mutex: Mutex::new(()),
+            condvar: Condvar::new(),
+        }
+    }
+
+    pub fn notify(&self) {
+        self.condvar.notify_all();
+    }
+
+    pub fn wait_timeout(&self, timeout: Duration) {
+        let guard = self.mutex.lock().unwrap();
+        let _ = self.condvar.wait_timeout(guard, timeout);
+    }
+}
 
 pub struct AudioPipeline {
     pub producer: HeapProd<u8>,
     pub end_of_stream: Arc<AtomicBool>,
+    pub signal: Arc<BufferSignal>,
 }
 
 pub trait DeviceTrait: Send + Sync {

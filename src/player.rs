@@ -14,6 +14,7 @@ use symphonia::core::units::{Time, TimeBase};
 use crate::audio::{
     BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams,
 };
+use crate::audio::device::BufferSignal;
 use crate::musictrack::MusicTrack;
 use crate::tools::resampler::RubatoResampler;
 
@@ -185,7 +186,7 @@ impl Resampler {
     }
 }
 
-fn write_all_blocking(producer: &mut HeapProd<u8>, data: &[u8], is_playing: &AtomicBool) {
+fn write_all_blocking(producer: &mut HeapProd<u8>, data: &[u8], is_playing: &AtomicBool, signal: &BufferSignal) {
     let mut offset = 0;
     while offset < data.len() {
         if !is_playing.load(Ordering::Relaxed) {
@@ -193,8 +194,11 @@ fn write_all_blocking(producer: &mut HeapProd<u8>, data: &[u8], is_playing: &Ato
         }
         let n = producer.push_slice(&data[offset..]);
         offset += n;
+        if n > 0 {
+            signal.notify();
+        }
         if offset < data.len() {
-            std::thread::sleep(Duration::from_micros(500));
+            signal.wait_timeout(Duration::from_millis(5));
         }
     }
 }
@@ -294,6 +298,7 @@ impl Player {
 
         let mut producer = pipeline.producer;
         let end_of_stream = pipeline.end_of_stream;
+        let signal = pipeline.signal;
         let is_playing_for_write = Arc::clone(&is_playing);
 
         self.is_playing.store(true, Ordering::Release);
@@ -354,11 +359,11 @@ impl Player {
                                 }
                                 let resampled = resampler.as_mut().unwrap();
                                 let bytes = resampled.resample_to_bytes(&decoded)?;
-                                write_all_blocking(&mut producer, bytes, &is_playing_for_write);
+                                write_all_blocking(&mut producer, bytes, &is_playing_for_write, &signal);
                             } else {
                                 sample_buffer.copy_interleaved_ref(decoded);
                                 let bytes = sample_buffer.as_bytes();
-                                write_all_blocking(&mut producer, bytes, &is_playing_for_write);
+                                write_all_blocking(&mut producer, bytes, &is_playing_for_write, &signal);
                             }
                         }
                         Ok(())
