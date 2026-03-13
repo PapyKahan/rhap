@@ -189,7 +189,7 @@ impl Resampler {
 fn write_all_blocking(producer: &mut HeapProd<u8>, data: &[u8], is_playing: &AtomicBool, signal: &BufferSignal) {
     let mut offset = 0;
     while offset < data.len() {
-        if !is_playing.load(Ordering::Relaxed) {
+        if !is_playing.load(Ordering::Acquire) {
             return;
         }
         let n = producer.push_slice(&data[offset..]);
@@ -323,7 +323,7 @@ impl Player {
 
                     let result: Result<()> = (|| {
                         loop {
-                            if !is_playing.load(Ordering::Relaxed) {
+                            if !is_playing.load(Ordering::Acquire) {
                                 break;
                             }
                             let packet = match format.next_packet() {
@@ -371,7 +371,7 @@ impl Player {
 
                     end_of_stream.store(true, Ordering::Release);
                     is_streaming.store(false, Ordering::Relaxed);
-                    is_playing.store(false, Ordering::Relaxed);
+                    is_playing.store(false, Ordering::Release);
                     result
                 })?,
         );

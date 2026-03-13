@@ -151,14 +151,14 @@ impl DeviceTrait for Device {
                     let mut buffer = vec![0u8; wasapi_buffer_bytes];
 
                     loop {
-                        if !is_playing.load(Ordering::Relaxed) {
+                        if !is_playing.load(Ordering::Acquire) {
                             break;
                         }
 
-                        if is_paused.load(Ordering::Relaxed) {
+                        if is_paused.load(Ordering::Acquire) {
                             client.stop()?;
-                            while is_paused.load(Ordering::Relaxed) {
-                                if !is_playing.load(Ordering::Relaxed) {
+                            while is_paused.load(Ordering::Acquire) {
+                                if !is_playing.load(Ordering::Acquire) {
                                     return Ok(());
                                 }
                                 std::thread::sleep(Duration::from_millis(10));
@@ -214,12 +214,12 @@ impl DeviceTrait for Device {
     }
 
     fn pause(&mut self) -> Result<()> {
-        self.is_paused.store(true, Ordering::Relaxed);
+        self.is_paused.store(true, Ordering::Release);
         Ok(())
     }
 
     fn resume(&mut self) -> Result<()> {
-        self.is_paused.store(false, Ordering::Relaxed);
+        self.is_paused.store(false, Ordering::Release);
         Ok(())
     }
 
