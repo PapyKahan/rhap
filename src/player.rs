@@ -33,6 +33,7 @@ pub struct CurrentTrackInfo {
     pub title: String,
     pub artist: String,
     pub info: String,
+    pub output_info: Option<String>,
     pub elapsed_time: Arc<AtomicU64>,
     pub total_duration: Time,
     time_base: TimeBase,
@@ -265,6 +266,16 @@ impl Player {
         let mut device = self.host.create_device(self.device_id)?;
         let adjusted_params = device.adjust_stream_params(&streamparams)?;
 
+        let output_info = {
+            let rate_changed = streamparams.samplerate != adjusted_params.samplerate;
+            let bits_changed = streamparams.bits_per_sample != adjusted_params.bits_per_sample;
+            if rate_changed || bits_changed {
+                Some(format!("{} - {}", adjusted_params.bits_per_sample, adjusted_params.samplerate))
+            } else {
+                None
+            }
+        };
+
         let time_base = playback.format.tracks().get(0).unwrap().codec_params.time_base.unwrap_or(Default::default());
 
         let pipeline = device.start(&adjusted_params)?;
@@ -368,6 +379,7 @@ impl Player {
             title: song.title.clone(),
             artist: song.artist.clone(),
             info: song.info(),
+            output_info,
             elapsed_time,
             total_duration,
             time_base,

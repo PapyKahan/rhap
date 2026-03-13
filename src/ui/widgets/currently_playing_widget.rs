@@ -54,7 +54,7 @@ impl CurrentlyPlayingWidget {
             let filled_width = ((progress / 100.0) * progress_bar_width as f64).round() as usize;
             let empty_width = progress_bar_width.saturating_sub(filled_width);
 
-            vec![
+            let mut lines = vec![
                 Line::from(vec![
                     Span::styled("Title: ", Style::default().add_modifier(Modifier::BOLD)),
                     Span::raw(&track_info.title),
@@ -67,29 +67,36 @@ impl CurrentlyPlayingWidget {
                     Span::styled("Info: ", Style::default().add_modifier(Modifier::BOLD)),
                     Span::raw(format!("{}", track_info.info)),
                 ]),
-                Line::from(vec![
-                    Span::raw(format_time(self.last_elapsed_time)),
-                    Span::raw(" "),
-                    Span::styled(
-                        "".repeat(filled_width),
-                        Style::default()
-                            .fg(PROGRESSBAR_COLOR)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(
-                        "",
-                        Style::default()
-                            .fg(HIGHLIGHT_COLOR)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(
-                        "".repeat(empty_width),
-                        Style::default().fg(ROW_COLOR).add_modifier(Modifier::BOLD),
-                    ),
-                    Span::raw(" "),
-                    Span::raw(format_time(track_info.total_duration)),
-                ]),
-            ]
+            ];
+            if let Some(output) = &track_info.output_info {
+                lines.push(Line::from(vec![
+                    Span::styled("Playing as: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::raw(output),
+                ]));
+            }
+            lines.push(Line::from(vec![
+                Span::raw(format_time(self.last_elapsed_time)),
+                Span::raw(" "),
+                Span::styled(
+                    "".repeat(filled_width),
+                    Style::default()
+                        .fg(PROGRESSBAR_COLOR)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    "",
+                    Style::default()
+                        .fg(HIGHLIGHT_COLOR)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    "".repeat(empty_width),
+                    Style::default().fg(ROW_COLOR).add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" "),
+                Span::raw(format_time(track_info.total_duration)),
+            ]));
+            lines
         } else {
             vec![Line::from(Span::raw("No track playing"))]
         };

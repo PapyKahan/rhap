@@ -172,6 +172,12 @@ impl Playlist {
     }
 
     pub(crate) fn render(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
+        let widget_height: u16 = if self.playing_track.as_ref().is_some_and(|t| t.output_info.is_some()) {
+            7
+        } else {
+            6
+        };
+
         let table_and_scrollbar = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([LConstraint::Min(0), LConstraint::Length(1)])
@@ -179,7 +185,7 @@ impl Playlist {
                 x: area.x,
                 y: area.y,
                 width: area.width,
-                height: area.height - 7, // Reduced by 7 (6 for widget + 1 for placeholder)
+                height: area.height - (widget_height + 1),
             });
         
         let table_area = table_and_scrollbar[0];
@@ -195,9 +201,9 @@ impl Playlist {
 
         let widget_area = Rect {
             x: area.x,
-            y: area.y + area.height - 7, // Position the widget below the table
+            y: area.y + area.height - (widget_height + 1),
             width: area.width,
-            height: 6, // Height for the widget
+            height: widget_height,
         };
 
         let placeholder_area = Rect {
