@@ -3,7 +3,6 @@ use log::debug;
 use log::error;
 use num_integer::Integer;
 use std::cmp;
-use std::time::Duration;
 use windows::core::w;
 use windows::Win32::Foundation::E_INVALIDARG;
 use windows::Win32::Media::Audio::IMMDevice;
@@ -131,6 +130,12 @@ impl AudioClient {
             renderer.write(frames, self.format.get_block_align() as usize, data, None)?;
         }
         Ok(())
+    }
+
+    /// Returns the number of bytes available to write in the WASAPI buffer.
+    pub(crate) fn get_writable_size(&self) -> Result<usize> {
+        self.get_available_buffer_frames()
+            .map(|f| f * self.format.get_block_align() as usize)
     }
 
     fn is_supported_exclusive(&self, format: WaveFormat) -> Result<WaveFormat> {
@@ -362,16 +367,10 @@ impl AudioClient {
             if let Some(event) = &self.eventhandle {
                 event.wait_for_event(1000)?;
             }
-            return Ok(());
-        } else {
-            loop {
-                let available_buffer_size = self.get_available_buffer_frames()?;
-                if available_buffer_size >= self.max_buffer_frames / 4 {
-                    return Ok(());
-                }
-                std::thread::sleep(Duration::from_millis(1));
-            }
         }
+        // In poll mode, the caller's loop already paces writes via
+        // get_writable_size() + sleep, so no additional wait is needed.
+        Ok(())
     }
 
     pub(crate) fn new(device: &IMMDevice, params: &StreamParams) -> Result<AudioClient> {

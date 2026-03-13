@@ -1,4 +1,5 @@
 use anyhow::Result;
+use log::error;
 use ringbuf::HeapRb;
 use ringbuf::traits::{Consumer, Observer, Split};
 use windows::Win32::{
@@ -166,10 +167,14 @@ impl DeviceTrait for Device {
                             client.start()?;
                         }
 
+                        // Query how much WASAPI can accept. In event mode this
+                        // is always the full buffer; in poll mode it may be less
+                        // (e.g. half on double-buffered devices).
+                        let writable = client.get_writable_size()?;
                         let available = consumer.occupied_len();
 
-                        if available >= wasapi_buffer_bytes {
-                            let n = consumer.pop_slice(&mut buffer);
+                        if writable > 0 && available >= writable {
+                            let n = consumer.pop_slice(&mut buffer[..writable]);
                             if n > 0 {
                                 signal_clone.notify();
                                 client.write(&buffer[..n])?;
@@ -180,23 +185,24 @@ impl DeviceTrait for Device {
                                 client.wait_for_buffer()?;
                             }
                         } else if eos_clone.load(Ordering::Acquire) {
-                            // Drain remaining data
+                            // Drain remaining data, pad with silence
                             let remaining = consumer.occupied_len();
-                            if remaining > 0 {
-                                let mut drain_buf = vec![0u8; remaining];
+                            let chunk = writable.max(remaining);
+                            if chunk > 0 {
+                                let mut drain_buf = vec![0u8; chunk];
                                 let n = consumer.pop_slice(&mut drain_buf);
                                 if n > 0 {
                                     signal_clone.notify();
-                                    // Pad to full buffer size for WASAPI
-                                    drain_buf.resize(wasapi_buffer_bytes, 0);
-                                    client.write(&drain_buf)?;
-                                    if !client_started {
-                                        client.start()?;
-                                    }
-                                    client.wait_for_buffer()?;
                                 }
+                                client.write(&drain_buf)?;
+                                if !client_started {
+                                    client.start()?;
+                                }
+                                client.wait_for_buffer()?;
                             }
                             break;
+                        } else if writable == 0 {
+                            std::thread::sleep(Duration::from_micros(100));
                         } else {
                             signal_clone.wait_timeout(Duration::from_millis(5));
                         }
@@ -226,7 +232,11 @@ impl DeviceTrait for Device {
     fn stop(&mut self) -> Result<()> {
         self.is_playing.store(false, Ordering::Release);
         if let Some(handle) = self.stream_thread_handle.take() {
-            let _ = handle.join();
+            match handle.join() {
+                Ok(Err(e)) => error!("Audio-out thread error: {:#}", e),
+                Err(_) => error!("Audio-out thread panicked"),
+                Ok(Ok(())) => {}
+            }
         }
         Ok(())
     }
