@@ -11,20 +11,20 @@ use crossterm::terminal::SetTitle;
 use crossterm::ExecutableCommand;
 use log::error;
 use ratatui::{DefaultTerminal, Frame};
-use std::{cell::RefCell, path::PathBuf, rc::Rc};
+use std::path::PathBuf;
 use tokio::sync::broadcast;
 
-pub enum Screens {
-    OutputSelector(Rc<RefCell<DeviceSelector>>),
-    SearchWidget(Rc<RefCell<SearchWidget>>),
-    Default(Rc<RefCell<Playlist>>),
+#[derive(Clone, Copy)]
+enum Layer {
+    OutputSelector,
+    Search,
 }
 
 pub struct App {
-    layers: Vec<Screens>,
-    output_selector: Rc<RefCell<DeviceSelector>>,
-    search_widget: Rc<RefCell<SearchWidget>>,
-    playlist: Rc<RefCell<Playlist>>,
+    layers: Vec<Layer>,
+    output_selector: DeviceSelector,
+    search_widget: SearchWidget,
+    playlist: Playlist,
     keyboard_manager: KeyboardManager,
     event_receiver: broadcast::Receiver<KeyboardEvent>,
 }
@@ -36,30 +36,25 @@ impl App {
 
         Ok(Self {
             layers: vec![],
-            output_selector: Rc::new(RefCell::new(DeviceSelector::new(host)?)),
-            search_widget: Rc::new(RefCell::new(SearchWidget::new())),
-            playlist: Rc::new(RefCell::new(Playlist::new(path, player)?)),
+            output_selector: DeviceSelector::new(host)?,
+            search_widget: SearchWidget::new(),
+            playlist: Playlist::new(path, player)?,
             keyboard_manager,
             event_receiver,
         })
     }
 
     fn render(&mut self, frame: &mut Frame) -> Result<()> {
-        self.playlist.borrow_mut().render(frame, frame.area())?;
-        let layer = if self.layers.is_empty() {
-            return Ok(());
-        } else {
-            self.layers.last().unwrap()
-        };
-        match layer {
-            Screens::OutputSelector(selector) => {
+        self.playlist.render(frame, frame.area())?;
+        match self.layers.last().copied() {
+            Some(Layer::OutputSelector) => {
                 let area = bottom_right_fixed_size(40, 6, frame.area());
-                (*selector).borrow_mut().render(frame, area)?;
+                self.output_selector.render(frame, area)?;
             }
-            Screens::SearchWidget(search) => {
-                (*search).borrow_mut().render(frame, frame.area());
+            Some(Layer::Search) => {
+                self.search_widget.render(frame, frame.area());
             }
-            _ => (),
+            None => {}
         }
         Ok(())
     }
@@ -71,101 +66,61 @@ impl App {
     }
 
     async fn handle_keyboard_event(&mut self, event: &KeyboardEvent) -> Result<()> {
-        let default_screen = Screens::Default(self.playlist.clone());
-        let current_screen = self.layers.last().unwrap_or(&default_screen);
-
-        match current_screen {
-            Screens::SearchWidget(search) => {
+        match self.layers.last().copied() {
+            Some(Layer::Search) => {
                 match event {
                     KeyboardEvent::Escape => {
                         self.exit_search_mode();
                     }
                     KeyboardEvent::Backspace => {
-                        // Handle backspace in search and get the new input string
-                        {
-                            search.borrow_mut().handle_backspace();
-                        } // The mutable borrow ends here
-
-                        // Update search results with a new borrow
-                        let query = search.borrow().input().to_string(); // Clone the string to avoid borrowing issues
-
-                        // Now update the search results
+                        self.search_widget.handle_backspace();
+                        let query = self.search_widget.input().to_string();
                         let index = if !query.is_empty() {
-                            self.playlist.borrow().search(&query)
+                            self.playlist.search(&query)
                         } else {
                             None
                         };
-
-                        {
-                            search.borrow_mut().set_search_result(index);
-                        }
+                        self.search_widget.set_search_result(index);
                     }
                     KeyboardEvent::Char(c) => {
-                        // Add character to search input
-                        {
-                            search.borrow_mut().handle_input(*c);
-                        } // The mutable borrow ends here
-
-                        // Get a copy of the query
-                        let query = search.borrow().input().to_string();
-
-                        // Search for matching items
-                        let index = self.playlist.borrow().search(&query);
-
-                        // Update the search result
-                        {
-                            search.borrow_mut().set_search_result(index);
-                        }
+                        self.search_widget.handle_input(*c);
+                        let query = self.search_widget.input().to_string();
+                        let index = self.playlist.search(&query);
+                        self.search_widget.set_search_result(index);
                     }
                     KeyboardEvent::Enter => {
-                        // Same approach - get data first, then perform actions
-                        let search_result = search.borrow().search_result();
-                        if let Some(index) = search_result {
-                            self.playlist.borrow_mut().select_index(index);
+                        if let Some(index) = self.search_widget.search_result() {
+                            self.playlist.select_index(index);
                         }
                         self.exit_search_mode();
                     }
                     KeyboardEvent::Delete => {
-                        // Handle Delete key with the same pattern
-                        {
-                            search.borrow_mut().handle_delete();
-                        } // The mutable borrow ends here
-
-                        // Copier la requête
-                        let query = search.borrow().input().to_string();
-
-                        // Chercher les éléments correspondants
+                        self.search_widget.handle_delete();
+                        let query = self.search_widget.input().to_string();
                         let index = if !query.is_empty() {
-                            self.playlist.borrow().search(&query)
+                            self.playlist.search(&query)
                         } else {
                             None
                         };
-
-                        // Mettre à jour le résultat de recherche
-                        {
-                            search.borrow_mut().set_search_result(index);
-                        }
+                        self.search_widget.set_search_result(index);
                     }
                     KeyboardEvent::Left => {
-                        search.borrow_mut().move_cursor_left();
+                        self.search_widget.move_cursor_left();
                     }
                     KeyboardEvent::Right => {
-                        search.borrow_mut().move_cursor_right();
+                        self.search_widget.move_cursor_right();
                     }
-                    // All other keyboard events are deliberately ignored when the search widget is active
-                    // to prevent actions from the playlist or other widgets from being triggered
                     _ => {}
                 }
             }
-            // Handle other screens as before
-            Screens::OutputSelector(selector) => match event {
+            Some(Layer::OutputSelector) => match event {
                 KeyboardEvent::Quit => {
                     self.layers.pop();
                 }
-                KeyboardEvent::Up => selector.borrow_mut().select_previous(),
-                KeyboardEvent::Down => selector.borrow_mut().select_next(),
+                KeyboardEvent::Up => self.output_selector.select_previous(),
+                KeyboardEvent::Down => self.output_selector.select_next(),
                 KeyboardEvent::Enter => {
-                    selector.borrow_mut().set_selected_device()?;
+                    self.output_selector.set_selected_device()?;
                     self.layers.pop();
                 }
                 KeyboardEvent::Escape => {
@@ -173,68 +128,49 @@ impl App {
                 }
                 _ => {}
             },
-            Screens::Default(playlist) => {
+            None => {
                 match event {
                     KeyboardEvent::Quit => {
-                        playlist.borrow_mut().stop()?;
+                        self.playlist.stop()?;
                         return Ok(());
                     }
                     KeyboardEvent::Search => {
-                        // Activate the search widget
-                        self.search_widget.borrow_mut().clear();
-                        self.keyboard_manager.set_search_mode(true); // Enable search mode
-                        self.layers
-                            .push(Screens::SearchWidget(self.search_widget.clone()));
+                        self.search_widget.clear();
+                        self.keyboard_manager.set_search_mode(true);
+                        self.layers.push(Layer::Search);
                     }
                     KeyboardEvent::DeviceSelector => {
-                        self.output_selector.borrow_mut().refresh_device_list()?;
-                        self.layers
-                            .push(Screens::OutputSelector(self.output_selector.clone()));
+                        self.output_selector.refresh_device_list()?;
+                        self.layers.push(Layer::OutputSelector);
                     }
                     KeyboardEvent::Play | KeyboardEvent::Pause => {
-                        if playlist.borrow_mut().is_playing() {
-                            playlist.borrow_mut().pause()?;
+                        if self.playlist.is_playing() {
+                            self.playlist.pause()?;
                         } else {
-                            playlist.borrow_mut().resume()?;
+                            self.playlist.resume()?;
                         }
                     }
-                    KeyboardEvent::Stop => playlist.borrow_mut().stop()?,
-                    KeyboardEvent::Next => playlist.borrow_mut().next()?,
-                    KeyboardEvent::Previous => playlist.borrow_mut().previous()?,
-                    KeyboardEvent::Up => playlist.borrow_mut().select_previous(),
-                    KeyboardEvent::Down => playlist.borrow_mut().select_next(),
-                    KeyboardEvent::Enter => playlist.borrow_mut().play_selected()?,
+                    KeyboardEvent::Stop => self.playlist.stop()?,
+                    KeyboardEvent::Next => self.playlist.next()?,
+                    KeyboardEvent::Previous => self.playlist.previous()?,
+                    KeyboardEvent::Up => self.playlist.select_previous(),
+                    KeyboardEvent::Down => self.playlist.select_next(),
+                    KeyboardEvent::Enter => self.playlist.play_selected()?,
                     KeyboardEvent::NextMatch => {
-                        // Get the last search query from search widget
-                        let query = self.search_widget.borrow().last_query().to_string();
-
+                        let query = self.search_widget.last_query().to_string();
                         if !query.is_empty() {
-                            // Get current selected index as the starting point
-                            let current_index = playlist.borrow().selected_index();
-
-                            // Find the next match
-                            let next_match = playlist.borrow().search_next(current_index, &query);
-
-                            // If found, select that item
-                            if let Some(index) = next_match {
-                                playlist.borrow_mut().select_index(index);
+                            let current_index = self.playlist.selected_index();
+                            if let Some(index) = self.playlist.search_next(current_index, &query) {
+                                self.playlist.select_index(index);
                             }
                         }
                     }
                     KeyboardEvent::PrevMatch => {
-                        // Get the last search query from search widget
-                        let query = self.search_widget.borrow().last_query().to_string();
-
+                        let query = self.search_widget.last_query().to_string();
                         if !query.is_empty() {
-                            // Get current selected index as the starting point
-                            let current_index = playlist.borrow().selected_index();
-
-                            // Find the previous match
-                            let prev_match = playlist.borrow().search_prev(current_index, &query);
-
-                            // If found, select that item
-                            if let Some(index) = prev_match {
-                                playlist.borrow_mut().select_index(index);
+                            let current_index = self.playlist.selected_index();
+                            if let Some(index) = self.playlist.search_prev(current_index, &query) {
+                                self.playlist.select_index(index);
                             }
                         }
                     }
@@ -275,13 +211,8 @@ impl App {
             }
 
             // Update the interface
-            let default_screen = Screens::Default(self.playlist.clone());
-            let current_screen = self.layers.last().unwrap_or(&default_screen);
-            match current_screen {
-                Screens::Default(playlist) => {
-                    playlist.borrow_mut().run()?;
-                }
-                _ => {}
+            if self.layers.is_empty() {
+                self.playlist.run()?;
             }
         }
     }
