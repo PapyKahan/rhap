@@ -19,9 +19,29 @@ pub struct MusicTrack {
     pub title: String,
     pub artist: String,
     pub duration: Time,
+    pub probed: bool,
 }
 
 impl MusicTrack {
+    /// Create an unprobed entry using only the filename — no I/O.
+    pub fn from_path(path: String) -> Self {
+        let title = std::path::Path::new(&path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Unknown")
+            .to_string();
+        Self {
+            path,
+            sample: SampleRate(0),
+            channels: 0,
+            bits_per_sample: BitsPerSample(0),
+            title,
+            artist: String::new(),
+            duration: Time::default(),
+            probed: false,
+        }
+    }
+
     /// Scan metadata only — does not create a decoder or retain the file handle.
     pub fn new(path: String) -> Result<Self> {
         let source = std::fs::File::open(path.clone())?;
@@ -75,6 +95,7 @@ impl MusicTrack {
             title,
             artist,
             duration,
+            probed: true,
         })
     }
 

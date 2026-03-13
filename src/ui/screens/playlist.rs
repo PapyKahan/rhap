@@ -1,6 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
+use arc_swap::ArcSwap;
 use rand::{rng, seq::SliceRandom};
 use rayon::prelude::*;
 use ratatui::{
@@ -23,7 +24,7 @@ use crate::{
 
 pub struct Playlist {
     state: TableState,
-    songs: Vec<Arc<MusicTrack>>,
+    songs: Arc<[ArcSwap<MusicTrack>]>,
     player: Player,
     playing_track: Option<CurrentTrackInfo>,
     playing_track_index: usize,
@@ -33,7 +34,8 @@ pub struct Playlist {
 
 impl Playlist {
     pub fn new(path: PathBuf, player: Player) -> Result<Self> {
-        let mut songs = vec![];
+        let songs: Arc<[ArcSwap<MusicTrack>]>;
+
         if path.is_dir() {
             const AUDIO_EXTENSIONS: &[&str] = &[
                 "flac", "mp3", "wav", "ogg", "m4a", "aac", "opus", "mp4", "mka", "webm", "caf",
@@ -47,18 +49,35 @@ impl Playlist {
                         .map(|path| path.to_string_lossy().to_string()),
                 );
             }
-            let mut loaded: Vec<Arc<MusicTrack>> = files
-                .par_iter()
-                .filter_map(|f| MusicTrack::new(f.clone()).ok())
-                .map(Arc::new)
+
+            // Create unprobed entries instantly, then shuffle
+            let mut entries: Vec<ArcSwap<MusicTrack>> = files
+                .into_iter()
+                .map(|f| ArcSwap::from_pointee(MusicTrack::from_path(f)))
                 .collect();
-            loaded.shuffle(&mut rng());
-            songs = loaded;
+            entries.shuffle(&mut rng());
+            songs = Arc::from(entries);
+
+            // Spawn background prober — stores directly into shared ArcSwap slots
+            let songs_ref = songs.clone();
+            std::thread::Builder::new()
+                .name("rhap-prober".into())
+                .spawn(move || {
+                    songs_ref.par_iter().for_each(|slot| {
+                        let path = slot.load().path.clone();
+                        if let Ok(track) = MusicTrack::new(path) {
+                            slot.store(Arc::new(track));
+                        }
+                    });
+                })
+                .ok();
         } else if path.is_file() {
-            songs.push(Arc::new(MusicTrack::new(
-                path.into_os_string().into_string().unwrap(),
-            )?));
+            let path_str = path.into_os_string().into_string().unwrap();
+            songs = Arc::from(vec![ArcSwap::from_pointee(MusicTrack::new(path_str)?)]);
+        } else {
+            songs = Arc::from(vec![]);
         }
+
         let mut state = TableState::default();
         state.select(Some(0));
         Ok(Self {
@@ -102,8 +121,15 @@ impl Playlist {
 
     pub fn play(&mut self) -> Result<()> {
         self.player.stop()?;
-        if let Some(song) = self.songs.get(self.playing_track_index) {
-            let current_track_info = self.player.play(song.clone())?;
+        if let Some(slot) = self.songs.get(self.playing_track_index) {
+            // Probe on demand if metadata hasn't been loaded yet
+            let song = slot.load();
+            if !song.probed {
+                let probed = MusicTrack::new(song.path.clone())?;
+                slot.store(Arc::new(probed));
+            }
+            let song = Arc::clone(&slot.load());
+            let current_track_info = self.player.play(song)?;
             self.playing_track = Some(current_track_info.clone());
             self.currently_playing_widget = CurrentlyPlayingWidget::new(Some(current_track_info));
         }
@@ -165,7 +191,15 @@ impl Playlist {
     pub fn run(&mut self) -> Result<()> {
         if let Some(current_track) = self.playing_track.clone() {
             if !current_track.is_streaming() && self.automatically_play_next {
-                self.next()?;
+                // Skip tracks that fail to probe/play (up to full playlist length)
+                for _ in 0..self.songs.len() {
+                    match self.next() {
+                        Ok(()) => break,
+                        Err(e) => {
+                            log::warn!("Skipping unplayable track: {}", e);
+                        }
+                    }
+                }
             }
         }
         Ok(())
@@ -215,7 +249,8 @@ impl Playlist {
 
         let mut items = Vec::new();
         for index in 0..self.songs.len() {
-            if let Some(song) = self.songs.get(index) {
+            if let Some(slot) = self.songs.get(index) {
+                let song = slot.load();
                 let row = Row::new(vec![
                     Cell::from(if index == self.playing_track_index {
                         if self.player.is_paused() {
@@ -236,12 +271,12 @@ impl Playlist {
                         },
                     )),
                     Cell::from(song.artist.clone()),
-                    Cell::from(song.info()).style(Style::default().bg(if items.len() % 2 == 0 {
+                    Cell::from(if song.probed { song.info() } else { String::new() }).style(Style::default().bg(if items.len() % 2 == 0 {
                         ROW_COLOR_COL
                     } else {
                         ROW_ALTERNATE_COLOR_COL
                     })),
-                    Cell::from(format_time(song.duration)),
+                    Cell::from(if song.probed { format_time(song.duration) } else { String::new() }),
                 ])
                 .height(1)
                 .style(Style::default().bg(if items.len() % 2 == 0 {
@@ -320,7 +355,8 @@ impl Playlist {
         }
 
         let query = query.to_lowercase();
-        for (index, song) in self.songs.iter().enumerate() {
+        for (index, slot) in self.songs.iter().enumerate() {
+            let song = slot.load();
             let title = song.title.to_lowercase();
             let artist = song.artist.to_lowercase();
 
@@ -339,10 +375,11 @@ impl Playlist {
 
         let query = query.to_lowercase();
         let start_index = current_index.map(|idx| idx + 1).unwrap_or(0);
-        
+
         // First, search from current position to end
         for index in start_index..self.songs.len() {
-            if let Some(song) = self.songs.get(index) {
+            if let Some(slot) = self.songs.get(index) {
+                let song = slot.load();
                 let title = song.title.to_lowercase();
                 let artist = song.artist.to_lowercase();
 
@@ -351,12 +388,13 @@ impl Playlist {
                 }
             }
         }
-        
+
         // If we didn't find anything and we started from a non-zero position,
         // cycle around to the beginning
         if start_index > 0 {
             for index in 0..start_index {
-                if let Some(song) = self.songs.get(index) {
+                if let Some(slot) = self.songs.get(index) {
+                    let song = slot.load();
                     let title = song.title.to_lowercase();
                     let artist = song.artist.to_lowercase();
 
@@ -376,14 +414,15 @@ impl Playlist {
         }
 
         let query = query.to_lowercase();
-        
+
         // Get the current position or use the length of songs as starting point
         // (to wrap around to the end when starting from the beginning)
         let start_index = current_index.unwrap_or(0);
-        
+
         // First, search backward from current position to beginning
         for index in (0..start_index).rev() {
-            if let Some(song) = self.songs.get(index) {
+            if let Some(slot) = self.songs.get(index) {
+                let song = slot.load();
                 let title = song.title.to_lowercase();
                 let artist = song.artist.to_lowercase();
 
@@ -392,11 +431,12 @@ impl Playlist {
                 }
             }
         }
-        
+
         // If we didn't find anything and we're not at the end,
         // cycle around to the end of the list
         for index in (start_index..self.songs.len()).rev() {
-            if let Some(song) = self.songs.get(index) {
+            if let Some(slot) = self.songs.get(index) {
+                let song = slot.load();
                 let title = song.title.to_lowercase();
                 let artist = song.artist.to_lowercase();
 

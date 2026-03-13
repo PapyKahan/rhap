@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.102"
+arc-swap = "1"
 clap = { version = "4.5.60", features = ["derive"] }
 crossterm = "0.29.0"
 log = "0.4.29"
