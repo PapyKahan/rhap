@@ -12,20 +12,33 @@ use symphonia::core::sample::i24;
 use symphonia::core::units::{Time, TimeBase};
 
 use crate::audio::{
-    BitsPerSample, Device, DeviceTrait, Host, HostTrait, StreamParams,
+    BitsPerSample, Capabilities, Device, DeviceTrait, Host, HostTrait, StreamParams,
 };
 use crate::audio::device::BufferSignal;
 use crate::musictrack::MusicTrack;
 use crate::tools::resampler::RubatoResampler;
+
+enum DecoderResult {
+    EndOfTrack {
+        producer: HeapProd<u8>,
+        end_of_stream: Arc<AtomicBool>,
+        signal: Arc<BufferSignal>,
+    },
+    Stopped,
+    Error(anyhow::Error),
+}
 
 pub struct Player {
     current_device: Option<Device>,
     host: Host,
     device_id: Option<u32>,
     pollmode: bool,
-    streaming_handle: Option<std::thread::JoinHandle<Result<()>>>,
+    gapless: bool,
+    streaming_handle: Option<std::thread::JoinHandle<DecoderResult>>,
     is_playing: Arc<AtomicBool>,
     is_paused: Arc<AtomicBool>,
+    cached_capabilities: Option<Capabilities>,
+    current_adjusted_params: Option<StreamParams>,
 }
 
 #[derive(Clone)]
@@ -204,15 +217,18 @@ fn write_all_blocking(producer: &mut HeapProd<u8>, data: &[u8], is_playing: &Ato
 }
 
 impl Player {
-    pub fn new(host: Host, device_id: Option<u32>, pollmode: bool) -> Result<Self> {
+    pub fn new(host: Host, device_id: Option<u32>, pollmode: bool, gapless: bool) -> Result<Self> {
         Ok(Player {
             current_device: None,
             host,
             device_id,
             pollmode,
+            gapless,
             streaming_handle: None,
             is_playing: Arc::new(AtomicBool::new(false)),
             is_paused: Arc::new(AtomicBool::new(false)),
+            cached_capabilities: None,
+            current_adjusted_params: None,
         })
     }
 
@@ -221,14 +237,19 @@ impl Player {
         self.is_paused.store(false, Ordering::Relaxed);
         if let Some(handle) = self.streaming_handle.take() {
             match handle.join() {
-                Ok(Err(e)) => error!("Decoder thread error: {:#}", e),
+                Ok(DecoderResult::EndOfTrack { end_of_stream, .. }) => {
+                    end_of_stream.store(true, Ordering::Release);
+                }
+                Ok(DecoderResult::Stopped) => {}
+                Ok(DecoderResult::Error(e)) => error!("Decoder thread error: {:#}", e),
                 Err(_) => error!("Decoder thread panicked"),
-                Ok(Ok(())) => {}
             }
         }
         if let Some(mut device) = self.current_device.take() {
             device.stop()?;
         }
+        self.cached_capabilities = None;
+        self.current_adjusted_params = None;
         Ok(())
     }
 
@@ -260,23 +281,21 @@ impl Player {
         self.is_paused.load(Ordering::Relaxed)
     }
 
-    pub fn play(&mut self, song: Arc<MusicTrack>) -> Result<CurrentTrackInfo> {
-        self.stop()?;
-
+    fn spawn_decoder(
+        &mut self,
+        song: &Arc<MusicTrack>,
+        src_params: StreamParams,
+        adjusted_params: StreamParams,
+        mut producer: HeapProd<u8>,
+        end_of_stream: Arc<AtomicBool>,
+        signal: Arc<BufferSignal>,
+    ) -> Result<CurrentTrackInfo> {
         let mut playback = song.open_for_playback()?;
-        let streamparams = StreamParams {
-            samplerate: song.sample,
-            channels: song.channels as u8,
-            bits_per_sample: song.bits_per_sample,
-            exclusive: true,
-            pollmode: self.pollmode,
-        };
-        let mut device = self.host.create_device(self.device_id)?;
-        let adjusted_params = device.adjust_stream_params(&streamparams)?;
+        let time_base = playback.format.tracks().get(0).unwrap().codec_params.time_base.unwrap_or(Default::default());
 
         let output_info = {
-            let rate_changed = streamparams.samplerate != adjusted_params.samplerate;
-            let bits_changed = streamparams.bits_per_sample != adjusted_params.bits_per_sample;
+            let rate_changed = src_params.samplerate != adjusted_params.samplerate;
+            let bits_changed = src_params.bits_per_sample != adjusted_params.bits_per_sample;
             if rate_changed || bits_changed {
                 Some(format!("{} - {}", adjusted_params.bits_per_sample, adjusted_params.samplerate))
             } else {
@@ -284,37 +303,30 @@ impl Player {
             }
         };
 
-        let time_base = playback.format.tracks().get(0).unwrap().codec_params.time_base.unwrap_or(Default::default());
-
-        let pipeline = device.start(&adjusted_params)?;
-        self.current_device = Some(device);
-
         let is_streaming = Arc::new(AtomicBool::new(true));
         let report_streaming = Arc::clone(&is_streaming);
         let is_playing = Arc::clone(&self.is_playing);
         let elapsed_time = Arc::new(AtomicU64::new(0));
         let elapsed_time_clone = Arc::clone(&elapsed_time);
         let total_duration = song.duration;
-
-        let mut producer = pipeline.producer;
-        let end_of_stream = pipeline.end_of_stream;
-        let signal = pipeline.signal;
         let is_playing_for_write = Arc::clone(&is_playing);
-
-        self.is_playing.store(true, Ordering::Release);
 
         self.streaming_handle = Some(
             std::thread::Builder::new()
                 .name("rhap-decoder".into())
-                .spawn(move || -> Result<()> {
+                .spawn(move || -> DecoderResult {
                     let format = &mut playback.format;
-                    format.seek(
+                    if let Err(e) = format.seek(
                         SeekMode::Accurate,
                         SeekTo::Time {
                             time: Time::default(),
                             track_id: None,
                         },
-                    )?;
+                    ) {
+                        end_of_stream.store(true, Ordering::Release);
+                        is_streaming.store(false, Ordering::Relaxed);
+                        return DecoderResult::Error(e.into());
+                    }
                     let decoder = &mut playback.decoder;
                     decoder.reset();
 
@@ -346,12 +358,12 @@ impl Player {
                                 StreamBuffer::new(adjusted_params.bits_per_sample, frames, *spec)
                             });
 
-                            if streamparams.samplerate != adjusted_params.samplerate {
+                            if src_params.samplerate != adjusted_params.samplerate {
                                 if resampler.is_none() {
                                     resampler = Some(Resampler::new(
-                                        streamparams.bits_per_sample,
+                                        src_params.bits_per_sample,
                                         adjusted_params.bits_per_sample,
-                                        streamparams.samplerate.0 as usize,
+                                        src_params.samplerate.0 as usize,
                                         adjusted_params.samplerate.0 as usize,
                                         frames,
                                         adjusted_params.channels as usize,
@@ -369,10 +381,22 @@ impl Player {
                         Ok(())
                     })();
 
-                    end_of_stream.store(true, Ordering::Release);
                     is_streaming.store(false, Ordering::Relaxed);
-                    is_playing.store(false, Ordering::Release);
-                    result
+                    match result {
+                        Ok(()) if is_playing.load(Ordering::Acquire) => {
+                            DecoderResult::EndOfTrack { producer, end_of_stream, signal }
+                        }
+                        Ok(()) => {
+                            end_of_stream.store(true, Ordering::Release);
+                            is_playing.store(false, Ordering::Release);
+                            DecoderResult::Stopped
+                        }
+                        Err(e) => {
+                            end_of_stream.store(true, Ordering::Release);
+                            is_playing.store(false, Ordering::Release);
+                            DecoderResult::Error(e)
+                        }
+                    }
                 })?,
         );
 
@@ -386,5 +410,75 @@ impl Player {
             total_duration,
             time_base,
         })
+    }
+
+    pub fn play(&mut self, song: Arc<MusicTrack>) -> Result<CurrentTrackInfo> {
+        self.stop()?;
+
+        let src_params = StreamParams {
+            samplerate: song.sample,
+            channels: song.channels as u8,
+            bits_per_sample: song.bits_per_sample,
+            exclusive: true,
+            pollmode: self.pollmode,
+        };
+        let mut device = self.host.create_device(self.device_id)?;
+        let capabilities = device.get_capabilities()?;
+        let adjusted_params = src_params.adjust_with_capabilities(&capabilities);
+
+        let pipeline = device.start(&adjusted_params)?;
+        self.current_device = Some(device);
+        self.cached_capabilities = Some(capabilities);
+        self.current_adjusted_params = Some(adjusted_params);
+
+        self.is_playing.store(true, Ordering::Release);
+
+        self.spawn_decoder(
+            &song,
+            src_params,
+            adjusted_params,
+            pipeline.producer,
+            pipeline.end_of_stream,
+            pipeline.signal,
+        )
+    }
+
+    pub fn play_gapless(&mut self, song: Arc<MusicTrack>) -> Result<Option<CurrentTrackInfo>> {
+        if !self.gapless {
+            return Ok(None);
+        }
+
+        let (caps, current_adj) = match (&self.cached_capabilities, &self.current_adjusted_params) {
+            (Some(c), Some(p)) => (c.clone(), *p),
+            _ => return Ok(None),
+        };
+
+        let src_params = StreamParams {
+            samplerate: song.sample,
+            channels: song.channels as u8,
+            bits_per_sample: song.bits_per_sample,
+            exclusive: true,
+            pollmode: self.pollmode,
+        };
+        if src_params.adjust_with_capabilities(&caps) != current_adj {
+            return Ok(None);
+        }
+
+        let handle = match self.streaming_handle.as_ref() {
+            Some(h) if h.is_finished() => self.streaming_handle.take().unwrap(),
+            _ => return Ok(None),
+        };
+        let (producer, eos, signal) = match handle.join() {
+            Ok(DecoderResult::EndOfTrack { producer, end_of_stream, signal }) => {
+                (producer, end_of_stream, signal)
+            }
+            Ok(DecoderResult::Stopped) => return Ok(None),
+            Ok(DecoderResult::Error(_)) => return Ok(None),
+            Err(_) => return Ok(None),
+        };
+
+        eos.store(false, Ordering::Release);
+        let info = self.spawn_decoder(&song, src_params, current_adj, producer, eos, signal)?;
+        Ok(Some(info))
     }
 }

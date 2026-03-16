@@ -27,6 +27,7 @@ impl std::fmt::Display for BitsPerSample {
     }
 }
 
+#[derive(Clone)]
 pub struct Capabilities {
     pub sample_rates: Vec<SampleRate>,
     pub bits_per_samples: Vec<BitsPerSample>,
@@ -59,11 +60,37 @@ impl Capabilities {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct StreamParams {
     pub channels: u8,
     pub samplerate: SampleRate,
     pub bits_per_sample: BitsPerSample,
     pub exclusive: bool,
     pub pollmode: bool,
+}
+
+impl StreamParams {
+    pub fn adjust_with_capabilities(&self, capabilities: &Capabilities) -> StreamParams {
+        let contains_sample_rates = capabilities.sample_rates.contains(&self.samplerate);
+        let contains_bits_per_samples = capabilities.bits_per_samples.contains(&self.bits_per_sample);
+        if !contains_sample_rates || !contains_bits_per_samples {
+            let samplerate = if contains_sample_rates {
+                self.samplerate
+            } else {
+                *capabilities.sample_rates.last().unwrap()
+            };
+            let bits_per_sample = if contains_bits_per_samples {
+                self.bits_per_sample
+            } else {
+                *capabilities.bits_per_samples.last().unwrap()
+            };
+            StreamParams {
+                samplerate,
+                bits_per_sample,
+                ..*self
+            }
+        } else {
+            *self
+        }
+    }
 }

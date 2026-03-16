@@ -149,7 +149,6 @@ impl AppState {
     }
 
     fn play(&mut self, playlist: &Playlist) -> Result<()> {
-        self.player.stop()?;
         if let Some(slot) = playlist.songs().get(self.playing_track_index) {
             let song = slot.load();
             if !song.probed {
@@ -157,6 +156,17 @@ impl AppState {
                 slot.store(Arc::new(probed));
             }
             let song = Arc::clone(&slot.load());
+
+            match self.player.play_gapless(song.clone()) {
+                Ok(Some(info)) => {
+                    self.playing_track = Some(info);
+                    return Ok(());
+                }
+                Ok(None) => {}
+                Err(e) => log::warn!("Gapless failed: {}", e),
+            }
+
+            self.player.stop()?;
             let current_track_info = self.player.play(song)?;
             self.playing_track = Some(current_track_info);
         }

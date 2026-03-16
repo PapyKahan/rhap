@@ -29,6 +29,8 @@ struct Args {
     device: Option<u32>,
     #[clap(long, default_value_t = false)]
     pollmode: bool,
+    #[clap(long, default_value_t = false)]
+    gapless: bool,
 }
 
 /// Convert a WSL `/mnt/<drive>/...` path to a Windows `<DRIVE>:\...` path.
@@ -79,7 +81,7 @@ fn main() -> Result<()> {
 
     let mut terminal = ratatui::init();
     let host = Host::new("wasapi", args.high_priority_mode);
-    let player = Player::new(host, args.device, args.pollmode)?;
+    let player = Player::new(host, args.device, args.pollmode, args.gapless)?;
     let path = wsl_path_to_windows(args.path);
     let mut app = App::new(host, player, path)?;
     app.run(&mut terminal)?;
