@@ -8,6 +8,7 @@ use crate::{
     action::{Action, Layer},
     app_state::AppState,
     audio::Host,
+    media_controls::MediaControlsBackend,
     player::Player,
 };
 use anyhow::Result;
@@ -24,15 +25,23 @@ pub struct App {
     playlist: Playlist,
     output_selector: DeviceSelector,
     search_widget: SearchWidget,
+    media_event_rx: Option<std::sync::mpsc::Receiver<Action>>,
 }
 
 impl App {
-    pub fn new(host: Host, player: Player, path: PathBuf) -> Result<Self> {
+    pub fn new(
+        host: Host,
+        player: Player,
+        path: PathBuf,
+        media_controls: Option<MediaControlsBackend>,
+        media_event_rx: Option<std::sync::mpsc::Receiver<Action>>,
+    ) -> Result<Self> {
         Ok(Self {
-            state: AppState::new(player),
+            state: AppState::new(player, media_controls),
             playlist: Playlist::new(path)?,
             output_selector: DeviceSelector::new(host)?,
             search_widget: SearchWidget::new(),
+            media_event_rx,
         })
     }
 
@@ -99,10 +108,26 @@ impl App {
                 }
             }
 
-            // 2. Auto-advance
+            // 2. Drain media control events
+            {
+                let mut media_actions = vec![];
+                if let Some(rx) = &self.media_event_rx {
+                    while let Ok(action) = rx.try_recv() {
+                        media_actions.push(action);
+                    }
+                }
+                for action in media_actions {
+                    self.process_action(action)?;
+                }
+            }
+
+            // 3. Sync media controls (pumps Windows messages + updates OS overlay)
+            self.state.sync_media_controls();
+
+            // 4. Auto-advance
             self.state.auto_advance(&self.playlist)?;
 
-            // 3. Render
+            // 5. Render
             let ctx = self.state.render_context();
             terminal.draw(|frame| {
                 self.playlist
@@ -130,7 +155,7 @@ impl App {
                 }
             })?;
 
-            // 4. Frame limiter: sleep up to 16ms, wake on input
+            // 6. Frame limiter: sleep up to 16ms, wake on input
             let _ = event::poll(Duration::from_millis(16));
         }
     }

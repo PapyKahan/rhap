@@ -1,8 +1,10 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Result;
 
 use crate::action::{Action, Layer};
+use crate::media_controls::{MediaControlsBackend, MediaControlsTrait, PlaybackStatus, TrackMetadata};
 use crate::musictrack::MusicTrack;
 use crate::player::{CurrentTrackInfo, Player};
 use crate::ui::component::RenderContext;
@@ -17,10 +19,11 @@ pub struct AppState {
     pub automatically_play_next: bool,
     pub layers: Vec<Layer>,
     pub status_message: Option<String>,
+    pub media_controls: Option<MediaControlsBackend>,
 }
 
 impl AppState {
-    pub fn new(player: Player) -> Self {
+    pub fn new(player: Player, media_controls: Option<MediaControlsBackend>) -> Self {
         Self {
             player,
             playing_track: None,
@@ -28,6 +31,7 @@ impl AppState {
             automatically_play_next: true,
             layers: vec![],
             status_message: None,
+            media_controls,
         }
     }
 
@@ -158,7 +162,30 @@ impl AppState {
                 }
             }
         }
+        self.sync_media_controls();
         Ok(())
+    }
+
+    pub fn sync_media_controls(&mut self) {
+        let Some(mc) = self.media_controls.as_mut() else {
+            return;
+        };
+        mc.pump_messages();
+        if let Some(track) = &self.playing_track {
+            let _ = mc.set_metadata(&TrackMetadata {
+                title: &track.title,
+                artist: &track.artist,
+                duration: Some(Duration::from_secs(track.total_duration.seconds)),
+            });
+            let status = if self.player.is_playing() {
+                PlaybackStatus::Playing
+            } else {
+                PlaybackStatus::Paused
+            };
+            let _ = mc.set_playback(status);
+        } else {
+            let _ = mc.set_playback(PlaybackStatus::Stopped);
+        }
     }
 
     fn play(&mut self, playlist: &Playlist) -> Result<()> {

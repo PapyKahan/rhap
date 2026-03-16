@@ -9,6 +9,7 @@ use ui::App;
 mod action;
 mod app_state;
 mod audio;
+mod media_controls;
 mod musictrack;
 mod player;
 mod tools;
@@ -54,6 +55,8 @@ fn wsl_path_to_windows(path: PathBuf) -> PathBuf {
 }
 
 fn main() -> Result<()> {
+    media_controls::init_platform();
+
     let log_path = std::env::temp_dir().join("rhap.log");
     let _ = WriteLogger::init(
         LevelFilter::Warn,
@@ -89,7 +92,17 @@ fn main() -> Result<()> {
     let host = Host::new("wasapi", args.high_priority_mode);
     let player = Player::new(host, args.device, args.pollmode, args.gapless, args.resample)?;
     let path = wsl_path_to_windows(args.path);
-    let mut app = App::new(host, player, path)?;
+
+    let media_handle = media_controls::create_media_controls()
+        .map_err(|e| log::warn!("Media controls unavailable: {}", e))
+        .ok();
+
+    let (media_backend, media_event_rx) = match media_handle {
+        Some(handle) => (Some(handle.backend), Some(handle.event_rx)),
+        None => (None, None),
+    };
+
+    let mut app = App::new(host, player, path, media_backend, media_event_rx)?;
     app.run(&mut terminal)?;
     ratatui::restore();
 
