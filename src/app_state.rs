@@ -16,6 +16,7 @@ pub struct AppState {
     pub playing_track_index: usize,
     pub automatically_play_next: bool,
     pub layers: Vec<Layer>,
+    pub status_message: Option<String>,
 }
 
 impl AppState {
@@ -26,6 +27,7 @@ impl AppState {
             playing_track_index: 0,
             automatically_play_next: true,
             layers: vec![],
+            status_message: None,
         }
     }
 
@@ -36,6 +38,7 @@ impl AppState {
             playing_track_index: self.playing_track_index,
             is_playing: self.player.is_playing(),
             is_paused: self.player.is_paused(),
+            status_message: self.status_message.as_deref(),
         }
     }
 
@@ -71,8 +74,9 @@ impl AppState {
                     self.player.pause()?;
                 } else if self.playing_track.is_some() {
                     self.player.resume()?;
-                } else {
-                    self.play_selected(playlist)?;
+                } else if let Err(e) = self.play_selected(playlist) {
+                    self.status_message = Some(format!("{}", e));
+                    log::warn!("Cannot play track: {}", e);
                 }
             }
             Action::Stop => {
@@ -80,13 +84,22 @@ impl AppState {
                 self.player.stop()?;
             }
             Action::NextTrack => {
-                self.next(playlist)?;
+                if let Err(e) = self.next(playlist) {
+                    self.status_message = Some(format!("{}", e));
+                    log::warn!("Cannot play track: {}", e);
+                }
             }
             Action::PreviousTrack => {
-                self.previous(playlist)?;
+                if let Err(e) = self.previous(playlist) {
+                    self.status_message = Some(format!("{}", e));
+                    log::warn!("Cannot play track: {}", e);
+                }
             }
             Action::PlaySelected => {
-                self.play_selected(playlist)?;
+                if let Err(e) = self.play_selected(playlist) {
+                    self.status_message = Some(format!("{}", e));
+                    log::warn!("Cannot play track: {}", e);
+                }
             }
             Action::SelectUp => {
                 playlist.select_previous();
@@ -160,6 +173,7 @@ impl AppState {
             match self.player.play_gapless(song.clone()) {
                 Ok(Some(info)) => {
                     self.playing_track = Some(info);
+                    self.status_message = None;
                     return Ok(());
                 }
                 Ok(None) => {}
@@ -167,8 +181,10 @@ impl AppState {
             }
 
             self.player.stop()?;
+            self.playing_track = None;
             let current_track_info = self.player.play(song)?;
             self.playing_track = Some(current_track_info);
+            self.status_message = None;
         }
         Ok(())
     }

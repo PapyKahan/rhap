@@ -1,6 +1,6 @@
 use ratatui::{
     prelude::{Alignment, Line, Rect, Span},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     widgets::{Block, BorderType, Borders, Paragraph},
     Frame,
 };
@@ -10,6 +10,8 @@ use crate::{
     player::format_time,
     ui::{component::RenderContext, PROGRESSBAR_COLOR, ROW_COLOR},
 };
+
+const ERROR_COLOR: Color = Color::Rgb(255, 80, 80);
 
 pub struct CurrentlyPlayingWidget;
 
@@ -80,6 +82,8 @@ impl CurrentlyPlayingWidget {
                 Span::raw(format_time(track_info.total_duration)),
             ]));
             lines
+        } else if let Some(msg) = ctx.status_message {
+            vec![Line::from(Span::styled(msg, Style::default().fg(ERROR_COLOR)))]
         } else {
             vec![Line::from(Span::raw("No track playing"))]
         };

@@ -11,6 +11,7 @@ pub struct RenderContext<'a> {
     pub playing_track_index: usize,
     pub is_playing: bool,
     pub is_paused: bool,
+    pub status_message: Option<&'a str>,
 }
 
 /// Terminal UI component trait.

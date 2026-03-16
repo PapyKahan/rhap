@@ -34,6 +34,7 @@ pub struct Player {
     device_id: Option<u32>,
     pollmode: bool,
     gapless: bool,
+    resample: bool,
     streaming_handle: Option<std::thread::JoinHandle<DecoderResult>>,
     is_playing: Arc<AtomicBool>,
     is_paused: Arc<AtomicBool>,
@@ -193,13 +194,14 @@ fn write_all_blocking(producer: &mut HeapProd<u8>, data: &[u8], is_playing: &Ato
 }
 
 impl Player {
-    pub fn new(host: Host, device_id: Option<u32>, pollmode: bool, gapless: bool) -> Result<Self> {
+    pub fn new(host: Host, device_id: Option<u32>, pollmode: bool, gapless: bool, resample: bool) -> Result<Self> {
         Ok(Player {
             current_device: None,
             host,
             device_id,
             pollmode,
             gapless,
+            resample,
             streaming_handle: None,
             is_playing: Arc::new(AtomicBool::new(false)),
             is_paused: Arc::new(AtomicBool::new(false)),
@@ -401,6 +403,21 @@ impl Player {
         let mut device = self.host.create_device(self.device_id)?;
         let capabilities = device.get_capabilities()?;
         let adjusted_params = src_params.adjust_with_capabilities(&capabilities);
+
+        if !self.resample {
+            if adjusted_params.samplerate != src_params.samplerate {
+                anyhow::bail!(
+                    "Device does not support {} natively (would resample to {}). Use --resample to allow.",
+                    src_params.samplerate, adjusted_params.samplerate,
+                );
+            }
+            if adjusted_params.bits_per_sample < src_params.bits_per_sample {
+                anyhow::bail!(
+                    "Device does not support {} natively (would downconvert to {}). Use --resample to allow.",
+                    src_params.bits_per_sample, adjusted_params.bits_per_sample,
+                );
+            }
+        }
 
         let pipeline = device.start(&adjusted_params)?;
         self.current_device = Some(device);
