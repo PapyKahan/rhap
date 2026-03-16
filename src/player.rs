@@ -77,6 +77,16 @@ impl CurrentTrackInfo {
     }
 }
 
+macro_rules! dispatch_buffer {
+    ($self:expr, $buf:ident => $body:expr) => {
+        match $self {
+            StreamBuffer::I16($buf) => $body,
+            StreamBuffer::I24($buf) => $body,
+            StreamBuffer::F32($buf) => $body,
+        }
+    };
+}
+
 pub enum StreamBuffer {
     I16(RawSampleBuffer<i16>),
     I24(RawSampleBuffer<i24>),
@@ -94,20 +104,22 @@ impl StreamBuffer {
     }
 
     pub fn copy_interleaved_ref(&mut self, decoded: AudioBufferRef<'_>) {
-        match self {
-            StreamBuffer::I16(buffer) => buffer.copy_interleaved_ref(decoded),
-            StreamBuffer::I24(buffer) => buffer.copy_interleaved_ref(decoded),
-            StreamBuffer::F32(buffer) => buffer.copy_interleaved_ref(decoded),
-        }
+        dispatch_buffer!(self, buf => buf.copy_interleaved_ref(decoded));
     }
 
     pub fn as_bytes(&self) -> &[u8] {
-        match self {
-            StreamBuffer::I16(buffer) => buffer.as_bytes(),
-            StreamBuffer::I24(buffer) => buffer.as_bytes(),
-            StreamBuffer::F32(buffer) => buffer.as_bytes(),
-        }
+        dispatch_buffer!(self, buf => buf.as_bytes())
     }
+}
+
+macro_rules! dispatch_resampler {
+    ($self:expr, $res:ident, $bytes:ident => $body:expr) => {
+        match $self {
+            Resampler::I16($res, $bytes) => $body,
+            Resampler::I24($res, $bytes) => $body,
+            Resampler::F32($res, $bytes) => $body,
+        }
+    };
 }
 
 enum Resampler {
@@ -125,40 +137,22 @@ impl Resampler {
         frames: usize,
         channels: usize,
     ) -> Result<Self> {
+        macro_rules! new_resampler {
+            ($variant:ident, $ty:ty) => {
+                Ok(Resampler::$variant(
+                    RubatoResampler::<$ty>::new(
+                        input_sample_rate, output_samplerate,
+                        input_bits_per_sample, output_bits_per_sample,
+                        frames, channels,
+                    )?,
+                    Vec::new(),
+                ))
+            };
+        }
         match output_bits_per_sample.0 {
-            16 => Ok(Resampler::I16(
-                RubatoResampler::<i16>::new(
-                    input_sample_rate,
-                    output_samplerate,
-                    input_bits_per_sample,
-                    output_bits_per_sample,
-                    frames,
-                    channels,
-                )?,
-                Vec::new(),
-            )),
-            24 => Ok(Resampler::I24(
-                RubatoResampler::<i24>::new(
-                    input_sample_rate,
-                    output_samplerate,
-                    input_bits_per_sample,
-                    output_bits_per_sample,
-                    frames,
-                    channels,
-                )?,
-                Vec::new(),
-            )),
-            32 => Ok(Resampler::F32(
-                RubatoResampler::<f32>::new(
-                    input_sample_rate,
-                    output_samplerate,
-                    input_bits_per_sample,
-                    output_bits_per_sample,
-                    frames,
-                    channels,
-                )?,
-                Vec::new(),
-            )),
+            16 => new_resampler!(I16, i16),
+            24 => new_resampler!(I24, i24),
+            32 => new_resampler!(F32, f32),
             other => Err(anyhow::anyhow!("Unsupported bits per sample for resampler: {}", other)),
         }
     }
@@ -167,35 +161,17 @@ impl Resampler {
         &mut self,
         streambuffer: &AudioBufferRef<'_>,
     ) -> Result<&[u8]> {
-        match self {
-            Resampler::I16(resampler, byte_buf) => {
-                let output = resampler.resample(streambuffer)?;
-                byte_buf.clear();
-                byte_buf.reserve(output.len() * 2);
-                for sample in output.iter() {
-                    byte_buf.extend_from_slice(&sample.to_ne_bytes());
-                }
-                Ok(byte_buf)
+        dispatch_resampler!(self, resampler, byte_buf => {
+            let output = resampler.resample(streambuffer)?;
+            byte_buf.clear();
+            if let Some(s) = output.first() {
+                byte_buf.reserve(output.len() * s.to_ne_bytes().len());
             }
-            Resampler::I24(resampler, byte_buf) => {
-                let output = resampler.resample(streambuffer)?;
-                byte_buf.clear();
-                byte_buf.reserve(output.len() * 3);
-                for sample in output.iter() {
-                    byte_buf.extend_from_slice(&sample.to_ne_bytes());
-                }
-                Ok(byte_buf)
+            for sample in output.iter() {
+                byte_buf.extend_from_slice(&sample.to_ne_bytes());
             }
-            Resampler::F32(resampler, byte_buf) => {
-                let output = resampler.resample(streambuffer)?;
-                byte_buf.clear();
-                byte_buf.reserve(output.len() * 4);
-                for sample in output.iter() {
-                    byte_buf.extend_from_slice(&sample.to_ne_bytes());
-                }
-                Ok(byte_buf)
-            }
-        }
+            Ok(byte_buf as &[u8])
+        })
     }
 }
 
