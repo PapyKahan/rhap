@@ -1,13 +1,12 @@
 use ratatui::style::Color;
 
 pub mod app;
+pub mod component;
 pub mod screens;
 pub mod utils;
 pub mod widgets;
-pub mod keyboard_manager;
 
 pub use app::App;
-pub use keyboard_manager::{KeyboardManager, KeyboardEvent};
 
 const ROW_COLOR: Color = Color::Rgb(80, 80, 80);
 const ROW_COLOR_COL: Color = Color::Rgb(85, 85, 85);

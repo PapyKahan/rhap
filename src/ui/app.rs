@@ -1,219 +1,137 @@
 use super::{
+    component::Component,
     screens::Playlist,
     utils::bottom_right_fixed_size,
     widgets::{DeviceSelector, SearchWidget},
 };
-use super::{KeyboardEvent, KeyboardManager};
-use crate::{audio::Host, player::Player};
+use crate::{
+    action::{Action, Layer},
+    app_state::AppState,
+    audio::Host,
+    player::Player,
+};
 use anyhow::Result;
-use crossterm::event::{self};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use crossterm::terminal::SetTitle;
 use crossterm::ExecutableCommand;
 use log::error;
-use ratatui::{DefaultTerminal, Frame};
+use ratatui::DefaultTerminal;
 use std::path::PathBuf;
-use tokio::sync::broadcast;
-
-#[derive(Clone, Copy)]
-enum Layer {
-    OutputSelector,
-    Search,
-}
+use std::time::Duration;
 
 pub struct App {
-    layers: Vec<Layer>,
+    state: AppState,
+    playlist: Playlist,
     output_selector: DeviceSelector,
     search_widget: SearchWidget,
-    playlist: Playlist,
-    keyboard_manager: KeyboardManager,
-    event_receiver: broadcast::Receiver<KeyboardEvent>,
 }
 
 impl App {
     pub fn new(host: Host, player: Player, path: PathBuf) -> Result<Self> {
-        let keyboard_manager = KeyboardManager::new();
-        let event_receiver = keyboard_manager.get_receiver();
-
         Ok(Self {
-            layers: vec![],
+            state: AppState::new(player),
+            playlist: Playlist::new(path)?,
             output_selector: DeviceSelector::new(host)?,
             search_widget: SearchWidget::new(),
-            playlist: Playlist::new(path, player)?,
-            keyboard_manager,
-            event_receiver,
         })
     }
 
-    fn render(&mut self, frame: &mut Frame) -> Result<()> {
-        self.playlist.render(frame, frame.area())?;
-        match self.layers.last().copied() {
-            Some(Layer::OutputSelector) => {
-                let area = bottom_right_fixed_size(40, 6, frame.area());
-                self.output_selector.render(frame, area)?;
-            }
-            Some(Layer::Search) => {
-                self.search_widget.render(frame, frame.area());
-            }
-            None => {}
-        }
-        Ok(())
-    }
-
-    // Helper function to exit search mode
-    fn exit_search_mode(&mut self) {
-        self.keyboard_manager.set_search_mode(false);
-        self.layers.pop();
-    }
-
-    async fn handle_keyboard_event(&mut self, event: &KeyboardEvent) -> Result<()> {
-        match self.layers.last().copied() {
-            Some(Layer::Search) => {
-                match event {
-                    KeyboardEvent::Escape => {
-                        self.exit_search_mode();
-                    }
-                    KeyboardEvent::Backspace => {
-                        self.search_widget.handle_backspace();
-                        let query = self.search_widget.input().to_string();
-                        let index = if !query.is_empty() {
-                            self.playlist.search(&query)
-                        } else {
-                            None
-                        };
-                        self.search_widget.set_search_result(index);
-                    }
-                    KeyboardEvent::Char(c) => {
-                        self.search_widget.handle_input(*c);
-                        let query = self.search_widget.input().to_string();
-                        let index = self.playlist.search(&query);
-                        self.search_widget.set_search_result(index);
-                    }
-                    KeyboardEvent::Enter => {
-                        if let Some(index) = self.search_widget.search_result() {
-                            self.playlist.select_index(index);
-                        }
-                        self.exit_search_mode();
-                    }
-                    KeyboardEvent::Delete => {
-                        self.search_widget.handle_delete();
-                        let query = self.search_widget.input().to_string();
-                        let index = if !query.is_empty() {
-                            self.playlist.search(&query)
-                        } else {
-                            None
-                        };
-                        self.search_widget.set_search_result(index);
-                    }
-                    KeyboardEvent::Left => {
-                        self.search_widget.move_cursor_left();
-                    }
-                    KeyboardEvent::Right => {
-                        self.search_widget.move_cursor_right();
-                    }
-                    _ => {}
-                }
-            }
-            Some(Layer::OutputSelector) => match event {
-                KeyboardEvent::Quit => {
-                    self.layers.pop();
-                }
-                KeyboardEvent::Up => self.output_selector.select_previous(),
-                KeyboardEvent::Down => self.output_selector.select_next(),
-                KeyboardEvent::Enter => {
-                    self.output_selector.set_selected_device()?;
-                    self.layers.pop();
-                }
-                KeyboardEvent::Escape => {
-                    self.layers.pop();
-                }
-                _ => {}
-            },
+    fn dispatch_event(&mut self, key: crossterm::event::KeyEvent) -> Result<Action> {
+        match self.state.layers.last().copied() {
+            Some(Layer::Search) => self.search_widget.handle_key_event(key),
+            Some(Layer::OutputSelector) => self.output_selector.handle_key_event(key),
             None => {
-                match event {
-                    KeyboardEvent::Quit => {
-                        self.playlist.stop()?;
-                        return Ok(());
-                    }
-                    KeyboardEvent::Search => {
-                        self.search_widget.clear();
-                        self.keyboard_manager.set_search_mode(true);
-                        self.layers.push(Layer::Search);
-                    }
-                    KeyboardEvent::DeviceSelector => {
-                        self.output_selector.refresh_device_list()?;
-                        self.layers.push(Layer::OutputSelector);
-                    }
-                    KeyboardEvent::Play | KeyboardEvent::Pause => {
-                        if self.playlist.is_playing() {
-                            self.playlist.pause()?;
-                        } else {
-                            self.playlist.resume()?;
+                // Handle Ctrl+N/P with search context before routing to playlist
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    match key.code {
+                        KeyCode::Char('n') => {
+                            return Ok(Action::SearchNext(
+                                self.search_widget.last_query().to_string(),
+                            ));
                         }
-                    }
-                    KeyboardEvent::Stop => self.playlist.stop()?,
-                    KeyboardEvent::Next => self.playlist.next()?,
-                    KeyboardEvent::Previous => self.playlist.previous()?,
-                    KeyboardEvent::Up => self.playlist.select_previous(),
-                    KeyboardEvent::Down => self.playlist.select_next(),
-                    KeyboardEvent::Enter => self.playlist.play_selected()?,
-                    KeyboardEvent::NextMatch => {
-                        let query = self.search_widget.last_query().to_string();
-                        if !query.is_empty() {
-                            let current_index = self.playlist.selected_index();
-                            if let Some(index) = self.playlist.search_next(current_index, &query) {
-                                self.playlist.select_index(index);
-                            }
+                        KeyCode::Char('p') => {
+                            return Ok(Action::SearchPrev(
+                                self.search_widget.last_query().to_string(),
+                            ));
                         }
+                        _ => {}
                     }
-                    KeyboardEvent::PrevMatch => {
-                        let query = self.search_widget.last_query().to_string();
-                        if !query.is_empty() {
-                            let current_index = self.playlist.selected_index();
-                            if let Some(index) = self.playlist.search_prev(current_index, &query) {
-                                self.playlist.select_index(index);
-                            }
-                        }
-                    }
-                    _ => {}
                 }
+                self.playlist.handle_key_event(key)
             }
         }
-        Ok(())
     }
 
-    pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
+    fn process_action(&mut self, action: Action) -> Result<()> {
+        self.state.process_action(
+            action,
+            &mut self.playlist,
+            &mut self.search_widget,
+            &mut self.output_selector,
+        )
+    }
+
+    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         terminal
             .backend_mut()
             .execute(SetTitle("rhap - Rust Handcrafted Audio Player"))?;
 
         loop {
-            terminal.draw(|frame| match self.render(frame) {
-                Ok(ok) => ok,
-                Err(err) => {
-                    error!("error while drawing {}", err.to_string());
-                    ()
+            // 1. Drain all pending input (zero-wait)
+            while event::poll(Duration::ZERO)? {
+                if let Event::Key(key) = event::read()? {
+                    if key.kind != KeyEventKind::Press {
+                        continue;
+                    }
+                    // Ctrl+C → quit
+                    if key.code == KeyCode::Char('c')
+                        && key.modifiers.contains(KeyModifiers::CONTROL)
+                    {
+                        self.process_action(Action::Quit)?;
+                        return Ok(());
+                    }
+                    let action = self.dispatch_event(key)?;
+                    if matches!(action, Action::Quit) {
+                        self.process_action(action)?;
+                        return Ok(());
+                    }
+                    self.process_action(action)?;
+                }
+            }
+
+            // 2. Auto-advance
+            self.state.auto_advance(&self.playlist)?;
+
+            // 3. Render
+            let ctx = self.state.render_context();
+            terminal.draw(|frame| {
+                self.playlist
+                    .render(frame, frame.area(), &ctx)
+                    .unwrap_or_else(|err| {
+                        error!("error while drawing playlist: {}", err);
+                    });
+                match self.state.layers.last().copied() {
+                    Some(Layer::OutputSelector) => {
+                        let area = bottom_right_fixed_size(40, 6, frame.area());
+                        self.output_selector
+                            .render(frame, area, &ctx)
+                            .unwrap_or_else(|err| {
+                                error!("error while drawing output selector: {}", err);
+                            });
+                    }
+                    Some(Layer::Search) => {
+                        self.search_widget
+                            .render(frame, frame.area(), &ctx)
+                            .unwrap_or_else(|err| {
+                                error!("error while drawing search widget: {}", err);
+                            });
+                    }
+                    None => {}
                 }
             })?;
 
-            // Keyboard event handling
-            if event::poll(std::time::Duration::from_millis(100))? {
-                if let Ok(event) = event::read() {
-                    self.keyboard_manager.handle_event(event).await?;
-                }
-            }
-
-            // Processing keyboard events
-            while let Ok(event) = self.event_receiver.try_recv() {
-                self.handle_keyboard_event(&event).await?;
-                if let KeyboardEvent::Quit = event {
-                    return Ok(());
-                }
-            }
-
-            // Update the interface
-            if self.layers.is_empty() {
-                self.playlist.run()?;
-            }
+            // 4. Frame limiter: sleep up to 16ms, wake on input
+            let _ = event::poll(Duration::from_millis(16));
         }
     }
 }

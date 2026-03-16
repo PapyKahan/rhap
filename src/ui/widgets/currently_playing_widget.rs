@@ -7,50 +7,30 @@ use ratatui::{
 
 use crate::ui::HIGHLIGHT_COLOR;
 use crate::{
-    player::{format_time, CurrentTrackInfo},
-    ui::{PROGRESSBAR_COLOR, ROW_COLOR},
+    player::format_time,
+    ui::{component::RenderContext, PROGRESSBAR_COLOR, ROW_COLOR},
 };
-use std::time::{Duration, Instant};
-use symphonia::core::units::Time;
 
-pub struct CurrentlyPlayingWidget {
-    track_info: Option<CurrentTrackInfo>,
-    last_update: Instant,
-    last_elapsed_time: Time,
-}
+pub struct CurrentlyPlayingWidget;
 
 impl CurrentlyPlayingWidget {
-    pub fn new(track_info: Option<CurrentTrackInfo>) -> Self {
-        Self {
-            track_info,
-            last_update: Instant::now(),
-            last_elapsed_time: Time::default(),
-        }
+    pub fn new() -> Self {
+        Self
     }
 
-    pub fn clear(&mut self) {
-        self.track_info = None;
-    }
+    pub fn render(&self, frame: &mut Frame, area: Rect, ctx: &RenderContext) {
+        let elapsed_time = ctx
+            .playing_track
+            .map(|t| t.get_elapsed_time())
+            .unwrap_or_default();
 
-    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
-        let now = Instant::now();
-        let elapsed = now.duration_since(self.last_update);
-
-        if elapsed >= Duration::from_millis(100) {
-            self.last_update = now;
-            if let Some(track_info) = &self.track_info {
-                self.last_elapsed_time = track_info.get_elapsed_time();
-            }
-        }
-
-        let text = if let Some(track_info) = &self.track_info {
+        let text = if let Some(track_info) = ctx.playing_track {
             let progress = if track_info.total_duration.seconds > 0 {
-                (self.last_elapsed_time.seconds as f64 / track_info.total_duration.seconds as f64)
-                    * 100.0
+                (elapsed_time.seconds as f64 / track_info.total_duration.seconds as f64) * 100.0
             } else {
                 0.0
             };
-            let progress_bar_width = (area.width as usize).saturating_sub(20); // Adjust for padding and other elements
+            let progress_bar_width = (area.width as usize).saturating_sub(20);
             let filled_width = ((progress / 100.0) * progress_bar_width as f64).round() as usize;
             let empty_width = progress_bar_width.saturating_sub(filled_width);
 
@@ -70,12 +50,15 @@ impl CurrentlyPlayingWidget {
             ];
             if let Some(output) = &track_info.output_info {
                 lines.push(Line::from(vec![
-                    Span::styled("Playing as: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        "Playing as: ",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    ),
                     Span::raw(output),
                 ]));
             }
             lines.push(Line::from(vec![
-                Span::raw(format_time(self.last_elapsed_time)),
+                Span::raw(format_time(elapsed_time)),
                 Span::raw(" "),
                 Span::styled(
                     "".repeat(filled_width),

@@ -6,6 +6,8 @@ use simplelog::{Config, LevelFilter, WriteLogger};
 use std::path::PathBuf;
 use ui::App;
 
+mod action;
+mod app_state;
 mod audio;
 mod musictrack;
 mod player;
@@ -43,9 +45,7 @@ fn wsl_path_to_windows(path: PathBuf) -> PathBuf {
     path
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-
+fn main() -> Result<()> {
     let log_path = std::env::temp_dir().join("rhap.log");
     let _ = WriteLogger::init(
         LevelFilter::Warn,
@@ -77,19 +77,12 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    tokio::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to listen for CTRL+C signal");
-        std::process::exit(0);
-    });
-
     let mut terminal = ratatui::init();
     let host = Host::new("wasapi", args.high_priority_mode);
     let player = Player::new(host, args.device, args.pollmode)?;
     let path = wsl_path_to_windows(args.path);
     let mut app = App::new(host, player, path)?;
-    app.run(&mut terminal).await?;
+    app.run(&mut terminal)?;
     ratatui::restore();
 
     Ok(())

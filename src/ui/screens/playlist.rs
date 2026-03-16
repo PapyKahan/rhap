@@ -2,38 +2,39 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use arc_swap::ArcSwap;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use glob::glob;
 use rand::{rng, seq::SliceRandom};
-use rayon::prelude::*;
 use ratatui::{
+    layout::{Constraint as LConstraint, Direction, Layout},
     prelude::{Alignment, Constraint, Rect},
     style::Style,
-    widgets::{Block, BorderType, Borders, Cell, Clear, Row, Table, TableState, Scrollbar, ScrollbarState},
+    widgets::{
+        Block, BorderType, Borders, Cell, Clear, Row, Scrollbar, ScrollbarState, Table, TableState,
+    },
     Frame,
-    layout::{Layout, Direction, Constraint as LConstraint}
 };
-use glob::glob;
+use rayon::prelude::*;
 
 use crate::{
+    action::{Action, Layer},
     musictrack::MusicTrack,
-    player::{format_time, CurrentTrackInfo, Player},
+    player::format_time,
     ui::{
-        widgets::CurrentlyPlayingWidget, HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR,
-        ROW_ALTERNATE_COLOR_COL, ROW_COLOR, ROW_COLOR_COL,
+        component::{Component, RenderContext},
+        widgets::CurrentlyPlayingWidget,
+        HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_ALTERNATE_COLOR_COL, ROW_COLOR, ROW_COLOR_COL,
     },
 };
 
 pub struct Playlist {
     state: TableState,
     songs: Arc<[ArcSwap<MusicTrack>]>,
-    player: Player,
-    playing_track: Option<CurrentTrackInfo>,
-    playing_track_index: usize,
-    automatically_play_next: bool,
     currently_playing_widget: CurrentlyPlayingWidget,
 }
 
 impl Playlist {
-    pub fn new(path: PathBuf, player: Player) -> Result<Self> {
+    pub fn new(path: PathBuf) -> Result<Self> {
         let songs: Arc<[ArcSwap<MusicTrack>]>;
 
         if path.is_dir() {
@@ -83,12 +84,16 @@ impl Playlist {
         Ok(Self {
             state,
             songs,
-            player,
-            playing_track: None,
-            playing_track_index: 0,
-            automatically_play_next: true,
-            currently_playing_widget: CurrentlyPlayingWidget::new(None),
+            currently_playing_widget: CurrentlyPlayingWidget::new(),
         })
+    }
+
+    pub fn songs(&self) -> &Arc<[ArcSwap<MusicTrack>]> {
+        &self.songs
+    }
+
+    pub fn songs_len(&self) -> usize {
+        self.songs.len()
     }
 
     pub fn select_next(&mut self) {
@@ -119,94 +124,114 @@ impl Playlist {
         self.state.select(Some(i));
     }
 
-    pub fn play(&mut self) -> Result<()> {
-        self.player.stop()?;
-        if let Some(slot) = self.songs.get(self.playing_track_index) {
-            // Probe on demand if metadata hasn't been loaded yet
+    pub fn search(&self, query: &str) -> Option<usize> {
+        if query.is_empty() {
+            return None;
+        }
+
+        let query = query.to_lowercase();
+        for (index, slot) in self.songs.iter().enumerate() {
             let song = slot.load();
-            if !song.probed {
-                let probed = MusicTrack::new(song.path.clone())?;
-                slot.store(Arc::new(probed));
-            }
-            let song = Arc::clone(&slot.load());
-            let current_track_info = self.player.play(song)?;
-            self.playing_track = Some(current_track_info.clone());
-            self.currently_playing_widget = CurrentlyPlayingWidget::new(Some(current_track_info));
-        }
-        Ok(())
-    }
+            let title = song.title.to_lowercase();
+            let artist = song.artist.to_lowercase();
 
-    pub fn next(&mut self) -> Result<()> {
-        self.playing_track_index = if self.playing_track_index + 1 > self.songs.len() - 1 {
-            0
-        } else {
-            self.playing_track_index + 1
-        };
-        self.play()
-    }
-
-    pub fn previous(&mut self) -> Result<()> {
-        // Check if a track is currently playing
-        if let Some(current_track) = &self.playing_track {
-            // Get elapsed time in seconds
-            let elapsed_time = current_track.get_elapsed_time();
-
-            // If the track has been playing for more than 5 seconds, restart it
-            if elapsed_time.seconds > 3 {
-                // Replay the current track
-                self.play()?;
-                return Ok(());
+            if title.contains(&query) || artist.contains(&query) {
+                return Some(index);
             }
         }
 
-        // Otherwise, move to the previous track
-        self.playing_track_index = if self.playing_track_index == 0 {
-            self.songs.len() - 1
-        } else {
-            self.playing_track_index - 1
-        };
-        self.play()
+        None
     }
 
-    pub fn stop(&mut self) -> Result<()> {
-        self.playing_track = None;
-        self.currently_playing_widget.clear();
-        self.player.stop()
-    }
-
-    pub fn pause(&mut self) -> Result<()> {
-        self.player.pause()?;
-        Ok(())
-    }
-
-    pub fn resume(&mut self) -> Result<()> {
-        if self.playing_track.is_some() {
-            self.player.resume()?;
-        } else {
-            self.play_selected()?;
+    pub fn search_next(&self, current_index: Option<usize>, query: &str) -> Option<usize> {
+        if query.is_empty() {
+            return None;
         }
-        Ok(())
-    }
 
-    pub fn run(&mut self) -> Result<()> {
-        if let Some(current_track) = self.playing_track.clone() {
-            if !current_track.is_streaming() && self.automatically_play_next {
-                // Skip tracks that fail to probe/play (up to full playlist length)
-                for _ in 0..self.songs.len() {
-                    match self.next() {
-                        Ok(()) => break,
-                        Err(e) => {
-                            log::warn!("Skipping unplayable track: {}", e);
-                        }
+        let query = query.to_lowercase();
+        let start_index = current_index.map(|idx| idx + 1).unwrap_or(0);
+
+        for index in start_index..self.songs.len() {
+            if let Some(slot) = self.songs.get(index) {
+                let song = slot.load();
+                let title = song.title.to_lowercase();
+                let artist = song.artist.to_lowercase();
+
+                if title.contains(&query) || artist.contains(&query) {
+                    return Some(index);
+                }
+            }
+        }
+
+        if start_index > 0 {
+            for index in 0..start_index {
+                if let Some(slot) = self.songs.get(index) {
+                    let song = slot.load();
+                    let title = song.title.to_lowercase();
+                    let artist = song.artist.to_lowercase();
+
+                    if title.contains(&query) || artist.contains(&query) {
+                        return Some(index);
                     }
                 }
             }
         }
-        Ok(())
+
+        None
     }
 
-    pub(crate) fn render(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let widget_height: u16 = if self.playing_track.as_ref().is_some_and(|t| t.output_info.is_some()) {
+    pub fn search_prev(&self, current_index: Option<usize>, query: &str) -> Option<usize> {
+        if query.is_empty() {
+            return None;
+        }
+
+        let query = query.to_lowercase();
+        let start_index = current_index.unwrap_or(0);
+
+        for index in (0..start_index).rev() {
+            if let Some(slot) = self.songs.get(index) {
+                let song = slot.load();
+                let title = song.title.to_lowercase();
+                let artist = song.artist.to_lowercase();
+
+                if title.contains(&query) || artist.contains(&query) {
+                    return Some(index);
+                }
+            }
+        }
+
+        for index in (start_index..self.songs.len()).rev() {
+            if let Some(slot) = self.songs.get(index) {
+                let song = slot.load();
+                let title = song.title.to_lowercase();
+                let artist = song.artist.to_lowercase();
+
+                if title.contains(&query) || artist.contains(&query) {
+                    return Some(index);
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn select_index(&mut self, index: usize) {
+        if index < self.songs.len() {
+            self.state.select(Some(index));
+        }
+    }
+
+    pub fn selected_index(&self) -> Option<usize> {
+        self.state.selected()
+    }
+}
+
+impl Component for Playlist {
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &RenderContext) -> Result<()> {
+        let widget_height: u16 = if ctx
+            .playing_track
+            .is_some_and(|t| t.output_info.is_some())
+        {
             7
         } else {
             6
@@ -221,14 +246,13 @@ impl Playlist {
                 width: area.width,
                 height: area.height - (widget_height + 1),
             });
-        
+
         let table_area = table_and_scrollbar[0];
         let scrollbar_area = table_and_scrollbar[1];
 
-        // Calculate scrollbar state based on selection and total items
         let selected = self.state.selected().unwrap_or(0);
         let max_items = self.songs.len().saturating_sub(1);
-        
+
         let mut scrollbar_state = ScrollbarState::default()
             .content_length(max_items)
             .position(selected);
@@ -242,9 +266,9 @@ impl Playlist {
 
         let placeholder_area = Rect {
             x: area.x,
-            y: area.y + area.height - 1, // Position the placeholder at the very bottom
+            y: area.y + area.height - 1,
             width: area.width,
-            height: 1, // Height of 1 line for the placeholder
+            height: 1,
         };
 
         let mut items = Vec::new();
@@ -252,10 +276,10 @@ impl Playlist {
             if let Some(slot) = self.songs.get(index) {
                 let song = slot.load();
                 let row = Row::new(vec![
-                    Cell::from(if index == self.playing_track_index {
-                        if self.player.is_paused() {
+                    Cell::from(if index == ctx.playing_track_index {
+                        if ctx.is_paused {
                             "󰏤"
-                        } else if self.player.is_playing() {
+                        } else if ctx.is_playing {
                             "󰐊"
                         } else {
                             "  "
@@ -271,12 +295,21 @@ impl Playlist {
                         },
                     )),
                     Cell::from(song.artist.clone()),
-                    Cell::from(if song.probed { song.info() } else { String::new() }).style(Style::default().bg(if items.len() % 2 == 0 {
+                    Cell::from(if song.probed {
+                        song.info()
+                    } else {
+                        String::new()
+                    })
+                    .style(Style::default().bg(if items.len() % 2 == 0 {
                         ROW_COLOR_COL
                     } else {
                         ROW_ALTERNATE_COLOR_COL
                     })),
-                    Cell::from(if song.probed { format_time(song.duration) } else { String::new() }),
+                    Cell::from(if song.probed {
+                        format_time(song.duration)
+                    } else {
+                        String::new()
+                    }),
                 ])
                 .height(1)
                 .style(Style::default().bg(if items.len() % 2 == 0 {
@@ -307,11 +340,9 @@ impl Playlist {
                 .border_style(Style::default().fg(HIGHLIGHT_COLOR)),
         );
 
-        // Render the table
         frame.render_widget(Clear, table_area);
         frame.render_stateful_widget(table, table_area, &mut self.state);
-        
-        // Render the scrollbar
+
         frame.render_stateful_widget(
             Scrollbar::default()
                 .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
@@ -325,137 +356,32 @@ impl Playlist {
                 .begin_style(Style::default().fg(ROW_COLOR_COL))
                 .end_style(Style::default().fg(ROW_COLOR_COL)),
             scrollbar_area,
-            &mut scrollbar_state
+            &mut scrollbar_state,
         );
 
-        // Render the CurrentlyPlayingWidget
-        self.currently_playing_widget.render(frame, widget_area);
-        
-        // Render a blank placeholder at the bottom
+        self.currently_playing_widget.render(frame, widget_area, ctx);
+
         frame.render_widget(Clear, placeholder_area);
 
         Ok(())
     }
 
-    pub fn play_selected(&mut self) -> Result<()> {
-        if let Some(index) = self.state.selected() {
-            self.playing_track_index = index;
-            self.play()?;
-        }
-        Ok(())
-    }
-
-    pub fn is_playing(&self) -> bool {
-        self.player.is_playing()
-    }
-
-    pub fn search(&self, query: &str) -> Option<usize> {
-        if query.is_empty() {
-            return None;
-        }
-
-        let query = query.to_lowercase();
-        for (index, slot) in self.songs.iter().enumerate() {
-            let song = slot.load();
-            let title = song.title.to_lowercase();
-            let artist = song.artist.to_lowercase();
-
-            if title.contains(&query) || artist.contains(&query) {
-                return Some(index);
+    fn handle_key_event(&mut self, key: KeyEvent) -> Result<Action> {
+        match key.code {
+            KeyCode::Char('q') => Ok(Action::Quit),
+            KeyCode::Char('/') => Ok(Action::PushLayer(Layer::Search)),
+            KeyCode::Char('o') => Ok(Action::PushLayer(Layer::OutputSelector)),
+            KeyCode::Char('p') if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                Ok(Action::TogglePlayPause)
             }
+            KeyCode::Char(' ') => Ok(Action::TogglePlayPause),
+            KeyCode::Char('s') => Ok(Action::Stop),
+            KeyCode::Char('l') => Ok(Action::NextTrack),
+            KeyCode::Char('h') => Ok(Action::PreviousTrack),
+            KeyCode::Up | KeyCode::Char('k') => Ok(Action::SelectUp),
+            KeyCode::Down | KeyCode::Char('j') => Ok(Action::SelectDown),
+            KeyCode::Enter => Ok(Action::PlaySelected),
+            _ => Ok(Action::None),
         }
-
-        None
-    }
-
-    pub fn search_next(&self, current_index: Option<usize>, query: &str) -> Option<usize> {
-        if query.is_empty() {
-            return None;
-        }
-
-        let query = query.to_lowercase();
-        let start_index = current_index.map(|idx| idx + 1).unwrap_or(0);
-
-        // First, search from current position to end
-        for index in start_index..self.songs.len() {
-            if let Some(slot) = self.songs.get(index) {
-                let song = slot.load();
-                let title = song.title.to_lowercase();
-                let artist = song.artist.to_lowercase();
-
-                if title.contains(&query) || artist.contains(&query) {
-                    return Some(index);
-                }
-            }
-        }
-
-        // If we didn't find anything and we started from a non-zero position,
-        // cycle around to the beginning
-        if start_index > 0 {
-            for index in 0..start_index {
-                if let Some(slot) = self.songs.get(index) {
-                    let song = slot.load();
-                    let title = song.title.to_lowercase();
-                    let artist = song.artist.to_lowercase();
-
-                    if title.contains(&query) || artist.contains(&query) {
-                        return Some(index);
-                    }
-                }
-            }
-        }
-
-        None
-    }
-
-    pub fn search_prev(&self, current_index: Option<usize>, query: &str) -> Option<usize> {
-        if query.is_empty() {
-            return None;
-        }
-
-        let query = query.to_lowercase();
-
-        // Get the current position or use the length of songs as starting point
-        // (to wrap around to the end when starting from the beginning)
-        let start_index = current_index.unwrap_or(0);
-
-        // First, search backward from current position to beginning
-        for index in (0..start_index).rev() {
-            if let Some(slot) = self.songs.get(index) {
-                let song = slot.load();
-                let title = song.title.to_lowercase();
-                let artist = song.artist.to_lowercase();
-
-                if title.contains(&query) || artist.contains(&query) {
-                    return Some(index);
-                }
-            }
-        }
-
-        // If we didn't find anything and we're not at the end,
-        // cycle around to the end of the list
-        for index in (start_index..self.songs.len()).rev() {
-            if let Some(slot) = self.songs.get(index) {
-                let song = slot.load();
-                let title = song.title.to_lowercase();
-                let artist = song.artist.to_lowercase();
-
-                if title.contains(&query) || artist.contains(&query) {
-                    return Some(index);
-                }
-            }
-        }
-
-        None
-    }
-
-    pub fn select_index(&mut self, index: usize) {
-        if index < self.songs.len() {
-            self.state.select(Some(index));
-        }
-    }
-    
-    pub fn selected_index(&self) -> Option<usize> {
-        self.state.selected()
     }
 }

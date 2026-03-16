@@ -1,13 +1,19 @@
-use crate::{
-    audio::{Device, DeviceTrait, Host, HostTrait},
-    ui::{HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_COLOR},
-};
 use anyhow::{anyhow, Result};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     prelude::{Alignment, Constraint, Rect},
     style::Style,
     widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
     Frame,
+};
+
+use crate::{
+    action::Action,
+    audio::{Device, DeviceTrait, Host, HostTrait},
+    ui::{
+        component::{Component, RenderContext},
+        HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_COLOR,
+    },
 };
 
 pub struct DeviceSelector {
@@ -44,7 +50,11 @@ impl DeviceSelector {
         self.state.select(Some(0));
 
         if let Some(device) = self.selected.as_ref() {
-            if !self.devices.iter().any(|item| -> bool { &item.name().unwrap_or_default() == device }) {
+            if !self
+                .devices
+                .iter()
+                .any(|item| -> bool { &item.name().unwrap_or_default() == device })
+            {
                 self.selected = None;
             }
         }
@@ -52,7 +62,7 @@ impl DeviceSelector {
         Ok(())
     }
 
-    pub fn set_selected_device(&mut self) -> Result<()> {
+    fn set_selected_device(&mut self) -> Result<()> {
         self.selected = match self.state.selected() {
             Some(i) => Some(if i < self.devices.len() {
                 self.devices[i].name()?
@@ -64,7 +74,7 @@ impl DeviceSelector {
         Ok(())
     }
 
-    pub fn select_previous(&mut self) {
+    fn select_previous(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
                 if i == 0 {
@@ -78,7 +88,7 @@ impl DeviceSelector {
         self.state.select(Some(i));
     }
 
-    pub fn select_next(&mut self) {
+    fn select_next(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
                 if i + 1 >= self.devices.len() {
@@ -91,8 +101,10 @@ impl DeviceSelector {
         };
         self.state.select(Some(i));
     }
+}
 
-    pub(crate) fn render(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
+impl Component for DeviceSelector {
+    fn render(&mut self, frame: &mut Frame, area: Rect, _ctx: &RenderContext) -> Result<()> {
         let default = &self.default.name()?.clone();
         let selected_device_name = if let Some(device) = self.selected.as_ref() {
             device
@@ -131,5 +143,24 @@ impl DeviceSelector {
         frame.render_widget(Clear, area);
         frame.render_stateful_widget(table, area, &mut self.state);
         Ok(())
+    }
+
+    fn handle_key_event(&mut self, key: KeyEvent) -> Result<Action> {
+        match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => Ok(Action::PopLayer),
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.select_previous();
+                Ok(Action::None)
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.select_next();
+                Ok(Action::None)
+            }
+            KeyCode::Enter => {
+                self.set_selected_device()?;
+                Ok(Action::PopLayer)
+            }
+            _ => Ok(Action::None),
+        }
     }
 }

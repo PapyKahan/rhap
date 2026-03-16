@@ -1,3 +1,5 @@
+use anyhow::Result;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     prelude::Rect,
     style::Style,
@@ -5,13 +7,15 @@ use ratatui::{
     Frame,
 };
 
+use crate::action::Action;
+use crate::ui::component::{Component, RenderContext};
 use crate::ui::HIGHLIGHT_COLOR;
 
 pub struct SearchWidget {
     input: String,
     cursor_position: usize,
     search_result_index: Option<usize>,
-    last_query: String, // Track the last query for next match functionality
+    last_query: String,
 }
 
 impl SearchWidget {
@@ -24,42 +28,31 @@ impl SearchWidget {
         }
     }
 
-    pub fn input(&self) -> &str {
-        &self.input
-    }
-
-    pub fn search_result(&self) -> Option<usize> {
-        self.search_result_index
-    }
-
-    pub fn handle_input(&mut self, c: char) {
+    fn handle_input(&mut self, c: char) {
         self.input.insert(self.cursor_position, c);
         self.cursor_position += 1;
     }
 
-    pub fn handle_backspace(&mut self) {
+    fn handle_backspace(&mut self) {
         if self.cursor_position > 0 {
             self.cursor_position -= 1;
             self.input.remove(self.cursor_position);
         }
     }
 
-    // New method to handle the Delete key
-    pub fn handle_delete(&mut self) {
+    fn handle_delete(&mut self) {
         if self.cursor_position < self.input.len() {
             self.input.remove(self.cursor_position);
         }
     }
 
-    // Move cursor to the left
-    pub fn move_cursor_left(&mut self) {
+    fn move_cursor_left(&mut self) {
         if self.cursor_position > 0 {
             self.cursor_position -= 1;
         }
     }
 
-    // Move cursor to the right
-    pub fn move_cursor_right(&mut self) {
+    fn move_cursor_right(&mut self) {
         if self.cursor_position < self.input.len() {
             self.cursor_position += 1;
         }
@@ -73,47 +66,82 @@ impl SearchWidget {
 
     pub fn set_search_result(&mut self, index: Option<usize>) {
         self.search_result_index = index;
-        // Save the current input as the last query when a result is found
         if index.is_some() {
             self.last_query = self.input.clone();
         }
     }
 
-    // Add this method to get the last search query
     pub fn last_query(&self) -> &str {
         &self.last_query
     }
+}
 
-    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
-        // Create a search area at the very bottom of the screen
+impl Component for SearchWidget {
+    fn render(&mut self, frame: &mut Frame, area: Rect, _ctx: &RenderContext) -> Result<()> {
         let search_area = Rect {
             x: area.x,
-            y: area.y + area.height - 1, // Position at the very bottom line
-            width: area.width,           // Use full width
-            height: 1,                   // Just 1 line high like vim
+            y: area.y + area.height - 1,
+            width: area.width,
+            height: 1,
         };
 
-        // Create separate spans for icon and input text with different colors
         let search_text = ratatui::text::Text::from(ratatui::text::Line::from(vec![
-            ratatui::text::Span::styled("", Style::default().fg(HIGHLIGHT_COLOR)),
-            ratatui::text::Span::raw(" "), // Space between icon and input
+            ratatui::text::Span::styled("", Style::default().fg(HIGHLIGHT_COLOR)),
+            ratatui::text::Span::raw(" "),
             ratatui::text::Span::styled(
                 &self.input,
                 Style::default().fg(ratatui::style::Color::White),
             ),
         ]));
 
-        // Simple paragraph without borders for a vim-like look
         let paragraph = Paragraph::new(search_text);
 
         frame.render_widget(Clear, search_area);
         frame.render_widget(paragraph, search_area);
 
-        // Position cursor right after the '/' plus the current input position
-        // Position cursor right after the '/' plus the current input position
         frame.set_cursor_position((
-            search_area.x + self.cursor_position as u16 + 2, // +1 for '/' and +1 for space
+            search_area.x + self.cursor_position as u16 + 2,
             search_area.y,
         ));
+
+        Ok(())
+    }
+
+    fn handle_key_event(&mut self, key: KeyEvent) -> Result<Action> {
+        match key.code {
+            KeyCode::Esc => Ok(Action::PopLayer),
+            KeyCode::Enter => Ok(Action::Batch(vec![
+                Action::CommitSearch(self.search_result_index),
+                Action::PopLayer,
+            ])),
+            KeyCode::Backspace => {
+                self.handle_backspace();
+                Ok(Action::SearchQuery(self.input.clone()))
+            }
+            KeyCode::Delete => {
+                self.handle_delete();
+                Ok(Action::SearchQuery(self.input.clone()))
+            }
+            KeyCode::Left => {
+                self.move_cursor_left();
+                Ok(Action::None)
+            }
+            KeyCode::Right => {
+                self.move_cursor_right();
+                Ok(Action::None)
+            }
+            // Ctrl+N/P are silently ignored in search mode (consistent with old behavior)
+            KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                Ok(Action::None)
+            }
+            KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                Ok(Action::None)
+            }
+            KeyCode::Char(c) => {
+                self.handle_input(c);
+                Ok(Action::SearchQuery(self.input.clone()))
+            }
+            _ => Ok(Action::None),
+        }
     }
 }
