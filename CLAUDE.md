@@ -35,3 +35,11 @@ cargo build --target x86_64-pc-windows-gnu --release
 - The app uses WASAPI via the `windows` crate, so it must be built as a Windows binary (not native Linux).
 - The `x86_64-pc-windows-gnu` target is used (not `msvc`) since MSVC toolchain is not available on Linux.
 - Rust must be installed via `rustup` (not the distro `rust` package) to get the Windows target's standard library.
+
+## Remaining Tasks
+
+### High Priority
+- **Platform-conditional deps** — Move `windows` crate behind `[target.'cfg(windows)'.dependencies]`, gate WASAPI code with `#[cfg(windows)]`. Blocks Linux builds. In progress on separate branch with ALSA/JACK backend.
+
+### Low Priority
+- **Volume control** — Software volume (gain factor on samples) or hardware volume via WASAPI endpoint.
