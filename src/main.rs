@@ -34,13 +34,17 @@ struct Args {
 }
 
 /// Convert a WSL `/mnt/<drive>/...` path to a Windows `<DRIVE>:\...` path.
+/// Only compiled on Windows targets — on Linux/macOS this is a no-op.
 fn wsl_path_to_windows(path: PathBuf) -> PathBuf {
-    let path_str = path.to_string_lossy();
-    if let Some(rest) = path_str.strip_prefix("/mnt/") {
-        if let Some((drive, remainder)) = rest.split_once('/') {
-            if drive.len() == 1 && drive.chars().next().is_some_and(|c| c.is_ascii_alphabetic()) {
-                let win_path = format!("{}:\\{}", drive.to_uppercase(), remainder.replace('/', "\\"));
-                return PathBuf::from(win_path);
+    #[cfg(target_os = "windows")]
+    {
+        let path_str = path.to_string_lossy();
+        if let Some(rest) = path_str.strip_prefix("/mnt/") {
+            if let Some((drive, remainder)) = rest.split_once('/') {
+                if drive.len() == 1 && drive.chars().next().is_some_and(|c| c.is_ascii_alphabetic()) {
+                    let win_path = format!("{}:\\{}", drive.to_uppercase(), remainder.replace('/', "\\"));
+                    return PathBuf::from(win_path);
+                }
             }
         }
     }
