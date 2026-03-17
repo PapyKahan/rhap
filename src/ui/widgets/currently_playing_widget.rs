@@ -2,7 +2,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     prelude::{Alignment, Line, Rect, Span},
     style::{Color, Modifier, Style},
-    widgets::{Block, BorderType, Borders, Paragraph},
+    widgets::{Block, BorderType, Borders, Padding, Paragraph},
     Frame,
 };
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
@@ -40,7 +40,8 @@ impl CurrentlyPlayingWidget {
             .title_alignment(Alignment::Center)
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(HIGHLIGHT_COLOR));
+            .border_style(Style::default().fg(HIGHLIGHT_COLOR))
+            .padding(Padding::uniform(1));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -118,15 +119,14 @@ impl CurrentlyPlayingWidget {
             .map(|t| t.get_elapsed_time())
             .unwrap_or_default();
 
-        let text = if let Some(track_info) = ctx.playing_track {
-            let progress = if track_info.total_duration.seconds > 0 {
-                (elapsed_time.seconds as f64 / track_info.total_duration.seconds as f64) * 100.0
-            } else {
-                0.0
+        if let Some(track_info) = ctx.playing_track {
+            // Split: info lines top-aligned, progress bar pinned to bottom
+            let info_area = Rect { height: area.height.saturating_sub(1), ..area };
+            let progress_area = Rect {
+                y: area.y + area.height.saturating_sub(1),
+                height: 1,
+                ..area
             };
-            let progress_bar_width = (area.width as usize).saturating_sub(20);
-            let filled_width = ((progress / 100.0) * progress_bar_width as f64).round() as usize;
-            let empty_width = progress_bar_width.saturating_sub(filled_width);
 
             let mut lines = vec![
                 Line::from(vec![
@@ -151,7 +151,20 @@ impl CurrentlyPlayingWidget {
                     Span::raw(output),
                 ]));
             }
-            lines.push(Line::from(vec![
+
+            let info = Paragraph::new(lines).alignment(Alignment::Center);
+            frame.render_widget(info, info_area);
+
+            let progress = if track_info.total_duration.seconds > 0 {
+                (elapsed_time.seconds as f64 / track_info.total_duration.seconds as f64) * 100.0
+            } else {
+                0.0
+            };
+            let progress_bar_width = (progress_area.width as usize).saturating_sub(20);
+            let filled_width = ((progress / 100.0) * progress_bar_width as f64).round() as usize;
+            let empty_width = progress_bar_width.saturating_sub(filled_width);
+
+            let progress_line = Line::from(vec![
                 Span::raw(format_time(elapsed_time)),
                 Span::raw(" "),
                 Span::styled(
@@ -172,15 +185,17 @@ impl CurrentlyPlayingWidget {
                 ),
                 Span::raw(" "),
                 Span::raw(format_time(track_info.total_duration)),
-            ]));
-            lines
-        } else if let Some(msg) = ctx.status_message {
-            vec![Line::from(Span::styled(msg, Style::default().fg(ERROR_COLOR)))]
-        } else {
-            vec![Line::from(Span::raw("No track playing"))]
-        };
+            ]);
 
-        let paragraph = Paragraph::new(text).alignment(Alignment::Center);
-        frame.render_widget(paragraph, area);
+            let bar = Paragraph::new(progress_line).alignment(Alignment::Center);
+            frame.render_widget(bar, progress_area);
+        } else if let Some(msg) = ctx.status_message {
+            let paragraph = Paragraph::new(Line::from(Span::styled(msg, Style::default().fg(ERROR_COLOR))))
+                .alignment(Alignment::Center);
+            frame.render_widget(paragraph, area);
+        } else {
+            let paragraph = Paragraph::new("No track playing").alignment(Alignment::Center);
+            frame.render_widget(paragraph, area);
+        };
     }
 }

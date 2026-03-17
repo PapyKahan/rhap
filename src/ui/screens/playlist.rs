@@ -228,14 +228,7 @@ impl Playlist {
 
 impl Component for Playlist {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &RenderContext) -> Result<()> {
-        let widget_height: u16 = if ctx
-            .playing_track
-            .is_some_and(|t| t.output_info.is_some())
-        {
-            7
-        } else {
-            6
-        };
+        let widget_height: u16 = 9;
 
         let table_and_scrollbar = Layout::default()
             .direction(Direction::Horizontal)
