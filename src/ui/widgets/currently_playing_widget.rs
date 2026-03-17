@@ -155,19 +155,19 @@ impl CurrentlyPlayingWidget {
                 Span::raw(format_time(elapsed_time)),
                 Span::raw(" "),
                 Span::styled(
-                    "".repeat(filled_width),
+                    "".repeat(filled_width),
                     Style::default()
                         .fg(PROGRESSBAR_COLOR)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
-                    "",
+                    "",
                     Style::default()
                         .fg(HIGHLIGHT_COLOR)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
-                    "".repeat(empty_width),
+                    "".repeat(empty_width),
                     Style::default().fg(ROW_COLOR).add_modifier(Modifier::BOLD),
                 ),
                 Span::raw(" "),
