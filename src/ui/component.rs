@@ -4,6 +4,7 @@ use ratatui::{prelude::Rect, Frame};
 
 use crate::action::Action;
 use crate::player::CurrentTrackInfo;
+use crate::ui::theme::Theme;
 
 /// Read-only state snapshot for terminal rendering.
 pub struct RenderContext<'a> {
@@ -12,6 +13,7 @@ pub struct RenderContext<'a> {
     pub is_playing: bool,
     pub is_paused: bool,
     pub status_message: Option<&'a str>,
+    pub theme: &'a Theme,
 }
 
 /// Terminal UI component trait.

@@ -2,14 +2,12 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     prelude::Rect,
-    style::Style,
     widgets::{Clear, Paragraph},
     Frame,
 };
 
 use crate::action::Action;
 use crate::ui::component::{Component, RenderContext};
-use crate::ui::HIGHLIGHT_COLOR;
 
 pub struct SearchWidget {
     input: String,
@@ -77,7 +75,7 @@ impl SearchWidget {
 }
 
 impl Component for SearchWidget {
-    fn render(&mut self, frame: &mut Frame, area: Rect, _ctx: &RenderContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &RenderContext) -> Result<()> {
         let search_area = Rect {
             x: area.x,
             y: area.y + area.height - 1,
@@ -86,12 +84,9 @@ impl Component for SearchWidget {
         };
 
         let search_text = ratatui::text::Text::from(ratatui::text::Line::from(vec![
-            ratatui::text::Span::styled("", Style::default().fg(HIGHLIGHT_COLOR)),
+            ratatui::text::Span::styled("", ctx.theme.accent),
             ratatui::text::Span::raw(" "),
-            ratatui::text::Span::styled(
-                &self.input,
-                Style::default().fg(ratatui::style::Color::White),
-            ),
+            ratatui::text::Span::styled(&self.input, ctx.theme.text),
         ]));
 
         let paragraph = Paragraph::new(search_text);

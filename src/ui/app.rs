@@ -10,6 +10,7 @@ use crate::{
     audio::Host,
     media_controls::MediaControlsBackend,
     player::Player,
+    ui::theme::Theme,
 };
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
@@ -22,6 +23,7 @@ use std::time::Duration;
 
 pub struct App {
     state: AppState,
+    theme: Theme,
     playlist: Playlist,
     output_selector: DeviceSelector,
     search_widget: SearchWidget,
@@ -39,6 +41,7 @@ impl App {
     ) -> Result<Self> {
         Ok(Self {
             state: AppState::new(player, media_controls),
+            theme: Theme::default(),
             playlist: Playlist::new(path, picker)?,
             output_selector: DeviceSelector::new(host)?,
             search_widget: SearchWidget::new(),
@@ -129,7 +132,7 @@ impl App {
             self.state.auto_advance(&self.playlist)?;
 
             // 5. Render
-            let ctx = self.state.render_context();
+            let ctx = self.state.render_context(&self.theme);
             terminal.draw(|frame| {
                 self.playlist
                     .render(frame, frame.area(), &ctx)

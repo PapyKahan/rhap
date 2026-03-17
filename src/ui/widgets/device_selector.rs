@@ -2,7 +2,6 @@ use anyhow::{anyhow, Result};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     prelude::{Alignment, Constraint, Rect},
-    style::Style,
     widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
     Frame,
 };
@@ -10,10 +9,7 @@ use ratatui::{
 use crate::{
     action::Action,
     audio::{Device, DeviceTrait, Host, HostTrait},
-    ui::{
-        component::{Component, RenderContext},
-        HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_COLOR,
-    },
+    ui::component::{Component, RenderContext},
 };
 
 pub struct DeviceSelector {
@@ -104,7 +100,7 @@ impl DeviceSelector {
 }
 
 impl Component for DeviceSelector {
-    fn render(&mut self, frame: &mut Frame, area: Rect, _ctx: &RenderContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &RenderContext) -> Result<()> {
         let default = &self.default.name()?.clone();
         let selected_device_name = if let Some(device) = self.selected.as_ref() {
             device
@@ -120,24 +116,24 @@ impl Component for DeviceSelector {
                 Cell::from(device.name()?),
             ])
             .height(1)
-            .style(Style::default().bg(if items.len() % 2 == 0 {
-                ROW_COLOR
+            .style(if items.len() % 2 == 0 {
+                ctx.theme.table.row_even
             } else {
-                ROW_ALTERNATE_COLOR
-            }));
+                ctx.theme.table.row_odd
+            });
             items.push(row);
         }
 
         let table = Table::new(items, &[Constraint::Length(1), Constraint::Percentage(100)])
             .highlight_symbol("=>")
-            .row_highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
+            .row_highlight_style(ctx.theme.table.highlight)
             .block(
                 Block::default()
                     .title("Select Output Device")
                     .title_alignment(Alignment::Center)
                     .borders(Borders::ALL)
                     .border_type(ratatui::widgets::BorderType::Rounded)
-                    .border_style(Style::default().fg(HIGHLIGHT_COLOR)),
+                    .border_style(ctx.theme.border),
             );
 
         frame.render_widget(Clear, area);

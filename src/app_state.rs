@@ -10,6 +10,7 @@ use crate::musictrack::MusicTrack;
 use crate::player::{CurrentTrackInfo, Player};
 use crate::ui::component::RenderContext;
 use crate::ui::screens::Playlist;
+use crate::ui::theme::Theme;
 use crate::ui::widgets::{DeviceSelector, SearchWidget};
 
 struct CoverArtFile {
@@ -46,13 +47,14 @@ impl AppState {
     }
 
     /// Build a state snapshot for rendering (terminal) or serialization (web).
-    pub fn render_context(&self) -> RenderContext<'_> {
+    pub fn render_context<'a>(&'a self, theme: &'a Theme) -> RenderContext<'a> {
         RenderContext {
             playing_track: self.playing_track.as_ref(),
             playing_track_index: self.playing_track_index,
             is_playing: self.player.is_playing(),
             is_paused: self.player.is_paused(),
             status_message: self.status_message.as_deref(),
+            theme,
         }
     }
 

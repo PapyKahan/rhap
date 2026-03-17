@@ -8,7 +8,6 @@ use rand::{rng, seq::SliceRandom};
 use ratatui::{
     layout::{Constraint as LConstraint, Direction, Layout},
     prelude::{Alignment, Constraint, Rect},
-    style::Style,
     widgets::{
         Block, BorderType, Borders, Cell, Clear, Row, Scrollbar, ScrollbarState, Table, TableState,
     },
@@ -23,7 +22,6 @@ use crate::{
     ui::{
         component::{Component, RenderContext},
         widgets::CurrentlyPlayingWidget,
-        HIGHLIGHT_COLOR, ROW_ALTERNATE_COLOR, ROW_ALTERNATE_COLOR_COL, ROW_COLOR, ROW_COLOR_COL,
     },
 };
 
@@ -280,24 +278,22 @@ impl Component for Playlist {
                     } else {
                         "  "
                     }),
-                    Cell::from(song.title.clone()).style(Style::default().bg(
-                        if items.len() % 2 == 0 {
-                            ROW_COLOR_COL
-                        } else {
-                            ROW_ALTERNATE_COLOR_COL
-                        },
-                    )),
+                    Cell::from(song.title.clone()).style(if items.len() % 2 == 0 {
+                        ctx.theme.table.cell_even
+                    } else {
+                        ctx.theme.table.cell_odd
+                    }),
                     Cell::from(song.artist.clone()),
                     Cell::from(if song.probed {
                         song.info()
                     } else {
                         String::new()
                     })
-                    .style(Style::default().bg(if items.len() % 2 == 0 {
-                        ROW_COLOR_COL
+                    .style(if items.len() % 2 == 0 {
+                        ctx.theme.table.cell_even
                     } else {
-                        ROW_ALTERNATE_COLOR_COL
-                    })),
+                        ctx.theme.table.cell_odd
+                    }),
                     Cell::from(if song.probed {
                         format_time(song.duration)
                     } else {
@@ -305,11 +301,11 @@ impl Component for Playlist {
                     }),
                 ])
                 .height(1)
-                .style(Style::default().bg(if items.len() % 2 == 0 {
-                    ROW_COLOR
+                .style(if items.len() % 2 == 0 {
+                    ctx.theme.table.row_even
                 } else {
-                    ROW_ALTERNATE_COLOR
-                }));
+                    ctx.theme.table.row_odd
+                });
                 items.push(row);
             }
         }
@@ -323,14 +319,14 @@ impl Component for Playlist {
                 Constraint::Percentage(10),
             ],
         )
-        .row_highlight_style(Style::default().fg(HIGHLIGHT_COLOR))
+        .row_highlight_style(ctx.theme.table.highlight)
         .block(
             Block::default()
                 .title(format!("Playlist - {}", self.songs.len()))
                 .title_alignment(Alignment::Left)
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(HIGHLIGHT_COLOR)),
+                .border_style(ctx.theme.border),
         );
 
         frame.render_widget(Clear, table_area);
@@ -344,10 +340,10 @@ impl Component for Playlist {
                 .begin_symbol(Some("│"))
                 .thumb_symbol("│")
                 .end_symbol(Some("│"))
-                .track_style(Style::default().fg(ROW_COLOR_COL))
-                .thumb_style(Style::default().fg(HIGHLIGHT_COLOR))
-                .begin_style(Style::default().fg(ROW_COLOR_COL))
-                .end_style(Style::default().fg(ROW_COLOR_COL)),
+                .track_style(ctx.theme.scrollbar.track)
+                .thumb_style(ctx.theme.scrollbar.thumb)
+                .begin_style(ctx.theme.scrollbar.track)
+                .end_style(ctx.theme.scrollbar.track),
             scrollbar_area,
             &mut scrollbar_state,
         );

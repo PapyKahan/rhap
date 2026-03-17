@@ -1,20 +1,13 @@
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     prelude::{Alignment, Line, Rect, Span},
-    style::{Color, Modifier, Style},
     widgets::{Block, BorderType, Borders, Padding, Paragraph},
     Frame,
 };
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
 use std::sync::Arc;
 
-use crate::ui::HIGHLIGHT_COLOR;
-use crate::{
-    player::format_time,
-    ui::{component::RenderContext, PROGRESSBAR_COLOR, ROW_COLOR},
-};
-
-const ERROR_COLOR: Color = Color::Rgb(255, 80, 80);
+use crate::{player::format_time, ui::component::RenderContext};
 
 struct CachedCoverArt {
     data_id: usize,
@@ -40,7 +33,7 @@ impl CurrentlyPlayingWidget {
             .title_alignment(Alignment::Center)
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(HIGHLIGHT_COLOR))
+            .border_style(ctx.theme.border)
             .padding(Padding::uniform(1));
 
         let inner = block.inner(area);
@@ -130,25 +123,22 @@ impl CurrentlyPlayingWidget {
 
             let mut lines = vec![
                 Line::from(vec![
-                    Span::styled("Title: ", Style::default().add_modifier(Modifier::BOLD)),
-                    Span::raw(&track_info.title),
+                    Span::styled("Title: ", ctx.theme.text_bold),
+                    Span::styled(&track_info.title, ctx.theme.text),
                 ]),
                 Line::from(vec![
-                    Span::styled("Artist: ", Style::default().add_modifier(Modifier::BOLD)),
-                    Span::raw(&track_info.artist),
+                    Span::styled("Artist: ", ctx.theme.text_bold),
+                    Span::styled(&track_info.artist, ctx.theme.text),
                 ]),
                 Line::from(vec![
-                    Span::styled("Info: ", Style::default().add_modifier(Modifier::BOLD)),
-                    Span::raw(format!("{}", track_info.info)),
+                    Span::styled("Info: ", ctx.theme.text_bold),
+                    Span::styled(format!("{}", track_info.info), ctx.theme.text),
                 ]),
             ];
             if let Some(output) = &track_info.output_info {
                 lines.push(Line::from(vec![
-                    Span::styled(
-                        "Playing as: ",
-                        Style::default().add_modifier(Modifier::BOLD),
-                    ),
-                    Span::raw(output),
+                    Span::styled("Playing as: ", ctx.theme.text_bold),
+                    Span::styled(output, ctx.theme.text),
                 ]));
             }
 
@@ -165,32 +155,28 @@ impl CurrentlyPlayingWidget {
             let empty_width = progress_bar_width.saturating_sub(filled_width);
 
             let progress_line = Line::from(vec![
-                Span::raw(format_time(elapsed_time)),
+                Span::styled(format_time(elapsed_time), ctx.theme.text),
                 Span::raw(" "),
                 Span::styled(
                     "".repeat(filled_width),
-                    Style::default()
-                        .fg(PROGRESSBAR_COLOR)
-                        .add_modifier(Modifier::BOLD),
+                    ctx.theme.progress.filled,
                 ),
                 Span::styled(
                     "",
-                    Style::default()
-                        .fg(HIGHLIGHT_COLOR)
-                        .add_modifier(Modifier::BOLD),
+                    ctx.theme.progress.cursor,
                 ),
                 Span::styled(
                     "".repeat(empty_width),
-                    Style::default().fg(ROW_COLOR).add_modifier(Modifier::BOLD),
+                    ctx.theme.progress.empty,
                 ),
                 Span::raw(" "),
-                Span::raw(format_time(track_info.total_duration)),
+                Span::styled(format_time(track_info.total_duration), ctx.theme.text),
             ]);
 
             let bar = Paragraph::new(progress_line).alignment(Alignment::Center);
             frame.render_widget(bar, progress_area);
         } else if let Some(msg) = ctx.status_message {
-            let paragraph = Paragraph::new(Line::from(Span::styled(msg, Style::default().fg(ERROR_COLOR))))
+            let paragraph = Paragraph::new(Line::from(Span::styled(msg, ctx.theme.error)))
                 .alignment(Alignment::Center);
             frame.render_widget(paragraph, area);
         } else {
