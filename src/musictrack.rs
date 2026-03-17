@@ -1,10 +1,11 @@
 use anyhow::Result;
+use std::sync::Arc;
 use symphonia::core::{
     audio::Layout,
     codecs::{Decoder, DecoderOptions},
     formats::FormatReader,
     io::MediaSourceStream,
-    meta::{MetadataRevision, StandardTagKey},
+    meta::{MetadataRevision, StandardTagKey, StandardVisualKey},
     probe::Hint,
     units::Time,
 };
@@ -20,6 +21,8 @@ pub struct MusicTrack {
     pub artist: String,
     pub duration: Time,
     pub probed: bool,
+    pub cover_art: Option<Arc<[u8]>>,
+    pub cover_art_mime: Option<String>,
 }
 
 impl MusicTrack {
@@ -39,6 +42,8 @@ impl MusicTrack {
             artist: String::new(),
             duration: Time::default(),
             probed: false,
+            cover_art: None,
+            cover_art_mime: None,
         }
     }
 
@@ -87,6 +92,14 @@ impl MusicTrack {
             .unwrap_or(Default::default())
             .calc_time(track.codec_params.n_frames.unwrap_or(0));
 
+        let visuals = metadata.visuals();
+        let visual = visuals
+            .iter()
+            .find(|v| v.usage == Some(StandardVisualKey::FrontCover))
+            .or_else(|| visuals.first());
+        let cover_art = visual.map(|v| Arc::from(v.data.as_ref()));
+        let cover_art_mime = visual.map(|v| v.media_type.clone());
+
         Ok(Self {
             path,
             sample: SampleRate(samplerate),
@@ -96,6 +109,8 @@ impl MusicTrack {
             artist,
             duration,
             probed: true,
+            cover_art,
+            cover_art_mime,
         })
     }
 

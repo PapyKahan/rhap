@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -11,6 +12,11 @@ use crate::ui::component::RenderContext;
 use crate::ui::screens::Playlist;
 use crate::ui::widgets::{DeviceSelector, SearchWidget};
 
+struct CoverArtFile {
+    _path: tempfile::TempPath,
+    url: String,
+}
+
 /// UI-agnostic application state. Shared between terminal and future web UI.
 pub struct AppState {
     pub player: Player,
@@ -20,6 +26,8 @@ pub struct AppState {
     pub layers: Vec<Layer>,
     pub status_message: Option<String>,
     pub media_controls: Option<MediaControlsBackend>,
+    cover_art_file: Option<CoverArtFile>,
+    metadata_dirty: bool,
 }
 
 impl AppState {
@@ -32,6 +40,8 @@ impl AppState {
             layers: vec![],
             status_message: None,
             media_controls,
+            cover_art_file: None,
+            metadata_dirty: false,
         }
     }
 
@@ -85,6 +95,8 @@ impl AppState {
             }
             Action::Stop => {
                 self.playing_track = None;
+                self.metadata_dirty = true;
+                self.cover_art_file = None;
                 self.player.stop()?;
             }
             Action::NextTrack => {
@@ -155,6 +167,8 @@ impl AppState {
             Action::Quit => {
                 self.player.stop()?;
                 self.playing_track = None;
+                self.metadata_dirty = true;
+                self.cover_art_file = None;
             }
             Action::Batch(actions) => {
                 for a in actions {
@@ -172,11 +186,23 @@ impl AppState {
         };
         mc.pump_messages();
         if let Some(track) = &self.playing_track {
-            let _ = mc.set_metadata(&TrackMetadata {
-                title: &track.title,
-                artist: &track.artist,
-                duration: Some(Duration::from_secs(track.total_duration.seconds)),
-            });
+            if self.metadata_dirty {
+                let cover_url = self.cover_art_file.as_ref().map(|f| f.url.as_str());
+                let metadata_with_cover = TrackMetadata {
+                    title: &track.title,
+                    artist: &track.artist,
+                    duration: Some(Duration::from_secs(track.total_duration.seconds)),
+                    cover_url,
+                };
+                if let Err(e) = mc.set_metadata(&metadata_with_cover) {
+                    log::warn!("set_metadata failed with cover_url {:?}: {}", cover_url, e);
+                    let _ = mc.set_metadata(&TrackMetadata {
+                        cover_url: None,
+                        ..metadata_with_cover
+                    });
+                }
+                self.metadata_dirty = false;
+            }
             let status = if self.player.is_playing() {
                 PlaybackStatus::Playing
             } else {
@@ -185,6 +211,39 @@ impl AppState {
             let _ = mc.set_playback(status);
         } else {
             let _ = mc.set_playback(PlaybackStatus::Stopped);
+        }
+    }
+
+    fn update_cover_art_file(&mut self) {
+        self.cover_art_file = None;
+        if let Some(track) = &self.playing_track {
+            if let Some(data) = &track.cover_art {
+                match (|| -> Result<CoverArtFile> {
+                    let suffix = match track.cover_art_mime.as_deref() {
+                        Some("image/png") => ".png",
+                        _ => ".jpg",
+                    };
+                    let mut file = tempfile::Builder::new()
+                        .prefix("rhap_cover_")
+                        .suffix(suffix)
+                        .tempfile_in(std::env::temp_dir())?;
+                    file.write_all(data)?;
+                    file.flush()?;
+                    // Close the file handle so Windows Storage API can read it
+                    let temp_path = file.into_temp_path();
+                    // Canonicalize to resolve 8.3 short names (e.g. CHRIST~1.FAJ)
+                    let full_path = std::fs::canonicalize(&temp_path)
+                        .unwrap_or_else(|_| temp_path.to_path_buf());
+                    // Windows Storage API needs backslash paths; strip \\?\ UNC prefix from canonicalize
+                    let path_str = full_path.to_string_lossy();
+                    let path_str = path_str.strip_prefix(r"\\?\").unwrap_or(&path_str);
+                    let url = format!("file://{}", path_str);
+                    Ok(CoverArtFile { _path: temp_path, url })
+                })() {
+                    Ok(caf) => self.cover_art_file = Some(caf),
+                    Err(e) => log::warn!("Failed to write cover art temp file: {}", e),
+                }
+            }
         }
     }
 
@@ -200,6 +259,8 @@ impl AppState {
             match self.player.play_gapless(song.clone()) {
                 Ok(Some(info)) => {
                     self.playing_track = Some(info);
+                    self.metadata_dirty = true;
+                    self.update_cover_art_file();
                     self.status_message = None;
                     return Ok(());
                 }
@@ -209,8 +270,11 @@ impl AppState {
 
             self.player.stop()?;
             self.playing_track = None;
+            self.metadata_dirty = true;
             let current_track_info = self.player.play(song)?;
             self.playing_track = Some(current_track_info);
+            self.metadata_dirty = true;
+            self.update_cover_art_file();
             self.status_message = None;
         }
         Ok(())

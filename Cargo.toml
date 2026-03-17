@@ -15,6 +15,9 @@ rubato = { version = "1.0.1", features = ["fft_resampler", "realfft", "num-compl
 symphonia = { version = "0.5.5", features = ["all-formats", "all-codecs", "opt-simd", "opt-simd-avx", "opt-simd-neon", "opt-simd-sse"] }
 glob = "0.3.3"
 souvlaki = "0.8"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+ratatui-image = { version = "10", default-features = false, features = ["crossterm", "image-defaults"] }
+tempfile = "3"
 num-integer = "0.1.46"
 rayon = "1.11.0"
 audioadapter-buffers = "2.0"

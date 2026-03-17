@@ -19,6 +19,7 @@ pub struct TrackMetadata<'a> {
     pub title: &'a str,
     pub artist: &'a str,
     pub duration: Option<Duration>,
+    pub cover_url: Option<&'a str>,
 }
 
 pub enum PlaybackStatus {

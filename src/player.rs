@@ -52,6 +52,8 @@ pub struct CurrentTrackInfo {
     pub elapsed_time: Arc<AtomicU64>,
     pub total_duration: Time,
     time_base: TimeBase,
+    pub cover_art: Option<Arc<[u8]>>,
+    pub cover_art_mime: Option<String>,
 }
 
 pub fn format_time(time: Time) -> String {
@@ -387,6 +389,8 @@ impl Player {
             elapsed_time,
             total_duration,
             time_base,
+            cover_art: song.cover_art.clone(),
+            cover_art_mime: song.cover_art_mime.clone(),
         })
     }
 

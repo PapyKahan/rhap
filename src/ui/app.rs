@@ -35,10 +35,11 @@ impl App {
         path: PathBuf,
         media_controls: Option<MediaControlsBackend>,
         media_event_rx: Option<std::sync::mpsc::Receiver<Action>>,
+        picker: Option<ratatui_image::picker::Picker>,
     ) -> Result<Self> {
         Ok(Self {
             state: AppState::new(player, media_controls),
-            playlist: Playlist::new(path)?,
+            playlist: Playlist::new(path, picker)?,
             output_selector: DeviceSelector::new(host)?,
             search_widget: SearchWidget::new(),
             media_event_rx,

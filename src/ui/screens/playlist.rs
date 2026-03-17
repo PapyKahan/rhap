@@ -34,7 +34,7 @@ pub struct Playlist {
 }
 
 impl Playlist {
-    pub fn new(path: PathBuf) -> Result<Self> {
+    pub fn new(path: PathBuf, picker: Option<ratatui_image::picker::Picker>) -> Result<Self> {
         let songs: Arc<[ArcSwap<MusicTrack>]>;
 
         if path.is_dir() {
@@ -84,7 +84,7 @@ impl Playlist {
         Ok(Self {
             state,
             songs,
-            currently_playing_widget: CurrentlyPlayingWidget::new(),
+            currently_playing_widget: CurrentlyPlayingWidget::new(picker),
         })
     }
 

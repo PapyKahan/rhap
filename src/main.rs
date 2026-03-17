@@ -88,6 +88,11 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    // Query terminal graphics capabilities before entering alternate screen
+    let picker = ratatui_image::picker::Picker::from_query_stdio()
+        .map_err(|e| log::warn!("Terminal image support unavailable: {}", e))
+        .ok();
+
     let mut terminal = ratatui::init();
     let host = Host::new("wasapi", args.high_priority_mode);
     let player = Player::new(host, args.device, args.pollmode, args.gapless, args.resample)?;
@@ -102,7 +107,7 @@ fn main() -> Result<()> {
         None => (None, None),
     };
 
-    let mut app = App::new(host, player, path, media_backend, media_event_rx)?;
+    let mut app = App::new(host, player, path, media_backend, media_event_rx, picker)?;
     app.run(&mut terminal)?;
     ratatui::restore();
 

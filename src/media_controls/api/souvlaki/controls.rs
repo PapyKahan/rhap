@@ -71,6 +71,7 @@ impl MediaControlsTrait for SouvlakiMediaControls {
                 title: Some(metadata.title),
                 artist: Some(metadata.artist),
                 duration: metadata.duration,
+                cover_url: metadata.cover_url,
                 ..Default::default()
             })
             .map_err(|e| anyhow::anyhow!("{}", e))?;
