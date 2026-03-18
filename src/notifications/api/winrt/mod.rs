@@ -1,19 +1,19 @@
 use anyhow::Result;
 use windows::core::HSTRING;
 use windows::Data::Xml::Dom::XmlDocument;
-use windows::UI::Notifications::{ToastNotification, ToastNotificationManager};
+use windows::UI::Notifications::{ToastNotification, ToastNotificationManager, ToastNotifier};
 
 use crate::notifications::{NotificationContent, NotificationsTrait};
 
 pub struct WinRtNotifications {
-    app_id: HSTRING,
+    notifier: ToastNotifier,
 }
 
 impl WinRtNotifications {
     pub fn new() -> Result<Self> {
-        Ok(Self {
-            app_id: HSTRING::from("rhap"),
-        })
+        let app_id = HSTRING::from("rhap");
+        let notifier = ToastNotificationManager::CreateToastNotifierWithId(&app_id)?;
+        Ok(Self { notifier })
     }
 }
 
@@ -62,8 +62,7 @@ impl NotificationsTrait for WinRtNotifications {
         let doc = XmlDocument::new()?;
         doc.LoadXml(&HSTRING::from(&xml))?;
         let toast = ToastNotification::CreateToastNotification(&doc)?;
-        let notifier = ToastNotificationManager::CreateToastNotifierWithId(&self.app_id)?;
-        notifier.Show(&toast)?;
+        self.notifier.Show(&toast)?;
 
         Ok(())
     }
