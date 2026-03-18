@@ -19,6 +19,7 @@ pub struct MusicTrack {
     pub bits_per_sample: BitsPerSample,
     pub title: String,
     pub artist: String,
+    pub album: String,
     pub duration: Time,
     pub probed: bool,
     pub cover_art: Option<Arc<[u8]>>,
@@ -40,6 +41,7 @@ impl MusicTrack {
             bits_per_sample: BitsPerSample(0),
             title,
             artist: String::new(),
+            album: String::new(),
             duration: Time::default(),
             probed: false,
             cover_art: None,
@@ -86,6 +88,12 @@ impl MusicTrack {
             .find(|e| e.std_key == Some(StandardTagKey::TrackTitle))
             .map(|t| t.value.to_string())
             .unwrap_or_else(|| "Unknown Title".to_string());
+        let album = metadata
+            .tags()
+            .iter()
+            .find(|e| e.std_key == Some(StandardTagKey::Album))
+            .map(|t| t.value.to_string())
+            .unwrap_or_else(|| "Unknown Album".to_string());
         let duration = track
             .codec_params
             .time_base
@@ -107,6 +115,7 @@ impl MusicTrack {
             bits_per_sample: BitsPerSample(bits_per_sample),
             title,
             artist,
+            album,
             duration,
             probed: true,
             cover_art,

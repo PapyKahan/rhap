@@ -47,6 +47,8 @@ features = [
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
     "Win32_Graphics_Gdi",
+    "UI_Notifications",
+    "Data_Xml_Dom",
 ]
 
 [build-dependencies]

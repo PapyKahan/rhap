@@ -10,6 +10,7 @@ mod action;
 mod app_state;
 mod audio;
 mod media_controls;
+mod notifications;
 mod musictrack;
 mod player;
 mod tools;
@@ -107,7 +108,11 @@ fn main() -> Result<()> {
         None => (None, None),
     };
 
-    let mut app = App::new(host, player, path, media_backend, media_event_rx, picker)?;
+    let notifications = notifications::create_notifications()
+        .map_err(|e| log::warn!("Notifications unavailable: {}", e))
+        .ok();
+
+    let mut app = App::new(host, player, path, media_backend, media_event_rx, notifications, picker)?;
     app.run(&mut terminal)?;
     ratatui::restore();
 

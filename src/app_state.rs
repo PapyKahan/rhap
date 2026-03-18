@@ -7,6 +7,7 @@ use anyhow::Result;
 use crate::action::{Action, Layer};
 use crate::media_controls::{MediaControlsBackend, MediaControlsTrait, PlaybackStatus, TrackMetadata};
 use crate::musictrack::MusicTrack;
+use crate::notifications::{NotificationsBackend, NotificationContent, NotificationsTrait};
 use crate::player::{CurrentTrackInfo, Player};
 use crate::ui::component::RenderContext;
 use crate::ui::screens::Playlist;
@@ -16,6 +17,7 @@ use crate::ui::widgets::{DeviceSelector, SearchWidget};
 struct CoverArtFile {
     _path: tempfile::TempPath,
     url: String,
+    fs_path: String,
 }
 
 /// UI-agnostic application state. Shared between terminal and future web UI.
@@ -27,12 +29,17 @@ pub struct AppState {
     pub layers: Vec<Layer>,
     pub status_message: Option<String>,
     pub media_controls: Option<MediaControlsBackend>,
+    pub notifications: Option<NotificationsBackend>,
     cover_art_file: Option<CoverArtFile>,
     metadata_dirty: bool,
 }
 
 impl AppState {
-    pub fn new(player: Player, media_controls: Option<MediaControlsBackend>) -> Self {
+    pub fn new(
+        player: Player,
+        media_controls: Option<MediaControlsBackend>,
+        notifications: Option<NotificationsBackend>,
+    ) -> Self {
         Self {
             player,
             playing_track: None,
@@ -41,6 +48,7 @@ impl AppState {
             layers: vec![],
             status_message: None,
             media_controls,
+            notifications,
             cover_art_file: None,
             metadata_dirty: false,
         }
@@ -183,35 +191,50 @@ impl AppState {
     }
 
     pub fn sync_media_controls(&mut self) {
-        let Some(mc) = self.media_controls.as_mut() else {
-            return;
-        };
-        mc.pump_messages();
+        if let Some(mc) = self.media_controls.as_mut() {
+            mc.pump_messages();
+        }
         if let Some(track) = &self.playing_track {
             if self.metadata_dirty {
-                let cover_url = self.cover_art_file.as_ref().map(|f| f.url.as_str());
-                let metadata_with_cover = TrackMetadata {
-                    title: &track.title,
-                    artist: &track.artist,
-                    duration: Some(Duration::from_secs(track.total_duration.seconds)),
-                    cover_url,
-                };
-                if let Err(e) = mc.set_metadata(&metadata_with_cover) {
-                    log::warn!("set_metadata failed with cover_url {:?}: {}", cover_url, e);
-                    let _ = mc.set_metadata(&TrackMetadata {
-                        cover_url: None,
-                        ..metadata_with_cover
-                    });
+                if let Some(mc) = self.media_controls.as_mut() {
+                    let cover_url = self.cover_art_file.as_ref().map(|f| f.url.as_str());
+                    let metadata_with_cover = TrackMetadata {
+                        title: &track.title,
+                        artist: &track.artist,
+                        duration: Some(Duration::from_secs(track.total_duration.seconds)),
+                        cover_url,
+                    };
+                    if let Err(e) = mc.set_metadata(&metadata_with_cover) {
+                        log::warn!("set_metadata failed with cover_url {:?}: {}", cover_url, e);
+                        let _ = mc.set_metadata(&TrackMetadata {
+                            cover_url: None,
+                            ..metadata_with_cover
+                        });
+                    }
+                }
+                if let Some(notif) = &self.notifications {
+                    let cover_path = self.cover_art_file.as_ref().map(|f| f.fs_path.as_str());
+                    let content = NotificationContent {
+                        title: &track.title,
+                        artist: &track.artist,
+                        album: &track.album,
+                        cover_art_path: cover_path,
+                    };
+                    if let Err(e) = notif.show_track_change(&content) {
+                        log::warn!("Toast notification failed: {}", e);
+                    }
                 }
                 self.metadata_dirty = false;
             }
-            let status = if self.player.is_playing() {
-                PlaybackStatus::Playing
-            } else {
-                PlaybackStatus::Paused
-            };
-            let _ = mc.set_playback(status);
-        } else {
+            if let Some(mc) = self.media_controls.as_mut() {
+                let status = if self.player.is_playing() {
+                    PlaybackStatus::Playing
+                } else {
+                    PlaybackStatus::Paused
+                };
+                let _ = mc.set_playback(status);
+            }
+        } else if let Some(mc) = self.media_controls.as_mut() {
             let _ = mc.set_playback(PlaybackStatus::Stopped);
         }
     }
@@ -239,8 +262,9 @@ impl AppState {
                     // Windows Storage API needs backslash paths; strip \\?\ UNC prefix from canonicalize
                     let path_str = full_path.to_string_lossy();
                     let path_str = path_str.strip_prefix(r"\\?\").unwrap_or(&path_str);
+                    let fs_path = path_str.to_string();
                     let url = format!("file://{}", path_str);
-                    Ok(CoverArtFile { _path: temp_path, url })
+                    Ok(CoverArtFile { _path: temp_path, url, fs_path })
                 })() {
                     Ok(caf) => self.cover_art_file = Some(caf),
                     Err(e) => log::warn!("Failed to write cover art temp file: {}", e),
