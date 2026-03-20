@@ -62,6 +62,8 @@ impl NotificationsTrait for WinRtNotifications {
         let doc = XmlDocument::new()?;
         doc.LoadXml(&HSTRING::from(&xml))?;
         let toast = ToastNotification::CreateToastNotification(&doc)?;
+        toast.SetTag(&HSTRING::from("track"))?;
+        toast.SetGroup(&HSTRING::from("playback"))?;
         self.notifier.Show(&toast)?;
 
         Ok(())
