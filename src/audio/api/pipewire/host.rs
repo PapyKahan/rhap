@@ -19,6 +19,7 @@ struct SinkInfo {
     node_name: String,
     description: String,
     alsa_path: Option<String>,
+    priority: u32,
 }
 
 /// Resolve a PipeWire object.path like "alsa:acp:DAC:1:playback" to an ALSA card number.
@@ -85,9 +86,13 @@ fn enumerate_sinks() -> Result<Vec<SinkInfo>> {
             let alsa_path = props.get("object.path")
                 .and_then(|op| resolve_alsa_path_from_object_path(op));
 
+            let priority = props.get("priority.session")
+                .and_then(|p| p.parse::<u32>().ok())
+                .unwrap_or(0);
+
             debug!(
-                "Found PipeWire sink: id={}, name={}, desc={}, alsa={:?}",
-                global.id, node_name, description, alsa_path
+                "Found PipeWire sink: id={}, name={}, desc={}, alsa={:?}, priority={}",
+                global.id, node_name, description, alsa_path, priority
             );
 
             sinks_for_global.borrow_mut().push(SinkInfo {
@@ -95,6 +100,7 @@ fn enumerate_sinks() -> Result<Vec<SinkInfo>> {
                 node_name,
                 description,
                 alsa_path,
+                priority,
             });
         })
         .register();
@@ -129,15 +135,17 @@ fn enumerate_sinks() -> Result<Vec<SinkInfo>> {
 impl HostTrait for Host {
     fn get_devices(&self) -> Result<Vec<crate::audio::Device>> {
         let sinks = enumerate_sinks()?;
+        // The sink with the highest priority.session is the default
+        let max_priority = sinks.iter().map(|s| s.priority).max().unwrap_or(0);
         let devices: Vec<crate::audio::Device> = sinks
             .into_iter()
-            .enumerate()
-            .map(|(i, sink)| {
+            .map(|sink| {
+                let is_default = sink.priority == max_priority;
                 crate::audio::Device::PipeWire(Device::new(
                     sink.id,
                     sink.node_name,
                     sink.description,
-                    i == 0,
+                    is_default,
                     sink.alsa_path,
                 ))
             })
@@ -147,6 +155,7 @@ impl HostTrait for Host {
 
     fn create_device(&self, id: Option<u32>) -> Result<crate::audio::Device> {
         let sinks = enumerate_sinks()?;
+        let max_priority = sinks.iter().map(|s| s.priority).max().unwrap_or(0);
         match id {
             Some(i) => {
                 let sink = sinks
@@ -157,14 +166,15 @@ impl HostTrait for Host {
                     sink.id,
                     sink.node_name,
                     sink.description,
-                    false,
+                    sink.priority == max_priority,
                     sink.alsa_path,
                 )))
             }
             None => {
+                // Pick the highest-priority sink (PipeWire's default)
                 let sink = sinks
                     .into_iter()
-                    .next()
+                    .max_by_key(|s| s.priority)
                     .ok_or_else(|| anyhow::anyhow!("No PipeWire sinks found"))?;
                 Ok(crate::audio::Device::PipeWire(Device::new(
                     sink.id,

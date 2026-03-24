@@ -289,10 +289,15 @@ impl AppState {
     fn play(&mut self, playlist: &Playlist) -> Result<()> {
         if let Some(slot) = playlist.songs().get(self.playing_track_index) {
             let song = slot.load();
-            if !song.probed {
-                let probed = MusicTrack::new(song.path.clone())?;
+
+            // If not yet probed, probe and open in one shot to avoid double I/O.
+            let preloaded_handle = if !song.probed {
+                let (probed, handle) = MusicTrack::probe_and_open(song.path.clone())?;
                 slot.store(Arc::new(probed));
-            }
+                Some(handle)
+            } else {
+                None
+            };
             let song = Arc::clone(&slot.load());
 
             match self.player.play_gapless(song.clone()) {
@@ -310,7 +315,10 @@ impl AppState {
             self.player.stop()?;
             self.playing_track = None;
             self.metadata_dirty = true;
-            let current_track_info = self.player.play(song)?;
+            let current_track_info = match preloaded_handle {
+                Some(handle) => self.player.play_with_handle(song, handle)?,
+                None => self.player.play(song)?,
+            };
             self.playing_track = Some(current_track_info);
             self.metadata_dirty = true;
             self.update_cover_art_file();

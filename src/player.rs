@@ -271,8 +271,12 @@ impl Player {
         mut producer: HeapProd<u8>,
         end_of_stream: Arc<AtomicBool>,
         signal: Arc<BufferSignal>,
+        playback_handle: Option<crate::musictrack::PlaybackHandle>,
     ) -> Result<CurrentTrackInfo> {
-        let mut playback = song.open_for_playback()?;
+        let mut playback = match playback_handle {
+            Some(h) => h,
+            None => song.open_for_playback()?,
+        };
         let time_base = playback.format.tracks().get(0).unwrap().codec_params.time_base.unwrap_or(Default::default());
 
         let output_info = {
@@ -397,7 +401,24 @@ impl Player {
         })
     }
 
+    /// Play a track with a pre-opened PlaybackHandle, avoiding a second file probe.
+    pub fn play_with_handle(
+        &mut self,
+        song: Arc<MusicTrack>,
+        handle: crate::musictrack::PlaybackHandle,
+    ) -> Result<CurrentTrackInfo> {
+        self.play_inner(song, Some(handle))
+    }
+
     pub fn play(&mut self, song: Arc<MusicTrack>) -> Result<CurrentTrackInfo> {
+        self.play_inner(song, None)
+    }
+
+    fn play_inner(
+        &mut self,
+        song: Arc<MusicTrack>,
+        handle: Option<crate::musictrack::PlaybackHandle>,
+    ) -> Result<CurrentTrackInfo> {
         self.stop()?;
 
         let src_params = StreamParams {
@@ -440,6 +461,7 @@ impl Player {
             pipeline.producer,
             pipeline.end_of_stream,
             pipeline.signal,
+            handle,
         )
     }
 
@@ -478,7 +500,7 @@ impl Player {
         };
 
         eos.store(false, Ordering::Release);
-        let info = self.spawn_decoder(&song, src_params, current_adj, producer, eos, signal)?;
+        let info = self.spawn_decoder(&song, src_params, current_adj, producer, eos, signal, None)?;
         Ok(Some(info))
     }
 }

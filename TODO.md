@@ -17,8 +17,8 @@ Comprehensive review of the rhap codebase — Rust best practices, performance, 
 - [x] **XRUN in `get_writable_bytes` is fatal** (`alsa/api.rs:158`) — Fixed: recover via `try_recover` and re-query, matching the `write()` recovery pattern.
 - [x] **PipeWire `expect()` panic in spawned thread** (`pipewire/api.rs:131`) — Fixed: `build_audio_format_params` returns `Result`, propagated to caller.
 - [x] **PipeWire ALSA device 0 hardcoded** (`pipewire/host.rs:42`) — Documented: profile_device index in object.path doesn't map to ALSA PCM device number. Device 0 is correct for USB DACs; HDA cards typically share codec capabilities across PCM devices.
-- [ ] **PipeWire default device is first enumerated** (`pipewire/host.rs:139`) — Not PipeWire's actual default. Requires querying `default.audio.sink` metadata (complex).
-- [ ] **File probed twice per play** (`musictrack.rs:53,128`) — `new()` probes metadata, `open_for_playback()` re-probes from scratch. Needs architecture change to share the reader.
+- [x] **PipeWire default device is first enumerated** (`pipewire/host.rs:139`) — Fixed: use `priority.session` from global props to identify the highest-priority sink as default.
+- [x] **File probed twice per play** (`musictrack.rs:53,128`) — Fixed: added `probe_and_open()` that returns metadata + PlaybackHandle in one probe. Used in `play()` for unprobed tracks.
 - [x] **FFT resampler rebuilt on every frame-count change** (`player.rs`, resampler) — Fixed: pad short packets with silence instead of rebuilding FFT plan, trim output proportionally.
 - [x] **`auto_advance` retries all tracks in one UI tick** (`app_state.rs:79`) — Fixed: limit retries to 5 to avoid blocking UI.
 - [x] **PipeWire detection unreliable** (`host.rs:75`) — Fixed: try actual device enumeration via PipeWire instead of checking socket path.
