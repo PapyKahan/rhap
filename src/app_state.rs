@@ -319,15 +319,18 @@ impl AppState {
 
     fn next(&mut self, playlist: &Playlist) -> Result<()> {
         let len = playlist.songs_len();
-        self.playing_track_index = if self.playing_track_index + 1 > len - 1 {
-            0
-        } else {
-            self.playing_track_index + 1
-        };
+        if len == 0 {
+            return Ok(());
+        }
+        self.playing_track_index = (self.playing_track_index + 1) % len;
         self.play(playlist)
     }
 
     fn previous(&mut self, playlist: &Playlist) -> Result<()> {
+        let len = playlist.songs_len();
+        if len == 0 {
+            return Ok(());
+        }
         if let Some(current_track) = &self.playing_track {
             let elapsed_time = current_track.get_elapsed_time();
             if elapsed_time.seconds > 3 {
@@ -335,7 +338,6 @@ impl AppState {
                 return Ok(());
             }
         }
-        let len = playlist.songs_len();
         self.playing_track_index = if self.playing_track_index == 0 {
             len - 1
         } else {

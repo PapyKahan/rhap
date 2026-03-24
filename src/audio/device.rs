@@ -34,7 +34,7 @@ pub struct AudioPipeline {
     pub signal: Arc<BufferSignal>,
 }
 
-pub trait DeviceTrait: Send + Sync {
+pub trait DeviceTrait: Send {
     fn is_default(&self) -> Result<bool>;
     fn name(&self) -> Result<String>;
     fn get_capabilities(&self) -> Result<Capabilities>;

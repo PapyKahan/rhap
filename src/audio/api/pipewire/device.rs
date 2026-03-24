@@ -39,8 +39,9 @@ impl Device {
 // thread. The stream handle's command sender is Send. Device itself is not
 // shared concurrently — it is owned by the Player and only accessed from the
 // main/UI thread while the audio thread runs independently.
+// SAFETY: PipeWire stream handle's command sender is Send. Device is moved
+// between threads but never shared concurrently.
 unsafe impl Send for Device {}
-unsafe impl Sync for Device {}
 
 impl DeviceTrait for Device {
     fn is_default(&self) -> Result<bool> {

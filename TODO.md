@@ -4,11 +4,11 @@ Comprehensive review of the rhap codebase — Rust best practices, performance, 
 
 ## Critical
 
-- [ ] **ALSA short write discards frames** (`alsa/api.rs:112`) — `writei` returning fewer frames than requested is normal; the tail is silently dropped instead of retried. Audio frames are permanently lost on every short write.
-- [ ] **ALSA `nice()` check is wrong** (`alsa/api.rs:315`) — `nice()` can legitimately return -1 on success. Must clear `errno` before the call and check it after, not check the return value.
-- [ ] **PipeWire `unsafe impl Sync` is unsound** (`pipewire/device.rs:42`) — `Device` has no interior synchronization. Two threads could call `start()`/`stop()` concurrently through `&Device`. The trait requires `Sync` but the impl is unsafe without a `Mutex`.
-- [ ] **Integer underflow panic on empty playlist** (`app_state.rs:322`) — `len - 1` underflows for `usize` when `playlist.songs_len() == 0`. Same in `previous()`.
-- [ ] **Stop ordering race** (`player.rs:217`) — `stop()` joins the decoder thread, then calls `device.stop()`. The audio output thread is still consuming the ring buffer and calling into the driver while the device is being torn down.
+- [x] **ALSA short write discards frames** (`alsa/api.rs:112`) — Fixed: retry with remaining data offset instead of discarding.
+- [x] **ALSA `nice()` check is wrong** (`alsa/api.rs:315`) — Fixed: clear and check errno instead of return value.
+- [x] **PipeWire `unsafe impl Sync` is unsound** (`pipewire/device.rs:42`) — Fixed: removed `Sync` bound from `DeviceTrait` and all `unsafe impl Sync` (Device is never shared across threads).
+- [x] **Integer underflow panic on empty playlist** (`app_state.rs:322`) — Fixed: guard `len == 0` in both `next()` and `previous()`, use modular arithmetic.
+- [x] **Stop ordering race** (`player.rs:217`) — Fixed: stop device (audio output thread) before joining decoder thread.
 
 ## Major
 

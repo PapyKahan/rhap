@@ -216,18 +216,19 @@ impl Player {
     pub fn stop(&mut self) -> Result<()> {
         self.is_playing.store(false, Ordering::Release);
         self.is_paused.store(false, Ordering::Relaxed);
+        // Stop the audio device FIRST so the output thread exits and releases
+        // driver resources before we join the decoder thread. This prevents
+        // the output thread from calling into the driver while it's being torn down.
+        if let Some(mut device) = self.current_device.take() {
+            device.stop()?;
+        }
         if let Some(handle) = self.streaming_handle.take() {
             match handle.join() {
-                Ok(DecoderResult::EndOfTrack { end_of_stream, .. }) => {
-                    end_of_stream.store(true, Ordering::Release);
-                }
+                Ok(DecoderResult::EndOfTrack { .. }) => {}
                 Ok(DecoderResult::Stopped) => {}
                 Ok(DecoderResult::Error(e)) => error!("Decoder thread error: {:#}", e),
                 Err(_) => error!("Decoder thread panicked"),
             }
-        }
-        if let Some(mut device) = self.current_device.take() {
-            device.stop()?;
         }
         self.cached_capabilities = None;
         self.current_adjusted_params = None;

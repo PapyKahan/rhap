@@ -63,7 +63,6 @@ impl Device {
 // MTA COM objects can be safely called from any thread. Device is moved between
 // threads but not shared concurrently.
 unsafe impl Send for Device {}
-unsafe impl Sync for Device {}
 
 impl DeviceTrait for Device {
     fn is_default(&self) -> Result<bool> {

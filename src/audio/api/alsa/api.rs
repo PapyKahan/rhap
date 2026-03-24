@@ -104,25 +104,23 @@ impl AlsaPcm {
     }
 
     /// Write interleaved PCM bytes to the device, with XRUN recovery.
+    /// Handles short writes by retrying with the remaining data.
     pub fn write(&self, data: &[u8]) -> Result<()> {
-        let frames_expected = (data.len() / self.frame_bytes) as alsa::pcm::Frames;
-        loop {
+        let mut offset = 0;
+        while offset < data.len() {
             let io = self.pcm.io_bytes();
-            match io.writei(data) {
-                Ok(n) if n == frames_expected as usize => return Ok(()),
+            match io.writei(&data[offset..]) {
                 Ok(n) => {
-                    warn!("ALSA short write: wrote {} of {} frames", n, frames_expected);
-                    return Ok(());
+                    offset += n * self.frame_bytes;
                 }
                 Err(e) => {
-                    // Attempt XRUN recovery; if recovery itself fails, propagate
                     self.pcm
                         .try_recover(e, false)
                         .map_err(|e2| anyhow!("ALSA xrun recovery failed: {}", e2))?;
-                    // Loop and retry after successful recovery
                 }
             }
         }
+        Ok(())
     }
 
     /// Block until all buffered audio has been played out.
@@ -310,10 +308,13 @@ impl ThreadPriority {
         let param = libc::sched_param { sched_priority: 50 };
         let result = unsafe { libc::sched_setscheduler(0, libc::SCHED_FIFO, &param) };
         if result != 0 {
-            // Fall back to nice(-11)
-            let nice_result = unsafe { libc::nice(-11) };
-            if nice_result == -1 {
-                warn!("Failed to set thread priority: both SCHED_FIFO and nice() failed");
+            // Fall back to nice(-11). nice() can return -1 on success,
+            // so we must check errno instead of the return value.
+            unsafe { *libc::__errno_location() = 0 };
+            unsafe { libc::nice(-11) };
+            let errno = unsafe { *libc::__errno_location() };
+            if errno != 0 {
+                warn!("Failed to set thread priority: both SCHED_FIFO and nice() failed (errno={})", errno);
             }
         }
         Ok(Self)
