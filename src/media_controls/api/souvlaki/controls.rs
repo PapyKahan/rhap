@@ -22,6 +22,8 @@ impl SouvlakiMediaControls {
             display_name: "rhap",
             #[cfg(target_os = "windows")]
             hwnd: Some(hwnd_guard.as_ptr()),
+            #[cfg(not(target_os = "windows"))]
+            hwnd: None,
         };
 
         let mut controls =
