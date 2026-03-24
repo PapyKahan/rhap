@@ -73,6 +73,7 @@ pub fn start_stream(
     let sample_rate = params.samplerate.0;
     let channels = params.channels as u32;
     let bytes_per_frame = (params.bits_per_sample.0 / 8) as usize * channels as usize;
+    let exclusive = params.exclusive;
 
     let (cmd_sender, cmd_receiver) = pw::channel::channel::<StreamCommand>();
 
@@ -84,6 +85,7 @@ pub fn start_stream(
                 sample_rate,
                 channels,
                 bytes_per_frame,
+                exclusive,
                 consumer,
                 end_of_stream,
                 signal,
@@ -136,6 +138,7 @@ fn run_pipewire_loop(
     sample_rate: u32,
     channels: u32,
     bytes_per_frame: usize,
+    exclusive: bool,
     consumer: HeapCons<u8>,
     end_of_stream: Arc<AtomicBool>,
     signal: Arc<BufferSignal>,
@@ -164,9 +167,14 @@ fn run_pipewire_loop(
     };
     // Request PipeWire to switch the graph clock to the stream's native rate.
     // Without this, PipeWire keeps its default rate (usually 48000) and resamples.
-    let rate_str = format!("1/{}", sample_rate);
-    props.insert("node.rate", rate_str);
+    props.insert("node.rate", format!("1/{}", sample_rate));
     props.insert("node.force-rate", format!("1/{}", sample_rate));
+
+    if exclusive {
+        // Ask WirePlumber to cork all other streams on this sink,
+        // preventing mixing and ensuring dedicated graph processing.
+        props.insert("node.exclusive", "true");
+    }
 
     let stream = StreamBox::new(&core, "rhap", props)?;
 

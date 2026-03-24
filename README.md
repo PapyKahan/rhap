@@ -89,7 +89,15 @@ rhap --backend alsa -p ~/Music/ -d 5
 
 ### Linux: PipeWire (Desktop-Friendly)
 
-PipeWire is the default backend on Linux when a PipeWire daemon is detected. It integrates with the desktop audio stack, allowing other applications to play audio simultaneously.
+PipeWire is the default backend on Linux when a PipeWire daemon is detected. It integrates with the desktop audio stack while providing near-bitperfect output through several stream properties:
+
+- **`node.passthrough=true`** — bypasses PipeWire's format conversion and per-stream volume processing
+- **`node.exclusive=true`** — tells WirePlumber to cork (pause) all other streams on the sink, preventing mixing
+- **`node.force-rate`** — requests PipeWire to switch the graph clock to the stream's native sample rate
+
+With these properties and proper configuration (see below), the audio path through PipeWire is: raw samples from rhap → PipeWire graph (no conversion, no mixing) → ALSA sink → DAC.
+
+The only remaining processing is the **sink-level volume**. When it's at 100% (unity gain), the output is bitperfect. Control volume on your DAC/amplifier instead of software for best results.
 
 **Usage:**
 ```
@@ -102,10 +110,9 @@ rhap --backend pipewire -p ~/Music/
 |-----------|----------|----------|
 | Rate matches hardware | bitperfect | bitperfect |
 | Rate exceeds hardware | resampled | resampled |
-| Volume at 100% | bitperfect | N/A (no software volume) |
-| Volume not 100% | modified | N/A |
-| Single stream | bitperfect | always exclusive |
-| Multiple streams | mixed | other apps blocked |
+| Sink volume at 100% | bitperfect | N/A (no software volume) |
+| Sink volume not 100% | modified | N/A |
+| Other streams | corked (exclusive) | other apps blocked |
 
 ### Configuring PipeWire for Optimal Playback
 
