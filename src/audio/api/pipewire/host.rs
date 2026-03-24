@@ -18,6 +18,28 @@ struct SinkInfo {
     id: u32,
     node_name: String,
     description: String,
+    alsa_path: Option<String>,
+}
+
+/// Resolve a PipeWire object.path like "alsa:acp:DAC:1:playback" to an ALSA hw: path.
+/// Uses /proc/asound/<card_id> symlink to map the card ID to a card number.
+fn resolve_alsa_path_from_object_path(object_path: &str) -> Option<String> {
+    // Format: "alsa:acp:<card_id>:<profile_device>:playback"
+    let parts: Vec<&str> = object_path.split(':').collect();
+    if parts.len() < 4 || parts[0] != "alsa" {
+        return None;
+    }
+    let card_id = parts[2];
+
+    // Resolve card ID to card number via /proc/asound/<card_id> → cardN symlink
+    let proc_path = format!("/proc/asound/{}", card_id);
+    let link_target = std::fs::read_link(&proc_path).ok()?;
+    let target_str = link_target.to_str()?;
+    let card_num: u32 = target_str.strip_prefix("card")?.parse().ok()?;
+
+    // USB audio devices typically have a single PCM device 0.
+    // For multi-device cards, device 0 is the primary playback device.
+    Some(format!("hw:{},0", card_num))
 }
 
 fn enumerate_sinks() -> Result<Vec<SinkInfo>> {
@@ -57,15 +79,21 @@ fn enumerate_sinks() -> Result<Vec<SinkInfo>> {
                 .unwrap_or(&node_name)
                 .to_string();
 
+            // Derive ALSA hw: path from object.path (e.g. "alsa:acp:DAC:1:playback").
+            // The card ID (e.g. "DAC") resolves to a card number via /proc/asound/<id> symlink.
+            let alsa_path = props.get("object.path")
+                .and_then(|op| resolve_alsa_path_from_object_path(op));
+
             debug!(
-                "Found PipeWire sink: id={}, name={}, desc={}",
-                global.id, node_name, description
+                "Found PipeWire sink: id={}, name={}, desc={}, alsa={:?}",
+                global.id, node_name, description, alsa_path
             );
 
             sinks_for_global.borrow_mut().push(SinkInfo {
                 id: global.id,
                 node_name,
                 description,
+                alsa_path,
             });
         })
         .register();
@@ -109,6 +137,7 @@ impl HostTrait for Host {
                     sink.node_name,
                     sink.description,
                     i == 0,
+                    sink.alsa_path,
                 ))
             })
             .collect();
@@ -128,6 +157,7 @@ impl HostTrait for Host {
                     sink.node_name,
                     sink.description,
                     false,
+                    sink.alsa_path,
                 )))
             }
             None => {
@@ -140,6 +170,7 @@ impl HostTrait for Host {
                     sink.node_name,
                     sink.description,
                     true,
+                    sink.alsa_path,
                 )))
             }
         }

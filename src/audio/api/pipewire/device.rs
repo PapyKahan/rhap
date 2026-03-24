@@ -13,6 +13,7 @@ pub struct Device {
     node_id: u32,
     description: String,
     is_default_device: bool,
+    alsa_path: Option<String>,
     stream_handle: Option<PwStreamHandle>,
 }
 
@@ -22,11 +23,13 @@ impl Device {
         _node_name: String,
         description: String,
         is_default_device: bool,
+        alsa_path: Option<String>,
     ) -> Self {
         Self {
             node_id,
             description,
             is_default_device,
+            alsa_path,
             stream_handle: None,
         }
     }
@@ -49,7 +52,18 @@ impl DeviceTrait for Device {
     }
 
     fn get_capabilities(&self) -> Result<Capabilities> {
-        // PipeWire handles format conversion transparently; report all formats.
+        // Probe the underlying ALSA device if available for accurate capabilities.
+        if let Some(ref alsa_path) = self.alsa_path {
+            if let Ok((rates, bits)) = crate::audio::api::alsa::api::probe_capabilities(alsa_path) {
+                if !rates.is_empty() && !bits.is_empty() {
+                    return Ok(Capabilities {
+                        sample_rates: rates,
+                        bits_per_samples: bits,
+                    });
+                }
+            }
+        }
+        // Non-ALSA sinks (Bluetooth, etc.): report all formats since PipeWire converts.
         Ok(Capabilities::all_possible())
     }
 

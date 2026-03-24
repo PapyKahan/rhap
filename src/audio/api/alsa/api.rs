@@ -184,10 +184,77 @@ impl AlsaPcm {
     }
 }
 
-/// Probe the capabilities of a named ALSA device by testing format/rate combos.
+/// Probe the capabilities of a named ALSA device.
+/// For USB audio devices, reads the authoritative USB stream descriptors from
+/// /proc/asound/. Falls back to hw_params probing for non-USB devices.
+pub fn probe_capabilities(device_name: &str) -> Result<(Vec<SampleRate>, Vec<BitsPerSample>)> {
+    // Extract card number from "hw:N,D"
+    if let Some(card_num) = parse_card_number(device_name) {
+        if let Some(caps) = probe_usb_stream_descriptors(card_num) {
+            return Ok(caps);
+        }
+    }
+    probe_capabilities_hwparams(device_name)
+}
+
+/// Parse card number from an ALSA device name like "hw:5,0" → Some(5)
+fn parse_card_number(device_name: &str) -> Option<u32> {
+    let rest = device_name.strip_prefix("hw:")?;
+    let card_str = rest.split(',').next()?;
+    card_str.parse().ok()
+}
+
+/// Read USB audio stream descriptors from /proc/asound/cardN/stream0.
+/// Returns None if the file doesn't exist (non-USB device).
+fn probe_usb_stream_descriptors(card: u32) -> Option<(Vec<SampleRate>, Vec<BitsPerSample>)> {
+    let path = format!("/proc/asound/card{}/stream0", card);
+    let content = std::fs::read_to_string(&path).ok()?;
+
+    // Find the Playback section
+    let playback_section = content.split("Playback:").nth(1)?;
+
+    let mut rates = Vec::new();
+    let mut bits = Vec::new();
+
+    for line in playback_section.lines() {
+        let trimmed = line.trim();
+
+        // Parse "Rates: 96000, 88200, 48000, 44100"
+        if let Some(rates_str) = trimmed.strip_prefix("Rates:") {
+            for rate_str in rates_str.split(',') {
+                if let Ok(rate) = rate_str.trim().parse::<u32>() {
+                    let sr = SampleRate(rate);
+                    if !rates.contains(&sr) {
+                        rates.push(sr);
+                    }
+                }
+            }
+        }
+
+        // Parse "Bits: 24"
+        if let Some(bits_str) = trimmed.strip_prefix("Bits:") {
+            if let Ok(b) = bits_str.trim().parse::<u16>() {
+                let bps = BitsPerSample(b);
+                if !bits.contains(&bps) {
+                    bits.push(bps);
+                }
+            }
+        }
+    }
+
+    if rates.is_empty() || bits.is_empty() {
+        return None;
+    }
+
+    rates.sort();
+    bits.sort();
+    Some((rates, bits))
+}
+
+/// Probe capabilities via ALSA hw_params (non-USB fallback).
 /// Each test sets access, channels, format, AND rate together — some drivers
 /// reject params unless the full configuration is constrained.
-pub fn probe_capabilities(device_name: &str) -> Result<(Vec<SampleRate>, Vec<BitsPerSample>)> {
+fn probe_capabilities_hwparams(device_name: &str) -> Result<(Vec<SampleRate>, Vec<BitsPerSample>)> {
     let pcm = PCM::new(device_name, Direction::Playback, false)
         .map_err(|e| anyhow!("Cannot open device '{}' for probing: {}", device_name, e))?;
 
