@@ -1,7 +1,7 @@
 use anyhow::Result;
 use log::error;
 use audioadapter_buffers::direct::SequentialSliceOfVecs;
-use rubato::{Fft, FixedSync, Resampler};
+use rubato::{Fft, FixedSync, Indexing, Resampler};
 use symphonia::core::{
     audio::{AudioBuffer, AudioBufferRef, Signal},
     conv::{FromSample, IntoSample},
@@ -15,8 +15,6 @@ pub struct RubatoResampler<O> {
     input: Vec<Vec<f64>>,
     output: Vec<Vec<f64>>,
     interleaved_output: Vec<O>,
-    from_samplerate: usize,
-    to_samplerate: usize,
     frames: usize,
     channels: usize,
 }
@@ -53,34 +51,38 @@ where
             input,
             output,
             interleaved_output,
-            from_samplerate,
-            to_samplerate,
             frames,
             channels,
         })
     }
 
     pub fn resample(&mut self, input: &AudioBufferRef<'_>) -> Result<&[O]> {
-        // Rubato's FixedSync::Input requires exact frame counts matching the FFT plan.
-        // When the frame count changes (e.g. last packet of a track), the plan must be rebuilt.
-        if input.frames() != self.frames {
-            self.frames = input.frames();
-            self.resampler = rubato::Fft::<f64>::new(
-                self.from_samplerate,
-                self.to_samplerate,
-                self.frames,
-                1,
-                self.channels,
-                FixedSync::Input,
-            )?;
-            let output_frames = self.resampler.output_frames_max();
-            let input_frames = self.resampler.input_frames_max();
-            self.output = vec![vec![0.0f64; output_frames]; self.channels];
-            self.input = vec![vec![0.0f64; input_frames]; self.channels];
-        }
+        let actual_frames = input.frames();
+
         match input {
             AudioBufferRef::S32(buffer) => {
                 copy_samples_vec(buffer, &mut self.input);
+
+                // For short packets (e.g. last packet of a track), pad input
+                // to chunk_size and use partial_len instead of rebuilding
+                // the FFT plan, which is expensive.
+                let is_partial = actual_frames < self.frames;
+                if is_partial {
+                    for ch in &mut self.input {
+                        ch.resize(self.frames, 0.0);
+                    }
+                }
+
+                let indexing = if is_partial {
+                    Some(Indexing {
+                        input_offset: 0,
+                        output_offset: 0,
+                        partial_len: Some(actual_frames),
+                        active_channels_mask: None,
+                    })
+                } else {
+                    None
+                };
 
                 let input_adapter = SequentialSliceOfVecs::new(
                     &self.input,
@@ -95,7 +97,7 @@ where
                 let (_in_frames, out_frames) = self.resampler.process_into_buffer(
                     &input_adapter,
                     &mut output_adapter,
-                    None,
+                    indexing.as_ref(),
                 )?;
 
                 self.input.iter_mut().for_each(|channel| {
