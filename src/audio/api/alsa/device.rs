@@ -137,6 +137,7 @@ impl DeviceTrait for Device {
                         }
                     }
 
+                    pcm.stop();
                     Ok(())
                 })?,
         );

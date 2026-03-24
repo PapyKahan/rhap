@@ -10,6 +10,7 @@ mod action;
 mod app_state;
 mod audio;
 mod media_controls;
+#[cfg(target_os = "windows")]
 mod notifications;
 mod musictrack;
 mod player;
@@ -115,9 +116,12 @@ fn main() -> Result<()> {
         None => (None, None),
     };
 
+    #[cfg(target_os = "windows")]
     let notifications = notifications::create_notifications()
         .map_err(|e| log::warn!("Notifications unavailable: {}", e))
         .ok();
+    #[cfg(not(target_os = "windows"))]
+    let notifications = None;
 
     let mut app = App::new(host, player, path, media_backend, media_event_rx, notifications, picker)?;
     app.run(&mut terminal)?;

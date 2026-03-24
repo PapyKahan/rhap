@@ -18,6 +18,7 @@ pub fn init_platform() {
 pub struct TrackMetadata<'a> {
     pub title: &'a str,
     pub artist: &'a str,
+    pub album: &'a str,
     pub duration: Option<Duration>,
     pub cover_url: Option<&'a str>,
 }

@@ -72,6 +72,7 @@ impl MediaControlsTrait for SouvlakiMediaControls {
             .set_metadata(MediaMetadata {
                 title: Some(metadata.title),
                 artist: Some(metadata.artist),
+                album: Some(metadata.album),
                 duration: metadata.duration,
                 cover_url: metadata.cover_url,
                 ..Default::default()

@@ -131,6 +131,10 @@ impl CurrentlyPlayingWidget {
                     Span::styled(&track_info.artist, ctx.theme.text),
                 ]),
                 Line::from(vec![
+                    Span::styled("Album: ", ctx.theme.text_bold),
+                    Span::styled(&track_info.album, ctx.theme.text),
+                ]),
+                Line::from(vec![
                     Span::styled("Info: ", ctx.theme.text_bold),
                     Span::styled(format!("{}", track_info.info), ctx.theme.text),
                 ]),

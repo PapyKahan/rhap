@@ -9,10 +9,11 @@ use crate::{
     app_state::AppState,
     audio::Host,
     media_controls::MediaControlsBackend,
-    notifications::NotificationsBackend,
     player::Player,
     ui::theme::Theme,
 };
+#[cfg(target_os = "windows")]
+use crate::notifications::NotificationsBackend;
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use crossterm::terminal::SetTitle;
@@ -38,11 +39,17 @@ impl App {
         path: PathBuf,
         media_controls: Option<MediaControlsBackend>,
         media_event_rx: Option<std::sync::mpsc::Receiver<Action>>,
+        #[cfg(target_os = "windows")]
         notifications: Option<NotificationsBackend>,
+        #[cfg(not(target_os = "windows"))]
+        _notifications: Option<std::convert::Infallible>,
         picker: Option<ratatui_image::picker::Picker>,
     ) -> Result<Self> {
         Ok(Self {
+            #[cfg(target_os = "windows")]
             state: AppState::new(player, media_controls, notifications),
+            #[cfg(not(target_os = "windows"))]
+            state: AppState::new(player, media_controls, None),
             theme: Theme::default(),
             playlist: Playlist::new(path, picker)?,
             output_selector: DeviceSelector::new(host)?,

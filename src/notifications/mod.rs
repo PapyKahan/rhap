@@ -14,29 +14,18 @@ pub trait NotificationsTrait {
 }
 
 pub enum NotificationsBackend {
-    #[cfg(target_os = "windows")]
     WinRt(api::winrt::WinRtNotifications),
-    #[cfg(not(target_os = "windows"))]
-    Unsupported,
 }
 
 impl NotificationsTrait for NotificationsBackend {
-    fn show_track_change(&self, _content: &NotificationContent) -> Result<()> {
+    fn show_track_change(&self, content: &NotificationContent) -> Result<()> {
         match self {
-            #[cfg(target_os = "windows")]
-            Self::WinRt(n) => n.show_track_change(_content),
-            #[cfg(not(target_os = "windows"))]
-            Self::Unsupported => Ok(()),
+            Self::WinRt(n) => n.show_track_change(content),
         }
     }
 }
 
 pub fn create_notifications() -> Result<NotificationsBackend> {
-    #[cfg(target_os = "windows")]
-    {
-        let n = api::winrt::WinRtNotifications::new()?;
-        return Ok(NotificationsBackend::WinRt(n));
-    }
-    #[cfg(not(target_os = "windows"))]
-    Err(anyhow::anyhow!("Notifications not supported on this platform"))
+    let n = api::winrt::WinRtNotifications::new()?;
+    Ok(NotificationsBackend::WinRt(n))
 }

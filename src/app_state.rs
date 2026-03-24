@@ -7,6 +7,7 @@ use anyhow::Result;
 use crate::action::{Action, Layer};
 use crate::media_controls::{MediaControlsBackend, MediaControlsTrait, PlaybackStatus, TrackMetadata};
 use crate::musictrack::MusicTrack;
+#[cfg(target_os = "windows")]
 use crate::notifications::{NotificationsBackend, NotificationContent, NotificationsTrait};
 use crate::player::{CurrentTrackInfo, Player};
 use crate::ui::component::RenderContext;
@@ -17,6 +18,7 @@ use crate::ui::widgets::{DeviceSelector, SearchWidget};
 struct CoverArtFile {
     _path: tempfile::TempPath,
     url: String,
+    #[cfg(target_os = "windows")]
     fs_path: String,
 }
 
@@ -29,6 +31,7 @@ pub struct AppState {
     pub layers: Vec<Layer>,
     pub status_message: Option<String>,
     pub media_controls: Option<MediaControlsBackend>,
+    #[cfg(target_os = "windows")]
     pub notifications: Option<NotificationsBackend>,
     cover_art_file: Option<CoverArtFile>,
     metadata_dirty: bool,
@@ -38,7 +41,8 @@ impl AppState {
     pub fn new(
         player: Player,
         media_controls: Option<MediaControlsBackend>,
-        notifications: Option<NotificationsBackend>,
+        #[cfg(target_os = "windows")] notifications: Option<NotificationsBackend>,
+        #[cfg(not(target_os = "windows"))] _notifications: Option<std::convert::Infallible>,
     ) -> Self {
         Self {
             player,
@@ -48,6 +52,7 @@ impl AppState {
             layers: vec![],
             status_message: None,
             media_controls,
+            #[cfg(target_os = "windows")]
             notifications,
             cover_art_file: None,
             metadata_dirty: false,
@@ -201,6 +206,7 @@ impl AppState {
                     let metadata_with_cover = TrackMetadata {
                         title: &track.title,
                         artist: &track.artist,
+                        album: &track.album,
                         duration: Some(Duration::from_secs(track.total_duration.seconds)),
                         cover_url,
                     };
@@ -212,6 +218,7 @@ impl AppState {
                         });
                     }
                 }
+                #[cfg(target_os = "windows")]
                 if let Some(notif) = &self.notifications {
                     let cover_path = self.cover_art_file.as_ref().map(|f| f.fs_path.as_str());
                     let content = NotificationContent {
@@ -262,9 +269,13 @@ impl AppState {
                     // Windows Storage API needs backslash paths; strip \\?\ UNC prefix from canonicalize
                     let path_str = full_path.to_string_lossy();
                     let path_str = path_str.strip_prefix(r"\\?\").unwrap_or(&path_str);
-                    let fs_path = path_str.to_string();
                     let url = format!("file://{}", path_str);
-                    Ok(CoverArtFile { _path: temp_path, url, fs_path })
+                    Ok(CoverArtFile {
+                        _path: temp_path,
+                        url,
+                        #[cfg(target_os = "windows")]
+                        fs_path: path_str.to_string(),
+                    })
                 })() {
                     Ok(caf) => self.cover_art_file = Some(caf),
                     Err(e) => log::warn!("Failed to write cover art temp file: {}", e),

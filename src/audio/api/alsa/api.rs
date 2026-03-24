@@ -178,10 +178,6 @@ impl AlsaPcm {
     pub fn buffer_bytes(&self) -> usize {
         self.buffer_bytes
     }
-
-    pub fn frame_bytes(&self) -> usize {
-        self.frame_bytes
-    }
 }
 
 /// Probe the capabilities of a named ALSA device.
