@@ -55,6 +55,7 @@ features = [
 
 [target.'cfg(target_os = "linux")'.dependencies]
 alsa = "0.9"
+pipewire = "0.9"
 libc = "0.2"
 
 [target.'cfg(target_os = "linux")'.dependencies.souvlaki]

@@ -50,6 +50,8 @@ pub enum Device {
     Wasapi(api::wasapi::device::Device),
     #[cfg(target_os = "linux")]
     Alsa(api::alsa::device::Device),
+    #[cfg(target_os = "linux")]
+    PipeWire(api::pipewire::device::Device),
 }
 
 impl DeviceTrait for Device {
@@ -60,6 +62,8 @@ impl DeviceTrait for Device {
             Self::Wasapi(device) => device.is_default(),
             #[cfg(target_os = "linux")]
             Self::Alsa(device) => device.is_default(),
+            #[cfg(target_os = "linux")]
+            Self::PipeWire(device) => device.is_default(),
         }
     }
 
@@ -70,6 +74,8 @@ impl DeviceTrait for Device {
             Self::Wasapi(device) => device.name(),
             #[cfg(target_os = "linux")]
             Self::Alsa(device) => device.name(),
+            #[cfg(target_os = "linux")]
+            Self::PipeWire(device) => device.name(),
         }
     }
 
@@ -80,6 +86,8 @@ impl DeviceTrait for Device {
             Self::Wasapi(device) => device.get_capabilities(),
             #[cfg(target_os = "linux")]
             Self::Alsa(device) => device.get_capabilities(),
+            #[cfg(target_os = "linux")]
+            Self::PipeWire(device) => device.get_capabilities(),
         }
     }
 
@@ -90,6 +98,8 @@ impl DeviceTrait for Device {
             Self::Wasapi(device) => device.start(params),
             #[cfg(target_os = "linux")]
             Self::Alsa(device) => device.start(params),
+            #[cfg(target_os = "linux")]
+            Self::PipeWire(device) => device.start(params),
         }
     }
 
@@ -100,6 +110,8 @@ impl DeviceTrait for Device {
             Self::Wasapi(device) => device.pause(),
             #[cfg(target_os = "linux")]
             Self::Alsa(device) => device.pause(),
+            #[cfg(target_os = "linux")]
+            Self::PipeWire(device) => device.pause(),
         }
     }
 
@@ -110,6 +122,8 @@ impl DeviceTrait for Device {
             Self::Wasapi(device) => device.resume(),
             #[cfg(target_os = "linux")]
             Self::Alsa(device) => device.resume(),
+            #[cfg(target_os = "linux")]
+            Self::PipeWire(device) => device.resume(),
         }
     }
 
@@ -120,6 +134,8 @@ impl DeviceTrait for Device {
             Self::Wasapi(device) => device.stop(),
             #[cfg(target_os = "linux")]
             Self::Alsa(device) => device.stop(),
+            #[cfg(target_os = "linux")]
+            Self::PipeWire(device) => device.stop(),
         }
     }
 }

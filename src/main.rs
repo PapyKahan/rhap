@@ -39,15 +39,6 @@ struct Args {
     backend: Option<String>,
 }
 
-fn default_host_name() -> &'static str {
-    #[cfg(target_os = "windows")]
-    { return "wasapi"; }
-    #[cfg(target_os = "linux")]
-    { return "alsa"; }
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-    { "unknown" }
-}
-
 /// Convert a WSL `/mnt/<drive>/...` path to a Windows `<DRIVE>:\...` path.
 /// Only compiled on Windows targets — on Linux/macOS this is a no-op.
 fn wsl_path_to_windows(path: PathBuf) -> PathBuf {
@@ -80,7 +71,7 @@ fn main() -> Result<()> {
 
     let backend_name = args
         .backend
-        .unwrap_or_else(|| default_host_name().to_string());
+        .unwrap_or_else(|| "auto".to_string());
 
     if args.list {
         let host = Host::new(&backend_name, args.high_priority_mode);
