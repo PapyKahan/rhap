@@ -28,7 +28,7 @@ Comprehensive review of the rhap codebase — Rust best practices, performance, 
 - [x] **Elapsed time overcounts on stop** (`player.rs:334`) — Fixed: move `fetch_add` after `decode()` so elapsed time reflects decoded position.
 - [x] **Byte packing loop not vectorizable** (`player.rs:170`) — Analyzed: bulk reinterpret is impossible because Symphonia's `i24` is `struct i24(i32)` (4 bytes in memory) but `to_ne_bytes()` extracts 3 bytes. Per-sample loop is correct and the cost (~4ms/sec at 192kHz) is negligible vs FFT resampling.
 - [x] **`write_all_blocking` busy-polls at 5ms** (`player.rs:182`) — Fixed: notify once on full write, notify+wait on partial, wait-only when no progress.
-- [ ] **Double-atomic `is_playing` + `is_paused`** (`player.rs:258`) — Deferred: cosmetic. Only composed in UI display path; single-tick stale state is benign.
+- [x] **Double-atomic `is_playing` + `is_paused`** (`player.rs:258`) — Fixed: replaced with single `AtomicU8` state machine (STATE_STOPPED/PLAYING/PAUSED). Single atomic read for all state queries.
 - [x] **PipeWire `RefCell::borrow_mut()` panic risk** (`pipewire/api.rs:189`) — Fixed: use `try_borrow_mut()` with early return on contention.
 - [x] **PipeWire `node.passthrough` unconditional** (`pipewire/api.rs:166`) — Fixed: only set in exclusive mode. Bluetooth sinks won't be rejected.
 - [x] **32-bit mapped to F32LE only** (`pipewire/api.rs:105`) — Documented: correct behavior. WASAPI and Symphonia both use IEEE float for 32-bit; ring buffer always contains F32LE.

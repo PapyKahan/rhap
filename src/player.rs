@@ -2,7 +2,7 @@ use anyhow::Result;
 use log::error;
 use ringbuf::HeapProd;
 use ringbuf::traits::Producer;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use symphonia::core::audio::{AudioBufferRef, RawSampleBuffer, SignalSpec};
@@ -28,6 +28,10 @@ enum DecoderResult {
     Error(anyhow::Error),
 }
 
+const STATE_STOPPED: u8 = 0;
+const STATE_PLAYING: u8 = 1;
+const STATE_PAUSED: u8 = 2;
+
 pub struct Player {
     current_device: Option<Device>,
     host: Host,
@@ -36,8 +40,7 @@ pub struct Player {
     gapless: bool,
     resample: bool,
     streaming_handle: Option<std::thread::JoinHandle<DecoderResult>>,
-    is_playing: Arc<AtomicBool>,
-    is_paused: Arc<AtomicBool>,
+    state: Arc<AtomicU8>,
     cached_capabilities: Option<Capabilities>,
     current_adjusted_params: Option<StreamParams>,
 }
@@ -179,10 +182,10 @@ impl Resampler {
     }
 }
 
-fn write_all_blocking(producer: &mut HeapProd<u8>, data: &[u8], is_playing: &AtomicBool, signal: &BufferSignal) {
+fn write_all_blocking(producer: &mut HeapProd<u8>, data: &[u8], state: &AtomicU8, signal: &BufferSignal) {
     let mut offset = 0;
     while offset < data.len() {
-        if !is_playing.load(Ordering::Acquire) {
+        if state.load(Ordering::Acquire) == STATE_STOPPED {
             return;
         }
         let n = producer.push_slice(&data[offset..]);
@@ -211,19 +214,14 @@ impl Player {
             gapless,
             resample,
             streaming_handle: None,
-            is_playing: Arc::new(AtomicBool::new(false)),
-            is_paused: Arc::new(AtomicBool::new(false)),
+            state: Arc::new(AtomicU8::new(STATE_STOPPED)),
             cached_capabilities: None,
             current_adjusted_params: None,
         })
     }
 
     pub fn stop(&mut self) -> Result<()> {
-        self.is_playing.store(false, Ordering::Release);
-        self.is_paused.store(false, Ordering::Relaxed);
-        // Stop the audio device FIRST so the output thread exits and releases
-        // driver resources before we join the decoder thread. This prevents
-        // the output thread from calling into the driver while it's being torn down.
+        self.state.store(STATE_STOPPED, Ordering::Release);
         if let Some(mut device) = self.current_device.take() {
             device.stop()?;
         }
@@ -241,31 +239,31 @@ impl Player {
     }
 
     pub fn pause(&mut self) -> Result<()> {
-        if !self.is_paused.load(Ordering::Relaxed) {
+        if self.state.load(Ordering::Relaxed) == STATE_PLAYING {
             if let Some(device) = self.current_device.as_mut() {
                 device.pause()?;
             }
-            self.is_paused.store(true, Ordering::Relaxed);
+            self.state.store(STATE_PAUSED, Ordering::Release);
         }
         Ok(())
     }
 
     pub fn resume(&mut self) -> Result<()> {
-        if self.is_paused.load(Ordering::Relaxed) {
+        if self.state.load(Ordering::Relaxed) == STATE_PAUSED {
             if let Some(device) = self.current_device.as_mut() {
                 device.resume()?;
             }
-            self.is_paused.store(false, Ordering::Relaxed);
+            self.state.store(STATE_PLAYING, Ordering::Release);
         }
         Ok(())
     }
 
     pub fn is_playing(&self) -> bool {
-        self.is_playing.load(Ordering::Relaxed) && !self.is_paused.load(Ordering::Relaxed)
+        self.state.load(Ordering::Relaxed) == STATE_PLAYING
     }
 
     pub fn is_paused(&self) -> bool {
-        self.is_paused.load(Ordering::Relaxed)
+        self.state.load(Ordering::Relaxed) == STATE_PAUSED
     }
 
     fn spawn_decoder(
@@ -298,11 +296,11 @@ impl Player {
 
         let is_streaming = Arc::new(AtomicBool::new(true));
         let report_streaming = Arc::clone(&is_streaming);
-        let is_playing = Arc::clone(&self.is_playing);
+        let state = Arc::clone(&self.state);
+        let state_for_write = Arc::clone(&self.state);
         let elapsed_time = Arc::new(AtomicU64::new(0));
         let elapsed_time_clone = Arc::clone(&elapsed_time);
         let total_duration = song.duration;
-        let is_playing_for_write = Arc::clone(&is_playing);
 
         self.streaming_handle = Some(
             std::thread::Builder::new()
@@ -328,7 +326,7 @@ impl Player {
 
                     let result: Result<()> = (|| {
                         loop {
-                            if !is_playing.load(Ordering::Acquire) {
+                            if state.load(Ordering::Acquire) == STATE_STOPPED {
                                 break;
                             }
                             let packet = match format.next_packet() {
@@ -364,11 +362,11 @@ impl Player {
                                 }
                                 let resampled = resampler.as_mut().unwrap();
                                 let bytes = resampled.resample_to_bytes(&decoded)?;
-                                write_all_blocking(&mut producer, bytes, &is_playing_for_write, &signal);
+                                write_all_blocking(&mut producer, bytes, &state_for_write, &signal);
                             } else {
                                 sample_buffer.copy_interleaved_ref(decoded);
                                 let bytes = sample_buffer.as_bytes();
-                                write_all_blocking(&mut producer, bytes, &is_playing_for_write, &signal);
+                                write_all_blocking(&mut producer, bytes, &state_for_write, &signal);
                             }
                         }
                         Ok(())
@@ -376,17 +374,15 @@ impl Player {
 
                     is_streaming.store(false, Ordering::Relaxed);
                     match result {
-                        Ok(()) if is_playing.load(Ordering::Acquire) => {
+                        Ok(()) if state.load(Ordering::Acquire) != STATE_STOPPED => {
                             DecoderResult::EndOfTrack { producer, end_of_stream, signal }
                         }
                         Ok(()) => {
                             end_of_stream.store(true, Ordering::Release);
-                            is_playing.store(false, Ordering::Release);
                             DecoderResult::Stopped
                         }
                         Err(e) => {
                             end_of_stream.store(true, Ordering::Release);
-                            is_playing.store(false, Ordering::Release);
                             DecoderResult::Error(e)
                         }
                     }
@@ -459,7 +455,7 @@ impl Player {
         self.cached_capabilities = Some(capabilities);
         self.current_adjusted_params = Some(adjusted_params);
 
-        self.is_playing.store(true, Ordering::Release);
+        self.state.store(STATE_PLAYING, Ordering::Release);
 
         self.spawn_decoder(
             &song,
