@@ -184,7 +184,9 @@ impl AlsaPcm {
     }
 }
 
-/// Probe the capabilities of a named ALSA device by testing format/rate support.
+/// Probe the capabilities of a named ALSA device by testing format/rate combos.
+/// Each test sets access, channels, format, AND rate together — some drivers
+/// reject params unless the full configuration is constrained.
 pub fn probe_capabilities(device_name: &str) -> Result<(Vec<SampleRate>, Vec<BitsPerSample>)> {
     let pcm = PCM::new(device_name, Direction::Playback, false)
         .map_err(|e| anyhow!("Cannot open device '{}' for probing: {}", device_name, e))?;
@@ -197,23 +199,33 @@ pub fn probe_capabilities(device_name: &str) -> Result<(Vec<SampleRate>, Vec<Bit
         let Ok(fmt) = bits_to_format(bits) else {
             continue;
         };
-        // Each test needs a fresh HwParams::any() so failed sets don't contaminate later tests
-        if let Ok(hwp) = HwParams::any(&pcm) {
-            if hwp.set_format(fmt).is_ok() && !supported_bits.contains(&bits) {
+        for &rate in &all.sample_rates {
+            let Ok(hwp) = HwParams::any(&pcm) else {
+                continue;
+            };
+            if hwp.set_access(Access::RWInterleaved).is_err() {
+                continue;
+            }
+            if hwp.set_channels(2).is_err() {
+                continue;
+            }
+            if hwp.set_format(fmt).is_err() {
+                continue;
+            }
+            if hwp.set_rate(rate.0, ValueOr::Nearest).is_err() {
+                continue;
+            }
+            let Ok(actual_rate) = hwp.get_rate() else {
+                continue;
+            };
+            if actual_rate != rate.0 {
+                continue;
+            }
+            if !supported_bits.contains(&bits) {
                 supported_bits.push(bits);
             }
-        }
-    }
-
-    for &rate in &all.sample_rates {
-        if let Ok(hwp) = HwParams::any(&pcm) {
-            if let Ok(actual) = hwp
-                .set_rate(rate.0, ValueOr::Nearest)
-                .and_then(|_| hwp.get_rate())
-            {
-                if actual == rate.0 && !supported_rates.contains(&rate) {
-                    supported_rates.push(rate);
-                }
+            if !supported_rates.contains(&rate) {
+                supported_rates.push(rate);
             }
         }
     }

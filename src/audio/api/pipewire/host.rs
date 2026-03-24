@@ -88,6 +88,10 @@ fn enumerate_sinks() -> Result<Vec<SinkInfo>> {
 
     main_loop.run();
 
+    // Drop listeners to release their Rc clones of `sinks` before unwrapping.
+    drop(_core_listener);
+    drop(_listener);
+
     Ok(Rc::try_unwrap(sinks)
         .map_err(|_| anyhow::anyhow!("Sink Rc still held"))?
         .into_inner())

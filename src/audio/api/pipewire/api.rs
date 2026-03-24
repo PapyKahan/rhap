@@ -154,7 +154,7 @@ fn run_pipewire_loop(
         done: false,
     }));
 
-    let props = properties! {
+    let mut props = properties! {
         *pw::keys::MEDIA_TYPE => "Audio",
         *pw::keys::MEDIA_ROLE => "Music",
         *pw::keys::MEDIA_CATEGORY => "Playback",
@@ -162,6 +162,11 @@ fn run_pipewire_loop(
         *pw::keys::APP_NAME => "rhap",
         "node.passthrough" => "true",
     };
+    // Request PipeWire to switch the graph clock to the stream's native rate.
+    // Without this, PipeWire keeps its default rate (usually 48000) and resamples.
+    let rate_str = format!("1/{}", sample_rate);
+    props.insert("node.rate", rate_str);
+    props.insert("node.force-rate", format!("1/{}", sample_rate));
 
     let stream = StreamBox::new(&core, "rhap", props)?;
 
