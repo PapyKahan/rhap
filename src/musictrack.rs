@@ -102,7 +102,7 @@ impl MusicTrack {
         let duration = track
             .codec_params
             .time_base
-            .unwrap_or(Default::default())
+            .unwrap_or_default()
             .calc_time(track.codec_params.n_frames.unwrap_or(0));
 
         let visuals = metadata.visuals();

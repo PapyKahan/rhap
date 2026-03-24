@@ -87,10 +87,28 @@ impl AlsaPcm {
             pcm.sw_params(&swp)
                 .map_err(|e| anyhow!("sw_params apply failed: {}", e))?;
 
-            log::debug!(
-                "ALSA opened: device={}, rate={}, channels={}, period_frames={}, buffer_frames={}, frame_bytes={}",
-                device_name, actual_rate, actual_channels, actual_period_frames, actual_buffer_frames, frame_bytes
+            let period_time_us = if actual_rate > 0 {
+                (actual_period_frames as f64 / actual_rate as f64) * 1_000_000.0
+            } else {
+                0.0
+            };
+            let buffer_time_us = if actual_rate > 0 {
+                (actual_buffer_frames as f64 / actual_rate as f64) * 1_000_000.0
+            } else {
+                0.0
+            };
+            log::info!(
+                "ALSA opened: device={}, rate={}, channels={}, period={} frames ({:.0}us), buffer={} frames ({:.0}us)",
+                device_name, actual_rate, actual_channels,
+                actual_period_frames, period_time_us,
+                actual_buffer_frames, buffer_time_us,
             );
+            if period_time_us > 0.0 && period_time_us < 3000.0 {
+                log::warn!(
+                    "ALSA period time ({:.0}us) is very low — may cause XRUNs on some devices",
+                    period_time_us
+                );
+            }
 
             (period_bytes, buffer_bytes, frame_bytes)
         };

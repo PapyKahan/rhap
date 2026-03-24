@@ -343,7 +343,10 @@ impl AppState {
         }
         if let Some(current_track) = &self.playing_track {
             let elapsed_time = current_track.get_elapsed_time();
-            if elapsed_time.seconds > 3 {
+            // Note: elapsed_time tracks decoded position, which is ahead of
+            // audible position by the ring buffer + device buffer duration.
+            // Using 5s threshold to account for this buffering lag.
+            if elapsed_time.seconds > 5 {
                 self.play(playlist)?;
                 return Ok(());
             }

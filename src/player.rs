@@ -167,13 +167,16 @@ impl Resampler {
     ) -> Result<&[u8]> {
         dispatch_resampler!(self, resampler, byte_buf => {
             let output = resampler.resample(streambuffer)?;
+            let sample_size = std::mem::size_of_val(output.first().unwrap_or(&Default::default()));
+            let byte_len = output.len() * sample_size;
             byte_buf.clear();
-            if let Some(s) = output.first() {
-                byte_buf.reserve(output.len() * s.to_ne_bytes().len());
-            }
-            for sample in output.iter() {
-                byte_buf.extend_from_slice(&sample.to_ne_bytes());
-            }
+            byte_buf.reserve(byte_len);
+            // SAFETY: output is a contiguous slice of packed samples.
+            // Reinterpreting as bytes is safe for any integer/float sample type.
+            let src = unsafe {
+                std::slice::from_raw_parts(output.as_ptr() as *const u8, byte_len)
+            };
+            byte_buf.extend_from_slice(src);
             Ok(byte_buf as &[u8])
         })
     }
@@ -187,10 +190,15 @@ fn write_all_blocking(producer: &mut HeapProd<u8>, data: &[u8], is_playing: &Ato
         }
         let n = producer.push_slice(&data[offset..]);
         offset += n;
-        if n > 0 {
+        if offset >= data.len() {
+            // Full write completed — notify consumer once
             signal.notify();
-        }
-        if offset < data.len() {
+        } else if n > 0 {
+            // Partial write — notify and wait for consumer to drain
+            signal.notify();
+            signal.wait_timeout(Duration::from_millis(5));
+        } else {
+            // No progress — wait for consumer without notifying
             signal.wait_timeout(Duration::from_millis(5));
         }
     }
@@ -277,7 +285,9 @@ impl Player {
             Some(h) => h,
             None => song.open_for_playback()?,
         };
-        let time_base = playback.format.tracks().get(0).unwrap().codec_params.time_base.unwrap_or(Default::default());
+        let time_base = playback.format.tracks().first()
+            .and_then(|t| t.codec_params.time_base)
+            .unwrap_or_default();
 
         let output_info = {
             let rate_changed = src_params.samplerate != adjusted_params.samplerate;
@@ -336,8 +346,8 @@ impl Player {
                                 },
                                 Err(err) => return Err(anyhow::anyhow!("Error reading packet: {:?}", err)),
                             };
-                            elapsed_time_clone.fetch_add(packet.dur, Ordering::Relaxed);
                             let decoded = decoder.decode(&packet)?;
+                            elapsed_time_clone.fetch_add(packet.dur, Ordering::Relaxed);
                             let spec = decoded.spec();
                             let frames = decoded.capacity();
                             let sample_buffer = buffer.get_or_insert_with(|| {

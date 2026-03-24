@@ -62,11 +62,9 @@ fn main() -> Result<()> {
     media_controls::init_platform();
 
     let log_path = std::env::temp_dir().join("rhap.log");
-    let _ = WriteLogger::init(
-        LevelFilter::Warn,
-        Config::default(),
-        std::fs::File::create(log_path).expect("failed to create log file"),
-    );
+    if let Ok(log_file) = std::fs::File::create(log_path) {
+        let _ = WriteLogger::init(LevelFilter::Warn, Config::default(), log_file);
+    }
 
     let args = Args::parse();
 

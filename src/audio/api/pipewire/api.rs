@@ -106,6 +106,8 @@ fn bits_to_spa_format(bits: BitsPerSample) -> Result<AudioFormat> {
     match bits.0 {
         16 => Ok(AudioFormat::S16LE),
         24 => Ok(AudioFormat::S24LE),
+        // 32-bit uses IEEE float — matches WASAPI (KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
+        // and Symphonia's RawSampleBuffer<f32> output in the ring buffer.
         32 => Ok(AudioFormat::F32LE),
         other => Err(anyhow!("Unsupported bits per sample for PipeWire: {}", other)),
     }
@@ -165,8 +167,13 @@ fn run_pipewire_loop(
         *pw::keys::MEDIA_CATEGORY => "Playback",
         *pw::keys::NODE_NAME => "rhap",
         *pw::keys::APP_NAME => "rhap",
-        "node.passthrough" => "true",
     };
+    if exclusive {
+        // Passthrough bypasses format conversion and per-stream volume.
+        // Only enabled in exclusive mode since some sinks (Bluetooth)
+        // may reject passthrough connections.
+        props.insert("node.passthrough", "true");
+    }
     // Request PipeWire to switch the graph clock to the stream's native rate.
     // Without this, PipeWire keeps its default rate (usually 48000) and resamples.
     props.insert("node.rate", format!("1/{}", sample_rate));
@@ -188,7 +195,10 @@ fn run_pipewire_loop(
     let _listener = stream
         .add_local_listener_with_user_data(())
         .process(move |stream: &pw::stream::Stream, _| {
-            let mut st = state_for_process.borrow_mut();
+            let mut st = match state_for_process.try_borrow_mut() {
+                Ok(st) => st,
+                Err(_) => return, // Another callback holds the borrow; skip this cycle
+            };
 
             if st.done {
                 return;

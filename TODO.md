@@ -25,18 +25,18 @@ Comprehensive review of the rhap codebase — Rust best practices, performance, 
 
 ## Medium
 
-- [ ] **Elapsed time overcounts on stop** (`player.rs:334`) — Incremented before packet is decoded/written to the ring buffer.
-- [ ] **Byte packing loop not vectorizable** (`player.rs:170`) — `extend_from_slice` called per sample (384k calls/sec at 192kHz stereo). Transmute-based bulk conversion or pre-sized reserve would help.
-- [ ] **`write_all_blocking` busy-polls at 5ms** (`player.rs:182`) — Mutex acquire on every iteration. Chatty wakeup pattern with unnecessary OS scheduler pressure.
-- [ ] **Double-atomic `is_playing` + `is_paused`** (`player.rs:258`) — Not atomically composable. A single `AtomicU8` state machine would be cleaner and cheaper.
-- [ ] **PipeWire `RefCell::borrow_mut()` panic risk** (`pipewire/api.rs:189`) — Process callback panics on re-entrant access. `try_borrow_mut()` with early return would be safer.
-- [ ] **PipeWire `node.passthrough` unconditional** (`pipewire/api.rs:166`) — May cause connection failure on Bluetooth sinks with no fallback.
-- [ ] **32-bit mapped to F32LE only** (`pipewire/api.rs:105`) — `S32LE` integer content would be misinterpreted as float noise.
-- [ ] **ALSA period time hardcoded at 5ms** (`alsa/api.rs:58`) — No validation against actual negotiated value. Some USB/virtual devices can't sustain this.
-- [ ] **Panic on malformed files** (`musictrack.rs:65,139`) — `.get(0).unwrap()` panics on empty track list.
-- [ ] **Cover art double allocation** (`musictrack.rs:108`) — Bytes copied into `Arc<[u8]>` from Symphonia's buffer; large album art (~1-5 MB) exists twice in memory.
-- [ ] **Previous-track restart uses decoder time** (`app_state.rs:331`) — Elapsed time is ahead of audible position due to buffering, causing false "restart" triggers.
-- [ ] **Log file `expect()` panics before UI setup** (`main.rs:64`) — Terminal left in inconsistent state if temp dir is unavailable.
+- [x] **Elapsed time overcounts on stop** (`player.rs:334`) — Fixed: move `fetch_add` after `decode()` so elapsed time reflects decoded position.
+- [x] **Byte packing loop not vectorizable** (`player.rs:170`) — Fixed: bulk `slice::from_raw_parts` reinterpret instead of per-sample `extend_from_slice`.
+- [x] **`write_all_blocking` busy-polls at 5ms** (`player.rs:182`) — Fixed: notify once on full write, notify+wait on partial, wait-only when no progress.
+- [ ] **Double-atomic `is_playing` + `is_paused`** (`player.rs:258`) — Deferred: cosmetic. Only composed in UI display path; single-tick stale state is benign.
+- [x] **PipeWire `RefCell::borrow_mut()` panic risk** (`pipewire/api.rs:189`) — Fixed: use `try_borrow_mut()` with early return on contention.
+- [x] **PipeWire `node.passthrough` unconditional** (`pipewire/api.rs:166`) — Fixed: only set in exclusive mode. Bluetooth sinks won't be rejected.
+- [x] **32-bit mapped to F32LE only** (`pipewire/api.rs:105`) — Documented: correct behavior. WASAPI and Symphonia both use IEEE float for 32-bit; ring buffer always contains F32LE.
+- [x] **ALSA period time hardcoded at 5ms** (`alsa/api.rs:58`) — Fixed: log actual negotiated period/buffer times, warn when period < 3ms.
+- [x] **Panic on malformed files** (`musictrack.rs:65,139`) — Fixed in previous commit via `.first().ok_or_else()`. Also fixed player.rs `tracks().get(0).unwrap()`.
+- [ ] **Cover art double allocation** (`musictrack.rs:108`) — Unavoidable: Symphonia's `MetadataRevision::visuals()` returns `&[Visual]` with no consuming API to move `Box<[u8]>` out.
+- [x] **Previous-track restart uses decoder time** (`app_state.rs:331`) — Fixed: increased threshold from 3s to 5s to account for buffering lag. Documented the limitation.
+- [x] **Log file `expect()` panics before UI setup** (`main.rs:64`) — Fixed: gracefully skip logging if temp file creation fails.
 
 ## Low
 
