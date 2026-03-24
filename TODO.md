@@ -26,7 +26,7 @@ Comprehensive review of the rhap codebase — Rust best practices, performance, 
 ## Medium
 
 - [x] **Elapsed time overcounts on stop** (`player.rs:334`) — Fixed: move `fetch_add` after `decode()` so elapsed time reflects decoded position.
-- [x] **Byte packing loop not vectorizable** (`player.rs:170`) — Fixed: bulk `slice::from_raw_parts` reinterpret instead of per-sample `extend_from_slice`.
+- [ ] **Byte packing loop not vectorizable** (`player.rs:170`) — Reverted unsafe bulk copy (broke resampled audio). Original per-sample `to_ne_bytes()` loop restored. Needs a safe bulk conversion approach.
 - [x] **`write_all_blocking` busy-polls at 5ms** (`player.rs:182`) — Fixed: notify once on full write, notify+wait on partial, wait-only when no progress.
 - [ ] **Double-atomic `is_playing` + `is_paused`** (`player.rs:258`) — Deferred: cosmetic. Only composed in UI display path; single-tick stale state is benign.
 - [x] **PipeWire `RefCell::borrow_mut()` panic risk** (`pipewire/api.rs:189`) — Fixed: use `try_borrow_mut()` with early return on contention.

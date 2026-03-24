@@ -167,16 +167,13 @@ impl Resampler {
     ) -> Result<&[u8]> {
         dispatch_resampler!(self, resampler, byte_buf => {
             let output = resampler.resample(streambuffer)?;
-            let sample_size = std::mem::size_of_val(output.first().unwrap_or(&Default::default()));
-            let byte_len = output.len() * sample_size;
             byte_buf.clear();
-            byte_buf.reserve(byte_len);
-            // SAFETY: output is a contiguous slice of packed samples.
-            // Reinterpreting as bytes is safe for any integer/float sample type.
-            let src = unsafe {
-                std::slice::from_raw_parts(output.as_ptr() as *const u8, byte_len)
-            };
-            byte_buf.extend_from_slice(src);
+            if let Some(s) = output.first() {
+                byte_buf.reserve(output.len() * s.to_ne_bytes().len());
+            }
+            for sample in output.iter() {
+                byte_buf.extend_from_slice(&sample.to_ne_bytes());
+            }
             Ok(byte_buf as &[u8])
         })
     }
