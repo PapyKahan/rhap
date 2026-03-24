@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use super::api::{AlsaPcm, ThreadPriority, probe_capabilities};
+use super::api::{AlsaPcm, set_thread_priority, probe_capabilities};
 use crate::audio::{Capabilities, DeviceTrait, StreamParams};
 use crate::audio::device::{AudioPipeline, BufferSignal};
 
@@ -50,7 +50,8 @@ impl DeviceTrait for Device {
 
     fn get_capabilities(&self) -> Result<Capabilities> {
         let (sample_rates, bits_per_samples) = probe_capabilities(&self.device_name)
-            .unwrap_or_else(|_| {
+            .unwrap_or_else(|e| {
+                log::warn!("Capability probe failed for {}: {}", self.device_name, e);
                 let all = Capabilities::all_possible();
                 (all.sample_rates, all.bits_per_samples)
             });
@@ -84,7 +85,7 @@ impl DeviceTrait for Device {
             std::thread::Builder::new()
                 .name("rhap-audio-out".into())
                 .spawn(move || -> Result<()> {
-                    let _priority = ThreadPriority::new(high_priority_mode)?;
+                    set_thread_priority(high_priority_mode);
                     let period_bytes = pcm.period_bytes();
                     let mut write_buf = vec![0u8; period_bytes];
                     let mut hw_paused = false;

@@ -16,7 +16,6 @@ pub struct Host;
 #[derive(Debug, Clone)]
 struct SinkInfo {
     id: u32,
-    node_name: String,
     description: String,
     alsa_path: Option<String>,
     priority: u32,
@@ -53,7 +52,6 @@ fn enumerate_sinks() -> Result<Vec<SinkInfo>> {
     let registry = core.get_registry()?;
 
     let sinks: Rc<RefCell<Vec<SinkInfo>>> = Rc::new(RefCell::new(Vec::new()));
-    let done = Rc::new(RefCell::new(false));
 
     let sinks_for_global = Rc::clone(&sinks);
 
@@ -97,7 +95,6 @@ fn enumerate_sinks() -> Result<Vec<SinkInfo>> {
 
             sinks_for_global.borrow_mut().push(SinkInfo {
                 id: global.id,
-                node_name,
                 description,
                 alsa_path,
                 priority,
@@ -107,14 +104,12 @@ fn enumerate_sinks() -> Result<Vec<SinkInfo>> {
 
     // Perform a roundtrip to ensure all globals are received.
     let pending = core.sync(0)?;
-    let done_clone = Rc::clone(&done);
     let main_loop_ptr: *const pw::main_loop::MainLoop = &*main_loop;
 
     let _core_listener = core
         .add_listener_local()
         .done(move |_id, seq| {
             if seq == pending {
-                *done_clone.borrow_mut() = true;
                 // SAFETY: main_loop_ptr is valid during main_loop.run()
                 unsafe { (*main_loop_ptr).quit() };
             }
@@ -143,7 +138,6 @@ impl HostTrait for Host {
                 let is_default = sink.priority == max_priority;
                 crate::audio::Device::PipeWire(Device::new(
                     sink.id,
-                    sink.node_name,
                     sink.description,
                     is_default,
                     sink.alsa_path,
@@ -164,7 +158,6 @@ impl HostTrait for Host {
                     .ok_or_else(|| anyhow::anyhow!("PipeWire device index {} out of range", i))?;
                 Ok(crate::audio::Device::PipeWire(Device::new(
                     sink.id,
-                    sink.node_name,
                     sink.description,
                     sink.priority == max_priority,
                     sink.alsa_path,
@@ -178,7 +171,6 @@ impl HostTrait for Host {
                     .ok_or_else(|| anyhow::anyhow!("No PipeWire sinks found"))?;
                 Ok(crate::audio::Device::PipeWire(Device::new(
                     sink.id,
-                    sink.node_name,
                     sink.description,
                     true,
                     sink.alsa_path,

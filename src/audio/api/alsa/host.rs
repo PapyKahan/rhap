@@ -17,7 +17,6 @@ impl Host {
     /// Returns a vec of (hw_device_name, friendly_name, is_default).
     fn enumerate_devices(&self) -> Result<Vec<(String, String, bool)>> {
         let mut devices = Vec::new();
-        let default_name = "hw:0,0".to_string();
 
         for card_result in alsa::card::Iter::new() {
             let card = match card_result {
@@ -44,18 +43,13 @@ impl Host {
                 let device_name = format!("hw:{},{}", card_index, dev_index);
                 let pcm_dev_name = info.get_name().unwrap_or("unknown");
                 let friendly = format!("{} [{}]", card_name, pcm_dev_name);
-                let is_def = device_name == default_name;
-                devices.push((device_name, friendly, is_def));
+                devices.push((device_name, friendly, false));
             }
         }
 
-        // Fallback: if no device was found, present a single default entry.
-        if devices.is_empty() {
-            devices.push((
-                default_name,
-                "Default ALSA device".to_string(),
-                true,
-            ));
+        // Mark the first device as default
+        if let Some(first) = devices.first_mut() {
+            first.2 = true;
         }
 
         Ok(devices)

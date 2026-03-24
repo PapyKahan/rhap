@@ -77,12 +77,12 @@ impl StreamParams {
             let samplerate = if contains_sample_rates {
                 self.samplerate
             } else {
-                *capabilities.sample_rates.last().unwrap()
+                capabilities.sample_rates.last().copied().unwrap_or(self.samplerate)
             };
             let bits_per_sample = if contains_bits_per_samples {
                 self.bits_per_sample
             } else {
-                *capabilities.bits_per_samples.last().unwrap()
+                capabilities.bits_per_samples.last().copied().unwrap_or(self.bits_per_sample)
             };
             StreamParams {
                 samplerate,

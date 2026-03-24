@@ -40,13 +40,13 @@ Comprehensive review of the rhap codebase — Rust best practices, performance, 
 
 ## Low
 
-- [ ] **`ThreadPriority` struct has no `Drop`** (`alsa/api.rs:301`) — Falsely implies RAII cleanup of scheduler policy. Should be a plain function.
-- [ ] **`"hw:0,0"` hardcoded as default** (`alsa/host.rs:20`) — Bypasses user ALSA config (`.asoundrc`, UCM).
-- [ ] **Capability probe error silently discarded** (`alsa/device.rs:53`) — Should log at warn level.
-- [ ] **`adjust_with_capabilities` panics on empty vecs** (`audio/mod.rs:80`) — `.last().unwrap()` on empty `sample_rates` or `bits_per_samples`.
-- [ ] **PipeWire `done` Rc is dead code** (`pipewire/host.rs:54`) — Set but never read after `main_loop.run()`.
-- [ ] **PipeWire `_node_name` dropped immediately** (`pipewire/device.rs:23`) — Wasted allocation.
-- [ ] **Redundant `MetadataRevision::default().clone()`** (`musictrack.rs:77`)
-- [ ] **Unnecessary `path.clone()` for `File::open`** (`musictrack.rs:54,128`)
-- [ ] **`index = index + 1`** (`main.rs:95`) — Should be `index += 1`.
-- [ ] **`"auto".to_string()` allocates unnecessarily** (`main.rs:73`) — `&str` would suffice.
+- [x] **`ThreadPriority` struct has no `Drop`** (`alsa/api.rs:301`) — Fixed: replaced with plain `set_thread_priority()` function.
+- [x] **`"hw:0,0"` hardcoded as default** (`alsa/host.rs:20`) — Fixed: first enumerated device is marked as default.
+- [x] **Capability probe error silently discarded** (`alsa/device.rs:53`) — Fixed: log at warn level.
+- [x] **`adjust_with_capabilities` panics on empty vecs** (`audio/mod.rs:80`) — Fixed: fallback to source params on empty capabilities.
+- [x] **PipeWire `done` Rc is dead code** (`pipewire/host.rs:54`) — Fixed: removed.
+- [x] **PipeWire `_node_name` dropped immediately** (`pipewire/device.rs:23`) — Fixed: removed from Device::new and SinkInfo struct.
+- [x] **Redundant `MetadataRevision::default().clone()`** (`musictrack.rs:77`) — Fixed in earlier commit.
+- [x] **Unnecessary `path.clone()` for `File::open`** (`musictrack.rs:54,128`) — Fixed in earlier commit.
+- [x] **`index = index + 1`** (`main.rs:95`) — Fixed: `index += 1`.
+- [x] **`"auto".to_string()` allocates unnecessarily** (`main.rs:73`) — Fixed: use `as_deref().unwrap_or("auto")`.

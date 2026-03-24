@@ -68,12 +68,10 @@ fn main() -> Result<()> {
 
     let args = Args::parse();
 
-    let backend_name = args
-        .backend
-        .unwrap_or_else(|| "auto".to_string());
+    let backend_name = args.backend.as_deref().unwrap_or("auto");
 
     if args.list {
-        let host = Host::new(&backend_name, args.high_priority_mode);
+        let host = Host::new(backend_name, args.high_priority_mode);
         let devices = host.get_devices()?;
         let mut index = 0;
         for device in devices {
@@ -90,7 +88,7 @@ fn main() -> Result<()> {
             if let Some(rate) = capabilities.sample_rates.last() {
                 println!("    Max sample rate: {}", rate);
             }
-            index = index + 1;
+            index += 1;
         }
         return Ok(());
     }
@@ -101,7 +99,7 @@ fn main() -> Result<()> {
         .ok();
 
     let mut terminal = ratatui::init();
-    let host = Host::new(&backend_name, args.high_priority_mode);
+    let host = Host::new(backend_name, args.high_priority_mode);
     let player = Player::new(host, args.device, args.pollmode, args.gapless, args.resample)?;
     let path = wsl_path_to_windows(args.path);
 

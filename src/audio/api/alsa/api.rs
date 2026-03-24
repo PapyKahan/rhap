@@ -324,27 +324,20 @@ fn probe_capabilities_hwparams(device_name: &str) -> Result<(Vec<SampleRate>, Ve
 
 /// Attempt to elevate the current thread to real-time scheduling.
 /// Falls back to `nice(-11)` if SCHED_FIFO is unavailable.
-pub struct ThreadPriority;
+pub fn set_thread_priority(high_priority_mode: bool) {
+    if !high_priority_mode {
+        return;
+    }
 
-impl ThreadPriority {
-    pub fn new(high_priority_mode: bool) -> Result<Self> {
-        if !high_priority_mode {
-            return Ok(Self);
+    let param = libc::sched_param { sched_priority: 50 };
+    let result = unsafe { libc::sched_setscheduler(0, libc::SCHED_FIFO, &param) };
+    if result != 0 {
+        // nice() can return -1 on success, so check errno instead.
+        unsafe { *libc::__errno_location() = 0 };
+        unsafe { libc::nice(-11) };
+        let errno = unsafe { *libc::__errno_location() };
+        if errno != 0 {
+            warn!("Failed to set thread priority: both SCHED_FIFO and nice() failed (errno={})", errno);
         }
-
-        // Try SCHED_FIFO priority 50
-        let param = libc::sched_param { sched_priority: 50 };
-        let result = unsafe { libc::sched_setscheduler(0, libc::SCHED_FIFO, &param) };
-        if result != 0 {
-            // Fall back to nice(-11). nice() can return -1 on success,
-            // so we must check errno instead of the return value.
-            unsafe { *libc::__errno_location() = 0 };
-            unsafe { libc::nice(-11) };
-            let errno = unsafe { *libc::__errno_location() };
-            if errno != 0 {
-                warn!("Failed to set thread priority: both SCHED_FIFO and nice() failed (errno={})", errno);
-            }
-        }
-        Ok(Self)
     }
 }

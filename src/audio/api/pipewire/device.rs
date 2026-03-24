@@ -20,7 +20,6 @@ pub struct Device {
 impl Device {
     pub fn new(
         node_id: u32,
-        _node_name: String,
         description: String,
         is_default_device: bool,
         alsa_path: Option<String>,
