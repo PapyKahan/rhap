@@ -19,7 +19,7 @@ Comprehensive review of the rhap codebase — Rust best practices, performance, 
 - [x] **PipeWire ALSA device 0 hardcoded** (`pipewire/host.rs:42`) — Documented: profile_device index in object.path doesn't map to ALSA PCM device number. Device 0 is correct for USB DACs; HDA cards typically share codec capabilities across PCM devices.
 - [x] **PipeWire default device is first enumerated** (`pipewire/host.rs:139`) — Fixed: use `priority.session` from global props to identify the highest-priority sink as default.
 - [x] **File probed twice per play** (`musictrack.rs:53,128`) — Fixed: added `probe_and_open()` that returns metadata + PlaybackHandle in one probe. Used in `play()` for unprobed tracks.
-- [ ] **FFT resampler rebuilt on every frame-count change** (`player.rs`, resampler) — Reverted padding approach (broke accumulator). Rebuild is necessary: rubato FixedSync::Input requires exact frame counts. The `.unwrap()` was replaced with `?`.
+- [x] **FFT resampler rebuilt on every frame-count change** (`player.rs`, resampler) — Fixed: use rubato's `Indexing { partial_len }` to handle short final packets without rebuilding the FFT plan.
 - [x] **`auto_advance` retries all tracks in one UI tick** (`app_state.rs:79`) — Fixed: limit retries to 5 to avoid blocking UI.
 - [x] **PipeWire detection unreliable** (`host.rs:75`) — Fixed: try actual device enumeration via PipeWire instead of checking socket path.
 
