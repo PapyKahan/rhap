@@ -12,16 +12,16 @@ Comprehensive review of the rhap codebase — Rust best practices, performance, 
 
 ## Major
 
-- [ ] **ALSA pause state machine race** (`alsa/device.rs:97`) — `is_paused` is both a command and a state. Rapid pause/unpause can call `pcm.pause()`/`pcm.resume()` in unexpected sequences. Needs a command/acknowledgment or state machine pattern.
-- [ ] **Heap alloc in ALSA audio thread EOS path** (`alsa/device.rs:121`) — `vec![0u8; remaining]` can be several MB for high-res audio. Should drain iteratively using the pre-allocated buffer.
-- [ ] **XRUN in `get_writable_bytes` is fatal** (`alsa/api.rs:158`) — `avail_update()` error kills the thread. The `write()` method recovers from XRUNs; this path doesn't.
-- [ ] **PipeWire `expect()` panic in spawned thread** (`pipewire/api.rs:131`) — Serialization failure panics the audio thread, silently swallowed as "thread panicked". Should return `Result`.
-- [ ] **PipeWire ALSA device 0 hardcoded** (`pipewire/host.rs:42`) — `object.path` contains the device number in `parts[3]` but it's discarded. Multi-device cards probe the wrong device.
-- [ ] **PipeWire default device is first enumerated** (`pipewire/host.rs:139`) — Not PipeWire's actual default. Should consult the `default.audio.sink` metadata.
-- [ ] **File probed twice per play** (`musictrack.rs:53,128`) — `new()` probes metadata, `open_for_playback()` re-probes from scratch. Double I/O for every `play()` call.
-- [ ] **FFT resampler rebuilt on every frame-count change** (`player.rs`, resampler) — Last packet of FLAC/MP3 tracks is shorter, triggering a full FFT plan reallocation per track end.
-- [ ] **`auto_advance` retries all tracks in one UI tick** (`app_state.rs:79`) — If every track fails to open, blocks the UI for seconds doing `len` stop/play cycles.
-- [ ] **PipeWire detection unreliable** (`host.rs:75`) — Empty `XDG_RUNTIME_DIR` produces path `/pipewire-0`. `PIPEWIRE_REMOTE` overrides are missed.
+- [x] **ALSA pause state machine race** (`alsa/device.rs:97`) — Fixed: separate `hw_paused` bool tracks actual hardware state, only pause/resume when state transitions.
+- [x] **Heap alloc in ALSA audio thread EOS path** (`alsa/device.rs:121`) — Fixed: drain iteratively using the pre-allocated `write_buf` instead of allocating.
+- [x] **XRUN in `get_writable_bytes` is fatal** (`alsa/api.rs:158`) — Fixed: recover via `try_recover` and re-query, matching the `write()` recovery pattern.
+- [x] **PipeWire `expect()` panic in spawned thread** (`pipewire/api.rs:131`) — Fixed: `build_audio_format_params` returns `Result`, propagated to caller.
+- [x] **PipeWire ALSA device 0 hardcoded** (`pipewire/host.rs:42`) — Documented: profile_device index in object.path doesn't map to ALSA PCM device number. Device 0 is correct for USB DACs; HDA cards typically share codec capabilities across PCM devices.
+- [ ] **PipeWire default device is first enumerated** (`pipewire/host.rs:139`) — Not PipeWire's actual default. Requires querying `default.audio.sink` metadata (complex).
+- [ ] **File probed twice per play** (`musictrack.rs:53,128`) — `new()` probes metadata, `open_for_playback()` re-probes from scratch. Needs architecture change to share the reader.
+- [x] **FFT resampler rebuilt on every frame-count change** (`player.rs`, resampler) — Fixed: pad short packets with silence instead of rebuilding FFT plan, trim output proportionally.
+- [x] **`auto_advance` retries all tracks in one UI tick** (`app_state.rs:79`) — Fixed: limit retries to 5 to avoid blocking UI.
+- [x] **PipeWire detection unreliable** (`host.rs:75`) — Fixed: try actual device enumeration via PipeWire instead of checking socket path.
 
 ## Medium
 

@@ -71,10 +71,12 @@ impl Host {
         { Host::Wasapi(api::wasapi::host::Host::new(high_priority_mode)) }
         #[cfg(target_os = "linux")]
         {
-            // Auto-detect: prefer PipeWire if running, fall back to ALSA
-            let xdg = std::env::var("XDG_RUNTIME_DIR").unwrap_or_default();
-            if std::path::Path::new(&format!("{}/pipewire-0", xdg)).exists() {
-                Host::PipeWire(api::pipewire::host::Host)
+            // Auto-detect: try PipeWire first by attempting to enumerate devices.
+            // This verifies the daemon is running and accessible, handling custom
+            // socket paths (PIPEWIRE_REMOTE) and empty XDG_RUNTIME_DIR correctly.
+            let pw_host = Host::PipeWire(api::pipewire::host::Host);
+            if pw_host.get_devices().is_ok_and(|d| !d.is_empty()) {
+                pw_host
             } else {
                 Host::Alsa(api::alsa::host::Host::new(high_priority_mode))
             }

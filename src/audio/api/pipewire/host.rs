@@ -21,24 +21,25 @@ struct SinkInfo {
     alsa_path: Option<String>,
 }
 
-/// Resolve a PipeWire object.path like "alsa:acp:DAC:1:playback" to an ALSA hw: path.
+/// Resolve a PipeWire object.path like "alsa:acp:DAC:1:playback" to an ALSA card number.
 /// Uses /proc/asound/<card_id> symlink to map the card ID to a card number.
+/// Returns the card number only — the ALSA probe function will use it to check
+/// USB descriptors (/proc/asound/cardN/stream0) or probe hw:N,0 via hwparams.
+/// Note: the profile_device index in object.path does NOT map to the ALSA PCM
+/// device number, so we always probe device 0 (correct for USB DACs; for multi-device
+/// HDA cards, capabilities are typically uniform across PCM devices).
 fn resolve_alsa_path_from_object_path(object_path: &str) -> Option<String> {
-    // Format: "alsa:acp:<card_id>:<profile_device>:playback"
     let parts: Vec<&str> = object_path.split(':').collect();
     if parts.len() < 4 || parts[0] != "alsa" {
         return None;
     }
     let card_id = parts[2];
 
-    // Resolve card ID to card number via /proc/asound/<card_id> → cardN symlink
     let proc_path = format!("/proc/asound/{}", card_id);
     let link_target = std::fs::read_link(&proc_path).ok()?;
     let target_str = link_target.to_str()?;
     let card_num: u32 = target_str.strip_prefix("card")?.parse().ok()?;
 
-    // USB audio devices typically have a single PCM device 0.
-    // For multi-device cards, device 0 is the primary playback device.
     Some(format!("hw:{},0", card_num))
 }
 

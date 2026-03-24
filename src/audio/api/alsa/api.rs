@@ -153,12 +153,22 @@ impl AlsaPcm {
     }
 
     /// Return the number of bytes currently writable without blocking.
+    /// Recovers from XRUN instead of failing fatally.
     pub fn get_writable_bytes(&self) -> Result<usize> {
-        let frames = self
-            .pcm
-            .avail_update()
-            .map_err(|e| anyhow!("ALSA avail_update failed: {}", e))?;
-        Ok(frames as usize * self.frame_bytes)
+        match self.pcm.avail_update() {
+            Ok(frames) => Ok(frames as usize * self.frame_bytes),
+            Err(e) => {
+                self.pcm
+                    .try_recover(e, false)
+                    .map_err(|e2| anyhow!("ALSA avail_update recovery failed: {}", e2))?;
+                // After recovery, re-query
+                let frames = self
+                    .pcm
+                    .avail_update()
+                    .map_err(|e| anyhow!("ALSA avail_update failed after recovery: {}", e))?;
+                Ok(frames as usize * self.frame_bytes)
+            }
+        }
     }
 
     /// Block until the device is ready to accept more data or `timeout_ms` elapses.

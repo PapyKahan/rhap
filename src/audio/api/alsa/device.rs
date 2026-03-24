@@ -86,23 +86,26 @@ impl DeviceTrait for Device {
                 .spawn(move || -> Result<()> {
                     let _priority = ThreadPriority::new(high_priority_mode)?;
                     let period_bytes = pcm.period_bytes();
-                    // Pre-allocate the write buffer once to avoid per-period heap allocation.
                     let mut write_buf = vec![0u8; period_bytes];
+                    let mut hw_paused = false;
 
                     loop {
                         if !is_playing.load(Ordering::Acquire) {
                             break;
                         }
 
-                        if is_paused.load(Ordering::Acquire) {
+                        let want_paused = is_paused.load(Ordering::Acquire);
+                        if want_paused && !hw_paused {
                             pcm.pause()?;
-                            while is_paused.load(Ordering::Acquire) {
-                                if !is_playing.load(Ordering::Acquire) {
-                                    return Ok(());
-                                }
-                                std::thread::sleep(Duration::from_millis(10));
-                            }
+                            hw_paused = true;
+                        }
+                        if want_paused {
+                            std::thread::sleep(Duration::from_millis(10));
+                            continue;
+                        }
+                        if hw_paused {
                             pcm.resume()?;
+                            hw_paused = false;
                         }
 
                         let writable = pcm.get_writable_bytes()?;
@@ -116,13 +119,16 @@ impl DeviceTrait for Device {
                             }
                             let _ = pcm.wait(100);
                         } else if eos_clone.load(Ordering::Acquire) {
-                            let remaining = consumer.occupied_len();
-                            if remaining > 0 {
-                                let mut drain_buf = vec![0u8; remaining];
-                                let n = consumer.pop_slice(&mut drain_buf);
+                            // Drain remaining data using the pre-allocated buffer.
+                            loop {
+                                let remaining = consumer.occupied_len();
+                                if remaining == 0 {
+                                    break;
+                                }
+                                let n = consumer.pop_slice(&mut write_buf);
                                 if n > 0 {
                                     signal_clone.notify();
-                                    pcm.write(&drain_buf[..n])?;
+                                    pcm.write(&write_buf[..n])?;
                                 }
                             }
                             // Pad with silence to flush the last hardware period.

@@ -115,7 +115,7 @@ fn build_audio_format_params(
     audio_format: AudioFormat,
     sample_rate: u32,
     channels: u32,
-) -> Vec<u8> {
+) -> Result<Vec<u8>> {
     let mut info = AudioInfoRaw::new();
     info.set_format(audio_format);
     info.set_rate(sample_rate);
@@ -127,10 +127,12 @@ fn build_audio_format_params(
         properties: info.into(),
     });
 
-    pw::spa::pod::serialize::PodSerializer::serialize(Cursor::new(Vec::new()), &value)
-        .expect("Failed to serialize audio format POD")
-        .0
-        .into_inner()
+    let (cursor, _) = pw::spa::pod::serialize::PodSerializer::serialize(
+        Cursor::new(Vec::new()),
+        &value,
+    )
+    .map_err(|e| anyhow!("Failed to serialize audio format POD: {:?}", e))?;
+    Ok(cursor.into_inner())
 }
 
 fn run_pipewire_loop(
@@ -258,7 +260,7 @@ fn run_pipewire_loop(
         })
         .register()?;
 
-    let pod_bytes = build_audio_format_params(audio_format, sample_rate, channels);
+    let pod_bytes = build_audio_format_params(audio_format, sample_rate, channels)?;
     let pod = Pod::from_bytes(&pod_bytes).ok_or_else(|| anyhow!("Invalid audio format POD"))?;
 
     stream.connect(

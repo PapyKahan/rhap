@@ -75,8 +75,10 @@ impl AppState {
     pub fn auto_advance(&mut self, playlist: &Playlist) -> Result<()> {
         if let Some(track) = &self.playing_track {
             if !track.is_streaming() && self.automatically_play_next {
-                let len = playlist.songs_len();
-                for _ in 0..len {
+                // Limit retries to avoid blocking the UI for seconds
+                // if many consecutive tracks are unplayable.
+                let max_retries = playlist.songs_len().min(5);
+                for _ in 0..max_retries {
                     match self.next(playlist) {
                         Ok(()) => break,
                         Err(e) => log::warn!("Skipping unplayable track: {}", e),
