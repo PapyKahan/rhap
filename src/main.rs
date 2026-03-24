@@ -35,6 +35,17 @@ struct Args {
     gapless: bool,
     #[clap(long, default_value_t = false)]
     resample: bool,
+    #[clap(long)]
+    backend: Option<String>,
+}
+
+fn default_host_name() -> &'static str {
+    #[cfg(target_os = "windows")]
+    { return "wasapi"; }
+    #[cfg(target_os = "linux")]
+    { return "pipewire"; }
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    { return "none"; }
 }
 
 /// Convert a WSL `/mnt/<drive>/...` path to a Windows `<DRIVE>:\...` path.
@@ -66,8 +77,15 @@ fn main() -> Result<()> {
     );
 
     let args = Args::parse();
+
+    let host_name_owned: String = match args.backend.as_deref() {
+        Some(name) => name.to_owned(),
+        None => default_host_name().to_owned(),
+    };
+    let host_name = host_name_owned.as_str();
+
     if args.list {
-        let host = Host::new("wasapi", args.high_priority_mode);
+        let host = Host::new(host_name, args.high_priority_mode);
         let devices = host.get_devices()?;
         let mut index = 0;
         for device in devices {
@@ -95,7 +113,7 @@ fn main() -> Result<()> {
         .ok();
 
     let mut terminal = ratatui::init();
-    let host = Host::new("wasapi", args.high_priority_mode);
+    let host = Host::new(host_name, args.high_priority_mode);
     let player = Player::new(host, args.device, args.pollmode, args.gapless, args.resample)?;
     let path = wsl_path_to_windows(args.path);
 
