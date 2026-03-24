@@ -15,6 +15,8 @@ pub struct RubatoResampler<O> {
     input: Vec<Vec<f64>>,
     output: Vec<Vec<f64>>,
     interleaved_output: Vec<O>,
+    from_samplerate: usize,
+    to_samplerate: usize,
     frames: usize,
     channels: usize,
 }
@@ -51,26 +53,34 @@ where
             input,
             output,
             interleaved_output,
+            from_samplerate,
+            to_samplerate,
             frames,
             channels,
         })
     }
 
     pub fn resample(&mut self, input: &AudioBufferRef<'_>) -> Result<&[O]> {
-        // Clear input buffers from previous iteration
-        self.input.iter_mut().for_each(|ch| ch.clear());
+        // Rubato's FixedSync::Input requires exact frame counts matching the FFT plan.
+        // When the frame count changes (e.g. last packet of a track), the plan must be rebuilt.
+        if input.frames() != self.frames {
+            self.frames = input.frames();
+            self.resampler = rubato::Fft::<f64>::new(
+                self.from_samplerate,
+                self.to_samplerate,
+                self.frames,
+                1,
+                self.channels,
+                FixedSync::Input,
+            )?;
+            let output_frames = self.resampler.output_frames_max();
+            let input_frames = self.resampler.input_frames_max();
+            self.output = vec![vec![0.0f64; output_frames]; self.channels];
+            self.input = vec![vec![0.0f64; input_frames]; self.channels];
+        }
         match input {
             AudioBufferRef::S32(buffer) => {
                 copy_samples_vec(buffer, &mut self.input);
-
-                // Pad short packets (e.g. last packet of a track) with silence
-                // instead of rebuilding the FFT resampler, which is expensive.
-                let actual_frames = input.frames();
-                if actual_frames < self.frames {
-                    for ch in &mut self.input {
-                        ch.resize(self.frames, 0.0);
-                    }
-                }
 
                 let input_adapter = SequentialSliceOfVecs::new(
                     &self.input,
@@ -91,14 +101,6 @@ where
                 self.input.iter_mut().for_each(|channel| {
                     channel.drain(0..self.frames);
                 });
-
-                // Trim output to match actual input frames ratio to avoid trailing silence
-                let actual_out_frames = if actual_frames < self.frames {
-                    (out_frames * actual_frames) / self.frames
-                } else {
-                    out_frames
-                };
-                let out_frames = actual_out_frames;
 
                 self.interleaved_output
                     .resize(self.channels * out_frames, O::MID);
