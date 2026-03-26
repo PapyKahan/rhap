@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.102"
 arc-swap = "1"
-clap = { version = "4.5.60", features = ["derive"] }
+clap = { version = "4.6.0", features = ["derive"] }
 crossterm = "0.29.0"
 log = "0.4.29"
 simplelog = "0.12"
@@ -54,7 +54,7 @@ features = [
 ]
 
 [target.'cfg(target_os = "linux")'.dependencies]
-alsa = "0.9"
+alsa = "0.11"
 pipewire = "0.9"
 libc = "0.2"
 
