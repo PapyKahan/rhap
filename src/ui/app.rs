@@ -134,13 +134,16 @@ impl App {
                 }
             }
 
-            // 3. Sync media controls (pumps Windows messages + updates OS overlay)
-            self.state.sync_media_controls();
+            // 3. Platform message pump (Windows SMTC)
+            self.state.media_sync.pump_messages();
 
             // 4. Auto-advance
             self.state.auto_advance(&self.playlist)?;
 
-            // 5. Render
+            // 5. Sync playback state to OS media controls
+            self.state.media_sync.sync_state(&self.state.playback);
+
+            // 6. Render
             let ctx = self.state.render_context(&self.theme);
             terminal.draw(|frame| {
                 self.playlist

@@ -2,7 +2,7 @@ use anyhow::Result;
 use log::error;
 use ringbuf::HeapProd;
 use ringbuf::traits::Producer;
-use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use symphonia::core::audio::{AudioBufferRef, RawSampleBuffer, SignalSpec};
@@ -23,14 +23,54 @@ enum DecoderResult {
         producer: HeapProd<u8>,
         end_of_stream: Arc<AtomicBool>,
         signal: Arc<BufferSignal>,
+        resampler: Option<Resampler>,
     },
     Stopped,
     Error(anyhow::Error),
 }
 
-const STATE_STOPPED: u8 = 0;
-const STATE_PLAYING: u8 = 1;
-const STATE_PAUSED: u8 = 2;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum PlayerState {
+    Stopped = 0,
+    Playing = 1,
+    Paused = 2,
+}
+
+impl PlayerState {
+    fn from_u8(v: u8) -> Self {
+        match v {
+            1 => Self::Playing,
+            2 => Self::Paused,
+            _ => Self::Stopped,
+        }
+    }
+}
+
+pub struct AtomicPlayerState(AtomicU8);
+
+impl AtomicPlayerState {
+    pub fn new(state: PlayerState) -> Self {
+        Self(AtomicU8::new(state as u8))
+    }
+
+    pub fn load(&self, ordering: Ordering) -> PlayerState {
+        PlayerState::from_u8(self.0.load(ordering))
+    }
+
+    pub fn store(&self, state: PlayerState, ordering: Ordering) {
+        self.0.store(state as u8, ordering);
+    }
+
+    /// Attempt an atomic state transition. Returns Ok if the current state
+    /// matched `from` and was changed to `to`, Err with the actual state otherwise.
+    pub fn transition(&self, from: PlayerState, to: PlayerState) -> Result<(), PlayerState> {
+        self.0
+            .compare_exchange(from as u8, to as u8, Ordering::AcqRel, Ordering::Acquire)
+            .map(|_| ())
+            .map_err(PlayerState::from_u8)
+    }
+}
 
 pub struct Player {
     current_device: Option<Device>,
@@ -40,7 +80,8 @@ pub struct Player {
     gapless: bool,
     resample: bool,
     streaming_handle: Option<std::thread::JoinHandle<DecoderResult>>,
-    state: Arc<AtomicU8>,
+    state: Arc<AtomicPlayerState>,
+    current_signal: Option<Arc<BufferSignal>>,
     cached_capabilities: Option<Capabilities>,
     current_adjusted_params: Option<StreamParams>,
 }
@@ -182,10 +223,10 @@ impl Resampler {
     }
 }
 
-fn write_all_blocking(producer: &mut HeapProd<u8>, data: &[u8], state: &AtomicU8, signal: &BufferSignal) {
+fn write_all_blocking(producer: &mut HeapProd<u8>, data: &[u8], state: &AtomicPlayerState, signal: &BufferSignal) {
     let mut offset = 0;
     while offset < data.len() {
-        if state.load(Ordering::Acquire) == STATE_STOPPED {
+        if state.load(Ordering::Acquire) == PlayerState::Stopped {
             return;
         }
         let n = producer.push_slice(&data[offset..]);
@@ -214,14 +255,19 @@ impl Player {
             gapless,
             resample,
             streaming_handle: None,
-            state: Arc::new(AtomicU8::new(STATE_STOPPED)),
+            state: Arc::new(AtomicPlayerState::new(PlayerState::Stopped)),
+            current_signal: None,
             cached_capabilities: None,
             current_adjusted_params: None,
         })
     }
 
     pub fn stop(&mut self) -> Result<()> {
-        self.state.store(STATE_STOPPED, Ordering::Release);
+        self.state.store(PlayerState::Stopped, Ordering::Release);
+        // Wake decoder immediately if blocked in write_all_blocking backpressure
+        if let Some(signal) = self.current_signal.take() {
+            signal.notify();
+        }
         if let Some(mut device) = self.current_device.take() {
             device.stop()?;
         }
@@ -239,31 +285,29 @@ impl Player {
     }
 
     pub fn pause(&mut self) -> Result<()> {
-        if self.state.load(Ordering::Relaxed) == STATE_PLAYING {
+        if self.state.transition(PlayerState::Playing, PlayerState::Paused).is_ok() {
             if let Some(device) = self.current_device.as_mut() {
                 device.pause()?;
             }
-            self.state.store(STATE_PAUSED, Ordering::Release);
         }
         Ok(())
     }
 
     pub fn resume(&mut self) -> Result<()> {
-        if self.state.load(Ordering::Relaxed) == STATE_PAUSED {
+        if self.state.transition(PlayerState::Paused, PlayerState::Playing).is_ok() {
             if let Some(device) = self.current_device.as_mut() {
                 device.resume()?;
             }
-            self.state.store(STATE_PLAYING, Ordering::Release);
         }
         Ok(())
     }
 
     pub fn is_playing(&self) -> bool {
-        self.state.load(Ordering::Relaxed) == STATE_PLAYING
+        self.state.load(Ordering::Relaxed) == PlayerState::Playing
     }
 
     pub fn is_paused(&self) -> bool {
-        self.state.load(Ordering::Relaxed) == STATE_PAUSED
+        self.state.load(Ordering::Relaxed) == PlayerState::Paused
     }
 
     fn spawn_decoder(
@@ -275,6 +319,7 @@ impl Player {
         end_of_stream: Arc<AtomicBool>,
         signal: Arc<BufferSignal>,
         playback_handle: Option<crate::musictrack::PlaybackHandle>,
+        cached_resampler: Option<Resampler>,
     ) -> Result<CurrentTrackInfo> {
         let mut playback = match playback_handle {
             Some(h) => h,
@@ -322,11 +367,11 @@ impl Player {
                     decoder.reset();
 
                     let mut buffer: Option<StreamBuffer> = None;
-                    let mut resampler: Option<Resampler> = None;
+                    let mut resampler: Option<Resampler> = cached_resampler;
 
                     let result: Result<()> = (|| {
                         loop {
-                            if state.load(Ordering::Acquire) == STATE_STOPPED {
+                            if state.load(Ordering::Acquire) == PlayerState::Stopped {
                                 break;
                             }
                             let packet = match format.next_packet() {
@@ -374,8 +419,8 @@ impl Player {
 
                     is_streaming.store(false, Ordering::Relaxed);
                     match result {
-                        Ok(()) if state.load(Ordering::Acquire) != STATE_STOPPED => {
-                            DecoderResult::EndOfTrack { producer, end_of_stream, signal }
+                        Ok(()) if state.load(Ordering::Acquire) != PlayerState::Stopped => {
+                            DecoderResult::EndOfTrack { producer, end_of_stream, signal, resampler }
                         }
                         Ok(()) => {
                             end_of_stream.store(true, Ordering::Release);
@@ -454,8 +499,9 @@ impl Player {
         self.current_device = Some(device);
         self.cached_capabilities = Some(capabilities);
         self.current_adjusted_params = Some(adjusted_params);
+        self.current_signal = Some(Arc::clone(&pipeline.signal));
 
-        self.state.store(STATE_PLAYING, Ordering::Release);
+        self.state.store(PlayerState::Playing, Ordering::Release);
 
         self.spawn_decoder(
             &song,
@@ -465,6 +511,7 @@ impl Player {
             pipeline.end_of_stream,
             pipeline.signal,
             handle,
+            None,
         )
     }
 
@@ -493,9 +540,9 @@ impl Player {
             Some(h) if h.is_finished() => self.streaming_handle.take().unwrap(),
             _ => return Ok(None),
         };
-        let (producer, eos, signal) = match handle.join() {
-            Ok(DecoderResult::EndOfTrack { producer, end_of_stream, signal }) => {
-                (producer, end_of_stream, signal)
+        let (producer, eos, signal, cached_resampler) = match handle.join() {
+            Ok(DecoderResult::EndOfTrack { producer, end_of_stream, signal, resampler }) => {
+                (producer, end_of_stream, signal, resampler)
             }
             Ok(DecoderResult::Stopped) => return Ok(None),
             Ok(DecoderResult::Error(_)) => return Ok(None),
@@ -503,7 +550,8 @@ impl Player {
         };
 
         eos.store(false, Ordering::Release);
-        let info = self.spawn_decoder(&song, src_params, current_adj, producer, eos, signal, None)?;
+        self.current_signal = Some(Arc::clone(&signal));
+        let info = self.spawn_decoder(&song, src_params, current_adj, producer, eos, signal, None, cached_resampler)?;
         Ok(Some(info))
     }
 }

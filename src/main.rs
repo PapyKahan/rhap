@@ -10,9 +10,11 @@ mod action;
 mod app_state;
 mod audio;
 mod media_controls;
+mod media_sync;
 #[cfg(target_os = "windows")]
 mod notifications;
 mod musictrack;
+mod playback;
 mod player;
 mod tools;
 mod ui;

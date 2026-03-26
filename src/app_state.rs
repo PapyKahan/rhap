@@ -1,40 +1,22 @@
-use std::io::Write;
-use std::sync::Arc;
-use std::time::Duration;
-
 use anyhow::Result;
 
 use crate::action::{Action, Layer};
-use crate::media_controls::{MediaControlsBackend, MediaControlsTrait, PlaybackStatus, TrackMetadata};
-use crate::musictrack::MusicTrack;
+use crate::media_controls::MediaControlsBackend;
+use crate::media_sync::MediaSync;
 #[cfg(target_os = "windows")]
-use crate::notifications::{NotificationsBackend, NotificationContent, NotificationsTrait};
-use crate::player::{CurrentTrackInfo, Player};
+use crate::notifications::NotificationsBackend;
+use crate::playback::{PlaybackController, PlaybackEvent};
+use crate::player::Player;
 use crate::ui::component::RenderContext;
 use crate::ui::screens::Playlist;
 use crate::ui::theme::Theme;
 use crate::ui::widgets::{DeviceSelector, SearchWidget};
 
-struct CoverArtFile {
-    _path: tempfile::TempPath,
-    url: String,
-    #[cfg(target_os = "windows")]
-    fs_path: String,
-}
-
-/// UI-agnostic application state. Shared between terminal and future web UI.
 pub struct AppState {
-    pub player: Player,
-    pub playing_track: Option<CurrentTrackInfo>,
-    pub playing_track_index: usize,
-    pub automatically_play_next: bool,
+    pub playback: PlaybackController,
+    pub media_sync: MediaSync,
     pub layers: Vec<Layer>,
     pub status_message: Option<String>,
-    pub media_controls: Option<MediaControlsBackend>,
-    #[cfg(target_os = "windows")]
-    pub notifications: Option<NotificationsBackend>,
-    cover_art_file: Option<CoverArtFile>,
-    metadata_dirty: bool,
 }
 
 impl AppState {
@@ -42,55 +24,43 @@ impl AppState {
         player: Player,
         media_controls: Option<MediaControlsBackend>,
         #[cfg(target_os = "windows")] notifications: Option<NotificationsBackend>,
-        #[cfg(not(target_os = "windows"))] _notifications: Option<std::convert::Infallible>,
+        #[cfg(not(target_os = "windows"))] notifications: Option<std::convert::Infallible>,
     ) -> Self {
         Self {
-            player,
-            playing_track: None,
-            playing_track_index: 0,
-            automatically_play_next: true,
+            playback: PlaybackController::new(player),
+            #[cfg(target_os = "windows")]
+            media_sync: MediaSync::new(media_controls, notifications),
+            #[cfg(not(target_os = "windows"))]
+            media_sync: MediaSync::new(media_controls, notifications),
             layers: vec![],
             status_message: None,
-            media_controls,
-            #[cfg(target_os = "windows")]
-            notifications,
-            cover_art_file: None,
-            metadata_dirty: false,
         }
     }
 
-    /// Build a state snapshot for rendering (terminal) or serialization (web).
     pub fn render_context<'a>(&'a self, theme: &'a Theme) -> RenderContext<'a> {
         RenderContext {
-            playing_track: self.playing_track.as_ref(),
-            playing_track_index: self.playing_track_index,
-            is_playing: self.player.is_playing(),
-            is_paused: self.player.is_paused(),
+            playing_track: self.playback.playing_track.as_ref(),
+            playing_track_index: self.playback.playing_track_index,
+            is_playing: self.playback.is_playing(),
+            is_paused: self.playback.is_paused(),
             status_message: self.status_message.as_deref(),
             theme,
         }
     }
 
-    /// Check if auto-advance should trigger.
     pub fn auto_advance(&mut self, playlist: &Playlist) -> Result<()> {
-        if let Some(track) = &self.playing_track {
-            if !track.is_streaming() && self.automatically_play_next {
-                // Limit retries to avoid blocking the UI for seconds
-                // if many consecutive tracks are unplayable.
-                let max_retries = playlist.songs_len().min(5);
-                for _ in 0..max_retries {
-                    match self.next(playlist) {
-                        Ok(()) => break,
-                        Err(e) => log::warn!("Skipping unplayable track: {}", e),
-                    }
+        match self.playback.auto_advance(playlist)? {
+            PlaybackEvent::TrackChanged => {
+                if let Some(track) = &self.playback.playing_track {
+                    self.media_sync.on_track_changed(track);
                 }
+                self.status_message = None;
             }
+            _ => {}
         }
         Ok(())
     }
 
-    /// Process an Action. Single entry point for all state mutations.
-    /// Both terminal App and future web server call this.
     pub fn process_action(
         &mut self,
         action: Action,
@@ -101,38 +71,35 @@ impl AppState {
         match action {
             Action::None => {}
             Action::TogglePlayPause => {
-                if self.player.is_playing() {
-                    self.player.pause()?;
-                } else if self.playing_track.is_some() {
-                    self.player.resume()?;
-                } else if let Err(e) = self.play_selected(playlist) {
-                    self.status_message = Some(format!("{}", e));
-                    log::warn!("Cannot play track: {}", e);
+                match self.playback.toggle_play_pause(playlist) {
+                    Ok(PlaybackEvent::TrackChanged) => {
+                        if let Some(track) = &self.playback.playing_track {
+                            self.media_sync.on_track_changed(track);
+                        }
+                        self.status_message = None;
+                    }
+                    Err(e) => {
+                        self.status_message = Some(format!("{}", e));
+                        log::warn!("Cannot play track: {}", e);
+                    }
+                    _ => {}
                 }
             }
             Action::Stop => {
-                self.playing_track = None;
-                self.metadata_dirty = true;
-                self.cover_art_file = None;
-                self.player.stop()?;
+                self.playback.stop()?;
+                self.media_sync.clear();
             }
             Action::NextTrack => {
-                if let Err(e) = self.next(playlist) {
-                    self.status_message = Some(format!("{}", e));
-                    log::warn!("Cannot play track: {}", e);
-                }
+                let result = self.playback.next(playlist);
+                self.handle_playback_result(result);
             }
             Action::PreviousTrack => {
-                if let Err(e) = self.previous(playlist) {
-                    self.status_message = Some(format!("{}", e));
-                    log::warn!("Cannot play track: {}", e);
-                }
+                let result = self.playback.previous(playlist);
+                self.handle_playback_result(result);
             }
             Action::PlaySelected => {
-                if let Err(e) = self.play_selected(playlist) {
-                    self.status_message = Some(format!("{}", e));
-                    log::warn!("Cannot play track: {}", e);
-                }
+                let result = self.playback.play_selected(playlist);
+                self.handle_playback_result(result);
             }
             Action::SelectUp => {
                 playlist.select_previous();
@@ -182,10 +149,8 @@ impl AppState {
                 }
             }
             Action::Quit => {
-                self.player.stop()?;
-                self.playing_track = None;
-                self.metadata_dirty = true;
-                self.cover_art_file = None;
+                self.playback.stop()?;
+                self.media_sync.clear();
             }
             Action::Batch(actions) => {
                 for a in actions {
@@ -193,177 +158,22 @@ impl AppState {
                 }
             }
         }
-        self.sync_media_controls();
         Ok(())
     }
 
-    pub fn sync_media_controls(&mut self) {
-        if let Some(mc) = self.media_controls.as_mut() {
-            mc.pump_messages();
-        }
-        if let Some(track) = &self.playing_track {
-            if self.metadata_dirty {
-                if let Some(mc) = self.media_controls.as_mut() {
-                    let cover_url = self.cover_art_file.as_ref().map(|f| f.url.as_str());
-                    let metadata_with_cover = TrackMetadata {
-                        title: &track.title,
-                        artist: &track.artist,
-                        album: &track.album,
-                        duration: Some(Duration::from_secs(track.total_duration.seconds)),
-                        cover_url,
-                    };
-                    if let Err(e) = mc.set_metadata(&metadata_with_cover) {
-                        log::warn!("set_metadata failed with cover_url {:?}: {}", cover_url, e);
-                        let _ = mc.set_metadata(&TrackMetadata {
-                            cover_url: None,
-                            ..metadata_with_cover
-                        });
-                    }
+    fn handle_playback_result(&mut self, result: Result<PlaybackEvent>) {
+        match result {
+            Ok(PlaybackEvent::TrackChanged) => {
+                if let Some(track) = &self.playback.playing_track {
+                    self.media_sync.on_track_changed(track);
                 }
-                #[cfg(target_os = "windows")]
-                if let Some(notif) = &self.notifications {
-                    let cover_path = self.cover_art_file.as_ref().map(|f| f.fs_path.as_str());
-                    let content = NotificationContent {
-                        title: &track.title,
-                        artist: &track.artist,
-                        album: &track.album,
-                        cover_art_path: cover_path,
-                    };
-                    if let Err(e) = notif.show_track_change(&content) {
-                        log::warn!("Toast notification failed: {}", e);
-                    }
-                }
-                self.metadata_dirty = false;
+                self.status_message = None;
             }
-            if let Some(mc) = self.media_controls.as_mut() {
-                let status = if self.player.is_playing() {
-                    PlaybackStatus::Playing
-                } else {
-                    PlaybackStatus::Paused
-                };
-                let _ = mc.set_playback(status);
+            Err(e) => {
+                self.status_message = Some(format!("{}", e));
+                log::warn!("Cannot play track: {}", e);
             }
-        } else if let Some(mc) = self.media_controls.as_mut() {
-            let _ = mc.set_playback(PlaybackStatus::Stopped);
+            _ => {}
         }
-    }
-
-    fn update_cover_art_file(&mut self) {
-        self.cover_art_file = None;
-        if let Some(track) = &self.playing_track {
-            if let Some(data) = &track.cover_art {
-                match (|| -> Result<CoverArtFile> {
-                    let suffix = match track.cover_art_mime.as_deref() {
-                        Some("image/png") => ".png",
-                        _ => ".jpg",
-                    };
-                    let mut file = tempfile::Builder::new()
-                        .prefix("rhap_cover_")
-                        .suffix(suffix)
-                        .tempfile_in(std::env::temp_dir())?;
-                    file.write_all(data)?;
-                    file.flush()?;
-                    // Close the file handle so Windows Storage API can read it
-                    let temp_path = file.into_temp_path();
-                    // Canonicalize to resolve 8.3 short names (e.g. CHRIST~1.FAJ)
-                    let full_path = std::fs::canonicalize(&temp_path)
-                        .unwrap_or_else(|_| temp_path.to_path_buf());
-                    // Windows Storage API needs backslash paths; strip \\?\ UNC prefix from canonicalize
-                    let path_str = full_path.to_string_lossy();
-                    let path_str = path_str.strip_prefix(r"\\?\").unwrap_or(&path_str);
-                    let url = format!("file://{}", path_str);
-                    Ok(CoverArtFile {
-                        _path: temp_path,
-                        url,
-                        #[cfg(target_os = "windows")]
-                        fs_path: path_str.to_string(),
-                    })
-                })() {
-                    Ok(caf) => self.cover_art_file = Some(caf),
-                    Err(e) => log::warn!("Failed to write cover art temp file: {}", e),
-                }
-            }
-        }
-    }
-
-    fn play(&mut self, playlist: &Playlist) -> Result<()> {
-        if let Some(slot) = playlist.songs().get(self.playing_track_index) {
-            let song = slot.load();
-
-            // If not yet probed, probe and open in one shot to avoid double I/O.
-            let preloaded_handle = if !song.probed {
-                let (probed, handle) = MusicTrack::probe_and_open(song.path.clone())?;
-                slot.store(Arc::new(probed));
-                Some(handle)
-            } else {
-                None
-            };
-            let song = Arc::clone(&slot.load());
-
-            match self.player.play_gapless(song.clone()) {
-                Ok(Some(info)) => {
-                    self.playing_track = Some(info);
-                    self.metadata_dirty = true;
-                    self.update_cover_art_file();
-                    self.status_message = None;
-                    return Ok(());
-                }
-                Ok(None) => {}
-                Err(e) => log::warn!("Gapless failed: {}", e),
-            }
-
-            self.player.stop()?;
-            self.playing_track = None;
-            self.metadata_dirty = true;
-            let current_track_info = match preloaded_handle {
-                Some(handle) => self.player.play_with_handle(song, handle)?,
-                None => self.player.play(song)?,
-            };
-            self.playing_track = Some(current_track_info);
-            self.metadata_dirty = true;
-            self.update_cover_art_file();
-            self.status_message = None;
-        }
-        Ok(())
-    }
-
-    fn next(&mut self, playlist: &Playlist) -> Result<()> {
-        let len = playlist.songs_len();
-        if len == 0 {
-            return Ok(());
-        }
-        self.playing_track_index = (self.playing_track_index + 1) % len;
-        self.play(playlist)
-    }
-
-    fn previous(&mut self, playlist: &Playlist) -> Result<()> {
-        let len = playlist.songs_len();
-        if len == 0 {
-            return Ok(());
-        }
-        if let Some(current_track) = &self.playing_track {
-            let elapsed_time = current_track.get_elapsed_time();
-            // Note: elapsed_time tracks decoded position, which is ahead of
-            // audible position by the ring buffer + device buffer duration.
-            // Using 5s threshold to account for this buffering lag.
-            if elapsed_time.seconds > 5 {
-                self.play(playlist)?;
-                return Ok(());
-            }
-        }
-        self.playing_track_index = if self.playing_track_index == 0 {
-            len - 1
-        } else {
-            self.playing_track_index - 1
-        };
-        self.play(playlist)
-    }
-
-    fn play_selected(&mut self, playlist: &Playlist) -> Result<()> {
-        if let Some(index) = playlist.selected_index() {
-            self.playing_track_index = index;
-            self.play(playlist)?;
-        }
-        Ok(())
     }
 }

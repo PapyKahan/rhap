@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc, sync::atomic::{AtomicBool, Ordering}};
 
 use anyhow::Result;
 use arc_swap::ArcSwap;
@@ -29,6 +29,8 @@ pub struct Playlist {
     state: TableState,
     songs: Arc<[ArcSwap<MusicTrack>]>,
     currently_playing_widget: CurrentlyPlayingWidget,
+    prober_handle: Option<std::thread::JoinHandle<()>>,
+    prober_cancel: Arc<AtomicBool>,
 }
 
 impl Playlist {
@@ -59,10 +61,16 @@ impl Playlist {
 
             // Spawn background prober — stores directly into shared ArcSwap slots
             let songs_ref = songs.clone();
-            std::thread::Builder::new()
+            let cancel = Arc::new(AtomicBool::new(false));
+            let cancel_clone = Arc::clone(&cancel);
+
+            let prober_handle = std::thread::Builder::new()
                 .name("rhap-prober".into())
                 .spawn(move || {
                     songs_ref.par_iter().for_each(|slot| {
+                        if cancel_clone.load(Ordering::Relaxed) {
+                            return;
+                        }
                         let path = slot.load().path.clone();
                         if let Ok(track) = MusicTrack::new(path) {
                             slot.store(Arc::new(track));
@@ -70,7 +78,18 @@ impl Playlist {
                     });
                 })
                 .ok();
-        } else if path.is_file() {
+            let mut state = TableState::default();
+            state.select(Some(0));
+            return Ok(Self {
+                state,
+                songs,
+                currently_playing_widget: CurrentlyPlayingWidget::new(picker),
+                prober_handle,
+                prober_cancel: cancel,
+            });
+        }
+
+        if path.is_file() {
             let path_str = path.into_os_string().into_string().unwrap();
             songs = Arc::from(vec![ArcSwap::from_pointee(MusicTrack::new(path_str)?)]);
         } else {
@@ -83,6 +102,8 @@ impl Playlist {
             state,
             songs,
             currently_playing_widget: CurrentlyPlayingWidget::new(picker),
+            prober_handle: None,
+            prober_cancel: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -221,6 +242,16 @@ impl Playlist {
 
     pub fn selected_index(&self) -> Option<usize> {
         self.state.selected()
+    }
+
+}
+
+impl Drop for Playlist {
+    fn drop(&mut self) {
+        self.prober_cancel.store(true, Ordering::Relaxed);
+        if let Some(handle) = self.prober_handle.take() {
+            let _ = handle.join();
+        }
     }
 }
 

@@ -15,13 +15,38 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+struct WasapiStreamHandle {
+    thread: Option<std::thread::JoinHandle<Result<()>>>,
+    is_playing: Arc<AtomicBool>,
+    is_paused: Arc<AtomicBool>,
+}
+
+impl WasapiStreamHandle {
+    fn pause(&self) {
+        self.is_paused.store(true, Ordering::Release);
+    }
+
+    fn resume(&self) {
+        self.is_paused.store(false, Ordering::Release);
+    }
+
+    fn stop(&mut self) {
+        self.is_playing.store(false, Ordering::Release);
+        if let Some(handle) = self.thread.take() {
+            match handle.join() {
+                Ok(Err(e)) => error!("Audio-out thread error: {:#}", e),
+                Err(_) => error!("Audio-out thread panicked"),
+                Ok(Ok(())) => {}
+            }
+        }
+    }
+}
+
 pub struct Device {
     default_device_id: String,
     inner_device: IMMDevice,
-    stream_thread_handle: Option<std::thread::JoinHandle<Result<()>>>,
+    stream_handle: Option<WasapiStreamHandle>,
     high_priority_mode: bool,
-    is_paused: Arc<AtomicBool>,
-    is_playing: Arc<AtomicBool>,
 }
 
 impl StreamParams {
@@ -43,10 +68,8 @@ impl Device {
         Ok(Self {
             inner_device,
             default_device_id,
-            stream_thread_handle: Option::None,
+            stream_handle: None,
             high_priority_mode,
-            is_paused: Arc::new(AtomicBool::new(false)),
-            is_playing: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -136,12 +159,13 @@ impl DeviceTrait for Device {
         let signal = Arc::new(BufferSignal::new());
         let signal_clone = Arc::clone(&signal);
 
-        self.is_playing.store(true, Ordering::Release);
-        let is_playing = Arc::clone(&self.is_playing);
-        let is_paused = Arc::clone(&self.is_paused);
+        let is_playing = Arc::new(AtomicBool::new(true));
+        let is_playing_clone = Arc::clone(&is_playing);
+        let is_paused = Arc::new(AtomicBool::new(false));
+        let is_paused_clone = Arc::clone(&is_paused);
         let high_priority_mode = self.high_priority_mode;
 
-        self.stream_thread_handle = Some(
+        let thread = Some(
             std::thread::Builder::new()
                 .name("rhap-audio-out".into())
                 .spawn(move || -> Result<()> {
@@ -151,14 +175,14 @@ impl DeviceTrait for Device {
                     let mut buffer = vec![0u8; wasapi_buffer_bytes];
 
                     loop {
-                        if !is_playing.load(Ordering::Acquire) {
+                        if !is_playing_clone.load(Ordering::Acquire) {
                             break;
                         }
 
-                        if is_paused.load(Ordering::Acquire) {
+                        if is_paused_clone.load(Ordering::Acquire) {
                             client.stop()?;
-                            while is_paused.load(Ordering::Acquire) {
-                                if !is_playing.load(Ordering::Acquire) {
+                            while is_paused_clone.load(Ordering::Acquire) {
+                                if !is_playing_clone.load(Ordering::Acquire) {
                                     return Ok(());
                                 }
                                 std::thread::sleep(Duration::from_millis(10));
@@ -211,6 +235,12 @@ impl DeviceTrait for Device {
                 })?,
         );
 
+        self.stream_handle = Some(WasapiStreamHandle {
+            thread,
+            is_playing,
+            is_paused,
+        });
+
         Ok(AudioPipeline {
             producer,
             end_of_stream,
@@ -219,23 +249,22 @@ impl DeviceTrait for Device {
     }
 
     fn pause(&mut self) -> Result<()> {
-        self.is_paused.store(true, Ordering::Release);
+        if let Some(handle) = &self.stream_handle {
+            handle.pause();
+        }
         Ok(())
     }
 
     fn resume(&mut self) -> Result<()> {
-        self.is_paused.store(false, Ordering::Release);
+        if let Some(handle) = &self.stream_handle {
+            handle.resume();
+        }
         Ok(())
     }
 
     fn stop(&mut self) -> Result<()> {
-        self.is_playing.store(false, Ordering::Release);
-        if let Some(handle) = self.stream_thread_handle.take() {
-            match handle.join() {
-                Ok(Err(e)) => error!("Audio-out thread error: {:#}", e),
-                Err(_) => error!("Audio-out thread panicked"),
-                Ok(Ok(())) => {}
-            }
+        if let Some(mut handle) = self.stream_handle.take() {
+            handle.stop();
         }
         Ok(())
     }
