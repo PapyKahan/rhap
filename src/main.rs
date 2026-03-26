@@ -28,8 +28,8 @@ struct Args {
     list: bool,
     #[clap(short = 'H', long, default_value_t = false)]
     high_priority_mode: bool,
-    #[clap(short, long, required = true)]
-    path: PathBuf,
+    #[clap(short, long, required_unless_present = "list")]
+    path: Option<PathBuf>,
     #[clap(short, long)]
     device: Option<u32>,
     #[clap(long, default_value_t = false)]
@@ -103,7 +103,7 @@ fn main() -> Result<()> {
     let mut terminal = ratatui::init();
     let host = Host::new(backend_name, args.high_priority_mode);
     let player = Player::new(host, args.device, args.pollmode, args.gapless, args.resample)?;
-    let path = wsl_path_to_windows(args.path);
+    let path = wsl_path_to_windows(args.path.ok_or_else(|| anyhow::anyhow!("--path is required"))?);
 
     let media_handle = media_controls::create_media_controls()
         .map_err(|e| log::warn!("Media controls unavailable: {}", e))
