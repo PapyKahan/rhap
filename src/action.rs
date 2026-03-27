@@ -16,6 +16,7 @@ pub enum Action {
     NextTrack,
     PreviousTrack,
     PlaySelected,
+    ChangeOutputDevice(u32),
     // Navigation
     SelectUp,
     SelectDown,

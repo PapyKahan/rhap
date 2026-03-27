@@ -154,7 +154,11 @@ impl Component for DeviceSelector {
             }
             KeyCode::Enter => {
                 self.set_selected_device()?;
-                Ok(Action::PopLayer)
+                let index = self.state.selected().unwrap_or(0) as u32;
+                Ok(Action::Batch(vec![
+                    Action::ChangeOutputDevice(index),
+                    Action::PopLayer,
+                ]))
             }
             _ => Ok(Action::None),
         }

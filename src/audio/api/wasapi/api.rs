@@ -262,9 +262,11 @@ impl AudioClient {
                 self.format.get_format(),
                 None,
             );
-            self.max_buffer_frames = self.inner_client.GetBufferSize()? as usize;
             match result {
-                Ok(()) => debug!("IAudioClient::Initialize ok"),
+                Ok(()) => {
+                    self.max_buffer_frames = self.inner_client.GetBufferSize()? as usize;
+                    debug!("IAudioClient::Initialize ok");
+                }
                 Err(e) => {
                     // Some of the possible errors. See the documentation for the full list and descriptions.
                     // https://docs.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize
@@ -279,6 +281,7 @@ impl AudioClient {
                             // https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize#examples
                             // Just panic on errors to keep it short and simple.
                             // 1. Call IAudioClient::GetBufferSize and receive the next-highest-aligned buffer size (in frames).
+                            self.max_buffer_frames = self.inner_client.GetBufferSize()? as usize;
                             debug!(
                                 "Client next-highest-aligned buffer size: {} frames",
                                 self.max_buffer_frames
@@ -302,6 +305,7 @@ impl AudioClient {
                                 self.format.get_format(),
                                 None,
                             )?;
+                            self.max_buffer_frames = self.inner_client.GetBufferSize()? as usize;
                             debug!("IAudioClient::Initialize ok");
                         }
                         AUDCLNT_E_DEVICE_IN_USE => {

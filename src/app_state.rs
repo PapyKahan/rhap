@@ -101,6 +101,10 @@ impl AppState {
                 let result = self.playback.play_selected(playlist);
                 self.handle_playback_result(result);
             }
+            Action::ChangeOutputDevice(id) => {
+                let result = self.playback.change_device(id, playlist);
+                self.handle_playback_result(result);
+            }
             Action::SelectUp => {
                 playlist.select_previous();
             }

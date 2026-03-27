@@ -310,6 +310,10 @@ impl Player {
         self.state.load(Ordering::Relaxed) == PlayerState::Paused
     }
 
+    pub fn set_device_id(&mut self, id: Option<u32>) {
+        self.device_id = id;
+    }
+
     fn spawn_decoder(
         &mut self,
         song: &Arc<MusicTrack>,
@@ -320,6 +324,7 @@ impl Player {
         signal: Arc<BufferSignal>,
         playback_handle: Option<crate::musictrack::PlaybackHandle>,
         cached_resampler: Option<Resampler>,
+        start_from_ts: u64,
     ) -> Result<CurrentTrackInfo> {
         let mut playback = match playback_handle {
             Some(h) => h,
@@ -343,7 +348,7 @@ impl Player {
         let report_streaming = Arc::clone(&is_streaming);
         let state = Arc::clone(&self.state);
         let state_for_write = Arc::clone(&self.state);
-        let elapsed_time = Arc::new(AtomicU64::new(0));
+        let elapsed_time = Arc::new(AtomicU64::new(start_from_ts));
         let elapsed_time_clone = Arc::clone(&elapsed_time);
         let total_duration = song.duration;
 
@@ -352,10 +357,15 @@ impl Player {
                 .name("rhap-decoder".into())
                 .spawn(move || -> DecoderResult {
                     let format = &mut playback.format;
+                    let seek_time = if start_from_ts > 0 {
+                        time_base.calc_time(start_from_ts)
+                    } else {
+                        Time::default()
+                    };
                     if let Err(e) = format.seek(
                         SeekMode::Accurate,
                         SeekTo::Time {
-                            time: Time::default(),
+                            time: seek_time,
                             track_id: None,
                         },
                     ) {
@@ -455,17 +465,23 @@ impl Player {
         song: Arc<MusicTrack>,
         handle: crate::musictrack::PlaybackHandle,
     ) -> Result<CurrentTrackInfo> {
-        self.play_inner(song, Some(handle))
+        self.play_inner(song, Some(handle), 0)
     }
 
     pub fn play(&mut self, song: Arc<MusicTrack>) -> Result<CurrentTrackInfo> {
-        self.play_inner(song, None)
+        self.play_inner(song, None, 0)
+    }
+
+    /// Play a track starting from a specific timestamp (in codec time units).
+    pub fn play_at(&mut self, song: Arc<MusicTrack>, start_from_ts: u64) -> Result<CurrentTrackInfo> {
+        self.play_inner(song, None, start_from_ts)
     }
 
     fn play_inner(
         &mut self,
         song: Arc<MusicTrack>,
         handle: Option<crate::musictrack::PlaybackHandle>,
+        start_from_ts: u64,
     ) -> Result<CurrentTrackInfo> {
         self.stop()?;
 
@@ -512,6 +528,7 @@ impl Player {
             pipeline.signal,
             handle,
             None,
+            start_from_ts,
         )
     }
 
@@ -551,7 +568,7 @@ impl Player {
 
         eos.store(false, Ordering::Release);
         self.current_signal = Some(Arc::clone(&signal));
-        let info = self.spawn_decoder(&song, src_params, current_adj, producer, eos, signal, None, cached_resampler)?;
+        let info = self.spawn_decoder(&song, src_params, current_adj, producer, eos, signal, None, cached_resampler, 0)?;
         Ok(Some(info))
     }
 }

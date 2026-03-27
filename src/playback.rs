@@ -137,6 +137,22 @@ impl PlaybackController {
         Ok(PlaybackEvent::None)
     }
 
+    pub fn change_device(&mut self, device_id: u32, playlist: &Playlist) -> Result<PlaybackEvent> {
+        self.player.set_device_id(Some(device_id));
+        if let Some(track) = &self.playing_track {
+            let start_from_ts = track.elapsed_time.load(std::sync::atomic::Ordering::Relaxed);
+            if let Some(slot) = playlist.songs().get(self.playing_track_index) {
+                let song = Arc::clone(&slot.load());
+                self.player.stop()?;
+                self.playing_track = None;
+                let info = self.player.play_at(song, start_from_ts)?;
+                self.playing_track = Some(info);
+                return Ok(PlaybackEvent::TrackChanged);
+            }
+        }
+        Ok(PlaybackEvent::None)
+    }
+
     pub fn is_playing(&self) -> bool {
         self.player.is_playing()
     }
