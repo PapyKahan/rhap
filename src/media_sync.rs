@@ -24,6 +24,22 @@ pub struct MediaSync {
     metadata_dirty: bool,
 }
 
+impl Drop for MediaSync {
+    fn drop(&mut self) {
+        // Leak the media-controls backend instead of dropping it. On Linux,
+        // souvlaki's MPRIS service thread is joined inside its Drop, and that
+        // join can block for several seconds (the dbus event loop polls with
+        // a 1s timeout and only checks the kill signal between polls). The
+        // DBus connection FD and any related resources are reclaimed by the
+        // OS when the process exits, so leaking is safe at shutdown.
+        if let Some(mc) = self.media_controls.take() {
+            std::mem::forget(mc);
+        }
+        // Drop cover art tempfile normally (cleans up /tmp).
+        let _ = self.cover_art_file.take();
+    }
+}
+
 impl MediaSync {
     pub fn new(
         media_controls: Option<MediaControlsBackend>,

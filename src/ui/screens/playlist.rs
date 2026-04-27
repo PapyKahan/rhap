@@ -29,7 +29,6 @@ pub struct Playlist {
     state: TableState,
     songs: Arc<[ArcSwap<MusicTrack>]>,
     currently_playing_widget: CurrentlyPlayingWidget,
-    prober_handle: Option<std::thread::JoinHandle<()>>,
     prober_cancel: Arc<AtomicBool>,
 }
 
@@ -64,7 +63,7 @@ impl Playlist {
             let cancel = Arc::new(AtomicBool::new(false));
             let cancel_clone = Arc::clone(&cancel);
 
-            let prober_handle = std::thread::Builder::new()
+            let _ = std::thread::Builder::new()
                 .name("rhap-prober".into())
                 .spawn(move || {
                     songs_ref.par_iter().for_each(|slot| {
@@ -76,15 +75,13 @@ impl Playlist {
                             slot.store(Arc::new(track));
                         }
                     });
-                })
-                .ok();
+                });
             let mut state = TableState::default();
             state.select(Some(0));
             return Ok(Self {
                 state,
                 songs,
                 currently_playing_widget: CurrentlyPlayingWidget::new(picker),
-                prober_handle,
                 prober_cancel: cancel,
             });
         }
@@ -102,7 +99,6 @@ impl Playlist {
             state,
             songs,
             currently_playing_widget: CurrentlyPlayingWidget::new(picker),
-            prober_handle: None,
             prober_cancel: Arc::new(AtomicBool::new(false)),
         })
     }
@@ -249,9 +245,9 @@ impl Playlist {
 impl Drop for Playlist {
     fn drop(&mut self) {
         self.prober_cancel.store(true, Ordering::Relaxed);
-        if let Some(handle) = self.prober_handle.take() {
-            let _ = handle.join();
-        }
+        // Do not join the prober: rayon's par_iter cannot be cancelled
+        // mid-task, so in-flight probes would block shutdown on a slow disk.
+        // The process is exiting, so the OS will reap the thread.
     }
 }
 
