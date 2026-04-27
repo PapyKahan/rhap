@@ -1,5 +1,4 @@
-use anyhow::{anyhow, Result};
-use log::{debug, error};
+use anyhow::Result;
 use ringbuf::HeapRb;
 use ringbuf::traits::{Consumer, Observer, Split};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -9,40 +8,14 @@ use std::time::Duration;
 use super::api::{AlsaInitError, AlsaPcm, set_thread_priority, probe_capabilities};
 use crate::audio::{BufferConfig, Capabilities, DeviceTrait, StreamParams};
 use crate::audio::device::{AudioPipeline, BufferSignal};
-
-struct AlsaStreamHandle {
-    thread: Option<std::thread::JoinHandle<Result<()>>>,
-    is_playing: Arc<AtomicBool>,
-    is_paused: Arc<AtomicBool>,
-}
-
-impl AlsaStreamHandle {
-    fn pause(&self) {
-        self.is_paused.store(true, Ordering::Release);
-    }
-
-    fn resume(&self) {
-        self.is_paused.store(false, Ordering::Release);
-    }
-
-    fn stop(&mut self) {
-        self.is_playing.store(false, Ordering::Release);
-        self.is_paused.store(false, Ordering::Release);
-        if let Some(handle) = self.thread.take() {
-            match handle.join() {
-                Ok(Err(e)) => error!("Audio-out thread error: {:#}", e),
-                Err(_) => error!("Audio-out thread panicked"),
-                Ok(Ok(())) => {}
-            }
-        }
-    }
-}
+use crate::audio::retry::{open_with_retry, RetryDecision, DEFAULT_INIT_BACKOFFS_MS};
+use crate::audio::stream_handle::PullStreamHandle;
 
 pub struct Device {
     device_name: String,
     friendly_name: String,
     is_default: bool,
-    stream_handle: Option<AlsaStreamHandle>,
+    stream_handle: Option<PullStreamHandle>,
     high_priority_mode: bool,
 }
 
@@ -107,10 +80,9 @@ impl DeviceTrait for Device {
         let is_paused_clone = Arc::clone(&is_paused);
         let high_priority_mode = self.high_priority_mode;
 
-        let thread = Some(
-            std::thread::Builder::new()
-                .name("rhap-audio-out".into())
-                .spawn(move || -> Result<()> {
+        let thread = std::thread::Builder::new()
+            .name("rhap-audio-out".into())
+            .spawn(move || -> Result<()> {
                     set_thread_priority(high_priority_mode);
                     let period_bytes = pcm.period_bytes();
                     let mut write_buf = vec![0u8; period_bytes];
@@ -172,14 +144,9 @@ impl DeviceTrait for Device {
 
                     pcm.stop();
                     Ok(())
-                })?,
-        );
+                })?;
 
-        self.stream_handle = Some(AlsaStreamHandle {
-            thread,
-            is_playing,
-            is_paused,
-        });
+        self.stream_handle = Some(PullStreamHandle::new(thread, is_playing, is_paused));
 
         Ok(AudioPipeline {
             producer,
@@ -210,29 +177,19 @@ impl DeviceTrait for Device {
     }
 }
 
-/// Open a PCM device with retry-with-backoff on transient EBUSY/EAGAIN errors.
-/// Up to 5 attempts (50/100/200/400/800 ms backoff). Permanent errors are
-/// returned immediately.
+/// Open a PCM device using the generic retry helper. Each attempt fully
+/// reopens the PCM (close+open) so a previous EBUSY holder has time to
+/// release its handle.
 fn open_pcm_with_retry(
     device_name: &str,
     params: &StreamParams,
     buffer: &BufferConfig,
 ) -> Result<AlsaPcm> {
-    let backoffs_ms = [50u64, 100, 200, 400, 800];
-    for (idx, &ms) in std::iter::once(&0u64).chain(backoffs_ms.iter()).enumerate() {
-        if ms > 0 {
-            debug!("alsa: device busy, retrying in {} ms (attempt {})", ms, idx);
-            std::thread::sleep(Duration::from_millis(ms));
-        }
+    open_with_retry("alsa: open", DEFAULT_INIT_BACKOFFS_MS, || {
         match AlsaPcm::open_classified(device_name, params, buffer) {
-            Ok(pcm) => return Ok(pcm),
-            Err(AlsaInitError::Busy) => continue,
-            Err(AlsaInitError::Permanent(e)) => return Err(e),
+            Ok(pcm) => RetryDecision::Ok(pcm),
+            Err(AlsaInitError::Busy) => RetryDecision::BackoffRetry,
+            Err(AlsaInitError::Permanent(e)) => RetryDecision::Fatal(e),
         }
-    }
-    Err(anyhow!(
-        "alsa: device {} remained busy after {} retries",
-        device_name,
-        backoffs_ms.len()
-    ))
+    })
 }

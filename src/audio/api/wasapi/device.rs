@@ -1,5 +1,4 @@
-use anyhow::{anyhow, Result};
-use log::{debug, error};
+use anyhow::Result;
 use ringbuf::HeapRb;
 use ringbuf::traits::{Consumer, Observer, Split};
 use windows::Win32::{
@@ -14,41 +13,16 @@ use windows::Win32::{
 use super::api::{com_initialize, AudioClient, ShareMode, ThreadPriority, WasapiInitError, WaveFormat};
 use crate::audio::{BufferConfig, Capabilities, DeviceTrait, StreamParams};
 use crate::audio::device::{AudioPipeline, BufferSignal};
+use crate::audio::retry::{open_with_retry, RetryDecision, DEFAULT_INIT_BACKOFFS_MS};
+use crate::audio::stream_handle::PullStreamHandle;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-struct WasapiStreamHandle {
-    thread: Option<std::thread::JoinHandle<Result<()>>>,
-    is_playing: Arc<AtomicBool>,
-    is_paused: Arc<AtomicBool>,
-}
-
-impl WasapiStreamHandle {
-    fn pause(&self) {
-        self.is_paused.store(true, Ordering::Release);
-    }
-
-    fn resume(&self) {
-        self.is_paused.store(false, Ordering::Release);
-    }
-
-    fn stop(&mut self) {
-        self.is_playing.store(false, Ordering::Release);
-        if let Some(handle) = self.thread.take() {
-            match handle.join() {
-                Ok(Err(e)) => error!("Audio-out thread error: {:#}", e),
-                Err(_) => error!("Audio-out thread panicked"),
-                Ok(Ok(())) => {}
-            }
-        }
-    }
-}
-
 pub struct Device {
     default_device_id: String,
     inner_device: IMMDevice,
-    stream_handle: Option<WasapiStreamHandle>,
+    stream_handle: Option<PullStreamHandle>,
     high_priority_mode: bool,
 }
 
@@ -183,10 +157,9 @@ impl DeviceTrait for Device {
         let is_paused_clone = Arc::clone(&is_paused);
         let high_priority_mode = self.high_priority_mode;
 
-        let thread = Some(
-            std::thread::Builder::new()
-                .name("rhap-audio-out".into())
-                .spawn(move || -> Result<()> {
+        let thread = std::thread::Builder::new()
+            .name("rhap-audio-out".into())
+            .spawn(move || -> Result<()> {
                     com_initialize();
                     let _thread_priority = ThreadPriority::new(high_priority_mode)?;
                     let mut client_started = false;
@@ -250,14 +223,9 @@ impl DeviceTrait for Device {
                     }
 
                     client.stop()
-                })?,
-        );
+                })?;
 
-        self.stream_handle = Some(WasapiStreamHandle {
-            thread,
-            is_playing,
-            is_paused,
-        });
+        self.stream_handle = Some(PullStreamHandle::new(thread, is_playing, is_paused));
 
         Ok(AudioPipeline {
             producer,
@@ -288,50 +256,45 @@ impl DeviceTrait for Device {
     }
 }
 
-/// Activate + Initialize a fresh AudioClient with retry policy:
-/// - Up to 5 attempts on transient busy errors (50/100/200/400/800 ms backoff).
-/// - Up to 1 alignment retry, fully recreating the client (MSDN-recommended path).
-/// - Permanent errors are returned immediately.
+/// Activate + Initialize a fresh AudioClient using the generic retry helper.
+/// Per MSDN, every retry recreates the IAudioClient before re-initializing.
 fn open_initialized_client(
     device: &IMMDevice,
     params: &StreamParams,
     buffer: &BufferConfig,
 ) -> Result<AudioClient> {
-    let backoffs_ms = [50u64, 100, 200, 400, 800];
-    let mut alignment_retry_used = false;
+    // Slot for the AudioClient under construction. Each attempt closes over
+    // this slot, recreates the client, and either returns it via Ok or
+    // updates `period` for the next iteration.
+    let mut client_slot: Option<AudioClient> = None;
+    let mut period: Option<i64> = None;
 
-    // Initial period — recomputed once if alignment retry kicks in.
-    let mut client = AudioClient::new(device, params)?;
-    let mut period = client.compute_desired_period(buffer)?;
-
-    let mut busy_idx = 0usize;
-    loop {
-        match client.initialize_with_period(period) {
-            Ok(()) => return Ok(client),
-            Err(WasapiInitError::Busy) => {
-                if busy_idx >= backoffs_ms.len() {
-                    return Err(anyhow!(
-                        "wasapi: device remained busy after {} retries",
-                        backoffs_ms.len()
-                    ));
-                }
-                let ms = backoffs_ms[busy_idx];
-                busy_idx += 1;
-                debug!("wasapi: device busy, retrying in {} ms", ms);
-                std::thread::sleep(std::time::Duration::from_millis(ms));
-                client = AudioClient::new(device, params)?;
+    open_with_retry("wasapi: open", DEFAULT_INIT_BACKOFFS_MS, || {
+        let mut client = match AudioClient::new(device, params) {
+            Ok(c) => c,
+            Err(e) => return RetryDecision::Fatal(e),
+        };
+        let p = match period {
+            Some(p) => p,
+            None => match client.compute_desired_period(buffer) {
+                Ok(p) => p,
+                Err(e) => return RetryDecision::Fatal(e),
+            },
+        };
+        match client.initialize_with_period(p) {
+            Ok(()) => {
+                client_slot = Some(client);
+                // Take it back out via a sentinel — RetryDecision::Ok needs
+                // the value, but the closure can't move out of `client_slot`
+                // easily; consume it via `take`.
+                RetryDecision::Ok(client_slot.take().expect("just stored"))
             }
+            Err(WasapiInitError::Busy) => RetryDecision::BackoffRetry,
             Err(WasapiInitError::AlignmentRetry(new_period)) => {
-                if alignment_retry_used {
-                    return Err(anyhow!(
-                        "wasapi: alignment retry already used, second mismatch"
-                    ));
-                }
-                alignment_retry_used = true;
-                period = new_period;
-                client = AudioClient::new(device, params)?;
+                period = Some(new_period);
+                RetryDecision::ImmediateRetry
             }
-            Err(WasapiInitError::Permanent(e)) => return Err(e),
+            Err(WasapiInitError::Permanent(e)) => RetryDecision::Fatal(e),
         }
-    }
+    })
 }
