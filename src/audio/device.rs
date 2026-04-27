@@ -1,4 +1,4 @@
-use super::{api, Capabilities, StreamParams};
+use super::{api, BufferConfig, Capabilities, StreamParams};
 use anyhow::{anyhow, Result};
 use ringbuf::HeapProd;
 use std::sync::atomic::AtomicBool;
@@ -38,7 +38,7 @@ pub trait DeviceTrait: Send {
     fn is_default(&self) -> Result<bool>;
     fn name(&self) -> Result<String>;
     fn get_capabilities(&self) -> Result<Capabilities>;
-    fn start(&mut self, params: &StreamParams) -> Result<AudioPipeline>;
+    fn start(&mut self, params: &StreamParams, buffer: &BufferConfig) -> Result<AudioPipeline>;
     fn pause(&mut self) -> Result<()>;
     fn resume(&mut self) -> Result<()>;
     fn stop(&mut self) -> Result<()>;
@@ -91,15 +91,15 @@ impl DeviceTrait for Device {
         }
     }
 
-    fn start(&mut self, params: &StreamParams) -> Result<AudioPipeline> {
+    fn start(&mut self, params: &StreamParams, buffer: &BufferConfig) -> Result<AudioPipeline> {
         match self {
             Self::None => Err(anyhow!("No host selected")),
             #[cfg(target_os = "windows")]
-            Self::Wasapi(device) => device.start(params),
+            Self::Wasapi(device) => device.start(params, buffer),
             #[cfg(target_os = "linux")]
-            Self::Alsa(device) => device.start(params),
+            Self::Alsa(device) => device.start(params, buffer),
             #[cfg(target_os = "linux")]
-            Self::PipeWire(device) => device.start(params),
+            Self::PipeWire(device) => device.start(params, buffer),
         }
     }
 

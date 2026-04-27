@@ -9,7 +9,7 @@ use windows::Win32::{
 };
 
 use super::api::{com_initialize, AudioClient, ShareMode, ThreadPriority, WaveFormat};
-use crate::audio::{Capabilities, DeviceTrait, StreamParams};
+use crate::audio::{BufferConfig, Capabilities, DeviceTrait, StreamParams};
 use crate::audio::device::{AudioPipeline, BufferSignal};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -143,14 +143,15 @@ impl DeviceTrait for Device {
         })
     }
 
-    fn start(&mut self, params: &StreamParams) -> Result<AudioPipeline> {
+    fn start(&mut self, params: &StreamParams, buffer: &BufferConfig) -> Result<AudioPipeline> {
         self.stop()?;
 
         let mut client = self.get_client(params)?;
-        client.initialize()?;
+        client.initialize(buffer)?;
         let wasapi_buffer_bytes = client.get_available_buffer_size()?;
 
-        let ring = HeapRb::<u8>::new(wasapi_buffer_bytes * 4);
+        let ring_bytes = buffer.ring_bytes_for(params).max(wasapi_buffer_bytes * 4);
+        let ring = HeapRb::<u8>::new(ring_bytes);
         let (producer, mut consumer) = ring.split();
 
         let end_of_stream = Arc::new(AtomicBool::new(false));

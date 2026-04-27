@@ -12,7 +12,7 @@ use symphonia::core::sample::i24;
 use symphonia::core::units::{Time, TimeBase};
 
 use crate::audio::{
-    BitsPerSample, Capabilities, Device, DeviceTrait, Host, HostTrait, StreamParams,
+    BitsPerSample, BufferConfig, Capabilities, Device, DeviceTrait, Host, HostTrait, StreamParams,
 };
 use crate::audio::device::BufferSignal;
 use crate::musictrack::MusicTrack;
@@ -79,6 +79,7 @@ pub struct Player {
     pollmode: bool,
     gapless: bool,
     resample: bool,
+    buffer_config: BufferConfig,
     streaming_handle: Option<std::thread::JoinHandle<DecoderResult>>,
     state: Arc<AtomicPlayerState>,
     current_signal: Option<Arc<BufferSignal>>,
@@ -254,6 +255,7 @@ impl Player {
             pollmode,
             gapless,
             resample,
+            buffer_config: BufferConfig::default(),
             streaming_handle: None,
             state: Arc::new(AtomicPlayerState::new(PlayerState::Stopped)),
             current_signal: None,
@@ -511,7 +513,7 @@ impl Player {
             }
         }
 
-        let pipeline = device.start(&adjusted_params)?;
+        let pipeline = device.start(&adjusted_params, &self.buffer_config)?;
         self.current_device = Some(device);
         self.cached_capabilities = Some(capabilities);
         self.current_adjusted_params = Some(adjusted_params);

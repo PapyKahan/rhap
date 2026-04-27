@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::api::{AlsaPcm, set_thread_priority, probe_capabilities};
-use crate::audio::{Capabilities, DeviceTrait, StreamParams};
+use crate::audio::{BufferConfig, Capabilities, DeviceTrait, StreamParams};
 use crate::audio::device::{AudioPipeline, BufferSignal};
 
 struct AlsaStreamHandle {
@@ -85,13 +85,14 @@ impl DeviceTrait for Device {
         })
     }
 
-    fn start(&mut self, params: &StreamParams) -> Result<AudioPipeline> {
+    fn start(&mut self, params: &StreamParams, buffer: &BufferConfig) -> Result<AudioPipeline> {
         self.stop()?;
 
-        let pcm = AlsaPcm::open(&self.device_name, params)?;
+        let pcm = AlsaPcm::open(&self.device_name, params, buffer)?;
         let alsa_buffer_bytes = pcm.buffer_bytes();
 
-        let ring = HeapRb::<u8>::new(alsa_buffer_bytes * 4);
+        let ring_bytes = buffer.ring_bytes_for(params).max(alsa_buffer_bytes * 4);
+        let ring = HeapRb::<u8>::new(ring_bytes);
         let (producer, mut consumer) = ring.split();
 
         let end_of_stream = Arc::new(AtomicBool::new(false));

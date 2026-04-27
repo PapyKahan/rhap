@@ -69,6 +69,37 @@ pub struct StreamParams {
     pub pollmode: bool,
 }
 
+/// Backend-agnostic buffer sizing. Each backend translates these timings
+/// to its native configuration (WASAPI period, ALSA period_time, etc.).
+#[derive(Debug, Copy, Clone)]
+pub struct BufferConfig {
+    /// Target hardware buffer period — how often the audio thread refills the DAC.
+    /// Lower = less latency, more CPU, more glitch-prone under scheduling jitter.
+    pub device_period_ms: u32,
+    /// Target ring buffer size — decoder cushion against I/O hiccups, GC pauses, etc.
+    pub ring_buffer_ms: u32,
+}
+
+impl Default for BufferConfig {
+    fn default() -> Self {
+        Self {
+            device_period_ms: 20,
+            ring_buffer_ms: 250,
+        }
+    }
+}
+
+impl BufferConfig {
+    /// Ring buffer size in bytes for the given stream format. Floored at 8 KiB
+    /// to handle pathological low-rate cases.
+    pub fn ring_bytes_for(&self, params: &StreamParams) -> usize {
+        let bytes_per_sec = params.samplerate.0 as usize
+            * params.channels as usize
+            * (params.bits_per_sample.0 as usize / 8);
+        (bytes_per_sec * self.ring_buffer_ms as usize / 1000).max(8 * 1024)
+    }
+}
+
 impl StreamParams {
     pub fn adjust_with_capabilities(&self, capabilities: &Capabilities) -> StreamParams {
         let contains_sample_rates = capabilities.sample_rates.contains(&self.samplerate);

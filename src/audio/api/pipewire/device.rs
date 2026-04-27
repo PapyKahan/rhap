@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use super::api::PwStreamHandle;
 use crate::audio::device::{AudioPipeline, BufferSignal};
-use crate::audio::{Capabilities, DeviceTrait, StreamParams};
+use crate::audio::{BufferConfig, Capabilities, DeviceTrait, StreamParams};
 
 pub struct Device {
     node_id: u32,
@@ -67,15 +67,11 @@ impl DeviceTrait for Device {
         Ok(Capabilities::all_possible())
     }
 
-    fn start(&mut self, params: &StreamParams) -> Result<AudioPipeline> {
+    fn start(&mut self, params: &StreamParams, buffer: &BufferConfig) -> Result<AudioPipeline> {
         self.stop()?;
 
-        let bytes_per_frame = (params.bits_per_sample.0 / 8) as usize * params.channels as usize;
-        // ~250ms at the given sample rate, minimum 64 KiB
-        let ring_bytes = {
-            let ms250 = (params.samplerate.0 as usize * bytes_per_frame * 250) / 1000;
-            ms250.max(64 * 1024)
-        };
+        // PipeWire negotiates its own period; only the ring buffer is sized here.
+        let ring_bytes = buffer.ring_bytes_for(params).max(64 * 1024);
 
         let ring = HeapRb::<u8>::new(ring_bytes);
         let (producer, consumer) = ring.split();

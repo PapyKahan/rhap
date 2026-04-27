@@ -44,7 +44,7 @@ use windows::{
     },
 };
 
-use crate::audio::{BitsPerSample, SampleRate, StreamParams};
+use crate::audio::{BitsPerSample, BufferConfig, SampleRate, StreamParams};
 
 //const REFTIMES_PER_MILLISEC: u64 = 10000;
 //const REFTIMES_PER_SEC: u64 = 10000000;
@@ -221,16 +221,19 @@ impl AudioClient {
         Ok(aligned_period)
     }
 
-    pub(crate) fn initialize(&mut self) -> Result<()> {
+    pub(crate) fn initialize(&mut self, buffer: &BufferConfig) -> Result<()> {
         let mode = match self.sharemode {
             ShareMode::Exclusive => AUDCLNT_SHAREMODE_EXCLUSIVE,
             ShareMode::Shared => AUDCLNT_SHAREMODE_SHARED,
         };
 
         let (_default_device_period, _min_device_period) = self.get_default_and_min_periods()?;
-        // Calculate desired period for better device compatibility.
+        // Translate target period (ms) to 100ns units, clamping above the device's
+        // minimum so Initialize never fails on exotic hardware with a high min period.
+        let target_period_100ns = (buffer.device_period_ms as i64) * 10_000;
+        let target_period_100ns = target_period_100ns.max(_min_device_period);
         let mut desired_period =
-            self.calculate_aligned_period_near(3 * _min_device_period / 2, Some(128))?;
+            self.calculate_aligned_period_near(target_period_100ns, Some(128))?;
         let device_period = match self.sharemode {
             ShareMode::Exclusive => desired_period,
             ShareMode::Shared => 0,

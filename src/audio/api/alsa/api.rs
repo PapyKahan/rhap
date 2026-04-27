@@ -3,7 +3,7 @@ use alsa::{Direction, ValueOr};
 use anyhow::{anyhow, Result};
 use log::warn;
 
-use crate::audio::{BitsPerSample, Capabilities, SampleRate, StreamParams};
+use crate::audio::{BitsPerSample, BufferConfig, Capabilities, SampleRate, StreamParams};
 
 /// Map a bit depth to the corresponding ALSA PCM format.
 fn bits_to_format(bits: BitsPerSample) -> Result<Format> {
@@ -32,7 +32,7 @@ unsafe impl Send for AlsaPcm {}
 
 impl AlsaPcm {
     /// Open and configure an ALSA PCM device for playback.
-    pub fn open(device_name: &str, params: &StreamParams) -> Result<Self> {
+    pub fn open(device_name: &str, params: &StreamParams, buffer: &BufferConfig) -> Result<Self> {
         let pcm = PCM::new(device_name, Direction::Playback, false)
             .map_err(|e| anyhow!("Failed to open ALSA device '{}': {}", device_name, e))?;
 
@@ -55,7 +55,7 @@ impl AlsaPcm {
             hwp.set_channels(channels)
                 .map_err(|e| anyhow!("set_channels({}) failed: {}", channels, e))?;
 
-            let target_period_us: u32 = 5_000;
+            let target_period_us: u32 = buffer.device_period_ms.saturating_mul(1_000);
             hwp.set_period_time_near(target_period_us, ValueOr::Nearest)
                 .map_err(|e| anyhow!("set_period_time_near failed: {}", e))?;
             hwp.set_periods(4, ValueOr::Nearest)
