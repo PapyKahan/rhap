@@ -13,7 +13,7 @@ use windows::Win32::{
 use super::api::{com_initialize, AudioClient, ShareMode, ThreadPriority, WasapiInitError, WaveFormat};
 use crate::audio::{BufferConfig, Capabilities, DeviceTrait, StreamParams};
 use crate::audio::device::{AudioPipeline, BufferSignal};
-use crate::audio::retry::{open_with_retry, RetryDecision, DEFAULT_INIT_BACKOFFS_MS};
+use crate::audio::acquire::{acquire_with_backoff, AcquireDecision, DEFAULT_ACQUIRE_BACKOFFS_MS};
 use crate::audio::stream_handle::PullStreamHandle;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -138,7 +138,7 @@ impl DeviceTrait for Device {
 
         // F1+F5: classified retry loop. Recreate the IAudioClient on every
         // attempt — both Busy retries (per safety) and AlignmentRetry (per MSDN).
-        let mut client = open_initialized_client(&self.inner_device, params, buffer)?;
+        let mut client = acquire_initialized_client(&self.inner_device, params, buffer)?;
         let wasapi_buffer_bytes = client.get_available_buffer_size()?;
 
         let ring_bytes = buffer.ring_bytes_for(params).max(wasapi_buffer_bytes * 4);
@@ -256,45 +256,35 @@ impl DeviceTrait for Device {
     }
 }
 
-/// Activate + Initialize a fresh AudioClient using the generic retry helper.
+/// Activate + Initialize a fresh AudioClient using the generic acquire helper.
 /// Per MSDN, every retry recreates the IAudioClient before re-initializing.
-fn open_initialized_client(
+fn acquire_initialized_client(
     device: &IMMDevice,
     params: &StreamParams,
     buffer: &BufferConfig,
 ) -> Result<AudioClient> {
-    // Slot for the AudioClient under construction. Each attempt closes over
-    // this slot, recreates the client, and either returns it via Ok or
-    // updates `period` for the next iteration.
-    let mut client_slot: Option<AudioClient> = None;
     let mut period: Option<i64> = None;
 
-    open_with_retry("wasapi: open", DEFAULT_INIT_BACKOFFS_MS, || {
+    acquire_with_backoff("wasapi: acquire", DEFAULT_ACQUIRE_BACKOFFS_MS, || {
         let mut client = match AudioClient::new(device, params) {
             Ok(c) => c,
-            Err(e) => return RetryDecision::Fatal(e),
+            Err(e) => return AcquireDecision::Fatal(e),
         };
         let p = match period {
             Some(p) => p,
             None => match client.compute_desired_period(buffer) {
                 Ok(p) => p,
-                Err(e) => return RetryDecision::Fatal(e),
+                Err(e) => return AcquireDecision::Fatal(e),
             },
         };
         match client.initialize_with_period(p) {
-            Ok(()) => {
-                client_slot = Some(client);
-                // Take it back out via a sentinel — RetryDecision::Ok needs
-                // the value, but the closure can't move out of `client_slot`
-                // easily; consume it via `take`.
-                RetryDecision::Ok(client_slot.take().expect("just stored"))
-            }
-            Err(WasapiInitError::Busy) => RetryDecision::BackoffRetry,
+            Ok(()) => AcquireDecision::Ok(client),
+            Err(WasapiInitError::Busy) => AcquireDecision::BackoffRetry,
             Err(WasapiInitError::AlignmentRetry(new_period)) => {
                 period = Some(new_period);
-                RetryDecision::ImmediateRetry
+                AcquireDecision::ImmediateRetry
             }
-            Err(WasapiInitError::Permanent(e)) => RetryDecision::Fatal(e),
+            Err(WasapiInitError::Permanent(e)) => AcquireDecision::Fatal(e),
         }
     })
 }

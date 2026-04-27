@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Result};
 use std::time::Duration;
 
-/// Outcome of one attempt by an `open_fn` passed to `open_with_retry`.
+/// Outcome of one attempt to acquire a device by `acquire_with_backoff`.
 #[allow(dead_code)] // ImmediateRetry is only used by the WASAPI backend.
-pub enum RetryDecision<T> {
+pub enum AcquireDecision<T> {
     /// Successful attempt — return this value.
     Ok(T),
     /// Transient failure: sleep through the next backoff slot, then retry.
@@ -17,8 +17,8 @@ pub enum RetryDecision<T> {
     Fatal(anyhow::Error),
 }
 
-/// Drive a retry loop for opening/initializing a device. The classification
-/// returned by `open_fn` selects the next action:
+/// Drive a retry loop for acquiring/initializing a device. The classification
+/// returned by `attempt_fn` selects the next action:
 ///
 /// - `Ok(T)` ends the loop successfully.
 /// - `BackoffRetry` sleeps through the next entry in `backoffs_ms` and retries;
@@ -29,19 +29,19 @@ pub enum RetryDecision<T> {
 ///
 /// `label` appears in the timeout/exhaustion error messages so multiple call
 /// sites are distinguishable.
-pub fn open_with_retry<T>(
+pub fn acquire_with_backoff<T>(
     label: &'static str,
     backoffs_ms: &[u64],
-    mut open_fn: impl FnMut() -> RetryDecision<T>,
+    mut attempt_fn: impl FnMut() -> AcquireDecision<T>,
 ) -> Result<T> {
     const MAX_IMMEDIATE: usize = 4;
     let mut backoff_used = 0usize;
     let mut immediate_used = 0usize;
 
     loop {
-        match open_fn() {
-            RetryDecision::Ok(v) => return Ok(v),
-            RetryDecision::ImmediateRetry => {
+        match attempt_fn() {
+            AcquireDecision::Ok(v) => return Ok(v),
+            AcquireDecision::ImmediateRetry => {
                 immediate_used += 1;
                 if immediate_used > MAX_IMMEDIATE {
                     return Err(anyhow!(
@@ -51,7 +51,7 @@ pub fn open_with_retry<T>(
                     ));
                 }
             }
-            RetryDecision::BackoffRetry => {
+            AcquireDecision::BackoffRetry => {
                 if backoff_used >= backoffs_ms.len() {
                     return Err(anyhow!(
                         "{}: still busy after {} backoff retries",
@@ -63,11 +63,11 @@ pub fn open_with_retry<T>(
                 backoff_used += 1;
                 std::thread::sleep(Duration::from_millis(ms));
             }
-            RetryDecision::Fatal(e) => return Err(e),
+            AcquireDecision::Fatal(e) => return Err(e),
         }
     }
 }
 
-/// Default backoff schedule used by both WASAPI and ALSA init paths:
+/// Default backoff schedule used by both WASAPI and ALSA acquisition paths:
 /// 50, 100, 200, 400, 800 ms (cumulative ≤ 1.55 s).
-pub const DEFAULT_INIT_BACKOFFS_MS: &[u64] = &[50, 100, 200, 400, 800];
+pub const DEFAULT_ACQUIRE_BACKOFFS_MS: &[u64] = &[50, 100, 200, 400, 800];

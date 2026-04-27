@@ -1,7 +1,7 @@
 pub(crate) mod api;
 pub(crate) mod host;
 pub(crate) mod device;
-pub(crate) mod retry;
+pub(crate) mod acquire;
 pub(crate) mod stream_handle;
 
 pub use host::{HostTrait, Host};

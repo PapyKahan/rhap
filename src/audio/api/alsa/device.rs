@@ -8,7 +8,7 @@ use std::time::Duration;
 use super::api::{AlsaInitError, AlsaPcm, set_thread_priority, probe_capabilities};
 use crate::audio::{BufferConfig, Capabilities, DeviceTrait, StreamParams};
 use crate::audio::device::{AudioPipeline, BufferSignal};
-use crate::audio::retry::{open_with_retry, RetryDecision, DEFAULT_INIT_BACKOFFS_MS};
+use crate::audio::acquire::{acquire_with_backoff, AcquireDecision, DEFAULT_ACQUIRE_BACKOFFS_MS};
 use crate::audio::stream_handle::PullStreamHandle;
 
 pub struct Device {
@@ -61,7 +61,7 @@ impl DeviceTrait for Device {
     fn start(&mut self, params: &StreamParams, buffer: &BufferConfig) -> Result<AudioPipeline> {
         self.stop()?;
 
-        let pcm = open_pcm_with_retry(&self.device_name, params, buffer)?;
+        let pcm = acquire_pcm(&self.device_name, params, buffer)?;
         let alsa_buffer_bytes = pcm.buffer_bytes();
 
         let ring_bytes = buffer.ring_bytes_for(params).max(alsa_buffer_bytes * 4);
@@ -177,19 +177,19 @@ impl DeviceTrait for Device {
     }
 }
 
-/// Open a PCM device using the generic retry helper. Each attempt fully
+/// Acquire a PCM device using the generic acquire helper. Each attempt fully
 /// reopens the PCM (close+open) so a previous EBUSY holder has time to
 /// release its handle.
-fn open_pcm_with_retry(
+fn acquire_pcm(
     device_name: &str,
     params: &StreamParams,
     buffer: &BufferConfig,
 ) -> Result<AlsaPcm> {
-    open_with_retry("alsa: open", DEFAULT_INIT_BACKOFFS_MS, || {
+    acquire_with_backoff("alsa: acquire", DEFAULT_ACQUIRE_BACKOFFS_MS, || {
         match AlsaPcm::open_classified(device_name, params, buffer) {
-            Ok(pcm) => RetryDecision::Ok(pcm),
-            Err(AlsaInitError::Busy) => RetryDecision::BackoffRetry,
-            Err(AlsaInitError::Permanent(e)) => RetryDecision::Fatal(e),
+            Ok(pcm) => AcquireDecision::Ok(pcm),
+            Err(AlsaInitError::Busy) => AcquireDecision::BackoffRetry,
+            Err(AlsaInitError::Permanent(e)) => AcquireDecision::Fatal(e),
         }
     })
 }
