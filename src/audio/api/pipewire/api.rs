@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use log::{debug, error};
 use pipewire as pw;
 use pw::properties::properties;
@@ -149,9 +149,9 @@ fn run_pipewire_loop(
     node_id: Option<u32>,
     cmd_receiver: pw::channel::Receiver<StreamCommand>,
 ) -> Result<()> {
-    let main_loop = pw::main_loop::MainLoopBox::new(None)?;
-    let context = pw::context::ContextBox::new(main_loop.loop_(), None)?;
-    let core = context.connect(None)?;
+    let main_loop = pw::main_loop::MainLoopBox::new(None).context("pw: main_loop")?;
+    let context = pw::context::ContextBox::new(main_loop.loop_(), None).context("pw: context")?;
+    let core = context.connect(None).context("pw: connect_core")?;
 
     let state = Rc::new(RefCell::new(CallbackState {
         consumer,
@@ -185,7 +185,7 @@ fn run_pipewire_loop(
         props.insert("node.exclusive", "true");
     }
 
-    let stream = StreamBox::new(&core, "rhap", props)?;
+    let stream = StreamBox::new(&core, "rhap", props).context("pw: stream_new")?;
 
     let state_for_process = Rc::clone(&state);
     // SAFETY: main_loop outlives all closures — both are on this thread and
@@ -278,7 +278,7 @@ fn run_pipewire_loop(
         node_id,
         StreamFlags::AUTOCONNECT | StreamFlags::MAP_BUFFERS | StreamFlags::RT_PROCESS,
         &mut [pod],
-    )?;
+    ).context("pw: stream_connect")?;
 
     // SAFETY: stream_ptr is valid for the duration of main_loop.run() below.
     // Raw pointers are required because StreamBox<'c> is not 'static; the 'c

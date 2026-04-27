@@ -1,12 +1,12 @@
-use anyhow::Result;
-use log::error;
+use anyhow::{anyhow, Result};
+use log::{debug, error};
 use ringbuf::HeapRb;
 use ringbuf::traits::{Consumer, Observer, Split};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use super::api::{AlsaPcm, set_thread_priority, probe_capabilities};
+use super::api::{AlsaInitError, AlsaPcm, set_thread_priority, probe_capabilities};
 use crate::audio::{BufferConfig, Capabilities, DeviceTrait, StreamParams};
 use crate::audio::device::{AudioPipeline, BufferSignal};
 
@@ -88,7 +88,7 @@ impl DeviceTrait for Device {
     fn start(&mut self, params: &StreamParams, buffer: &BufferConfig) -> Result<AudioPipeline> {
         self.stop()?;
 
-        let pcm = AlsaPcm::open(&self.device_name, params, buffer)?;
+        let pcm = open_pcm_with_retry(&self.device_name, params, buffer)?;
         let alsa_buffer_bytes = pcm.buffer_bytes();
 
         let ring_bytes = buffer.ring_bytes_for(params).max(alsa_buffer_bytes * 4);
@@ -208,4 +208,31 @@ impl DeviceTrait for Device {
         }
         Ok(())
     }
+}
+
+/// Open a PCM device with retry-with-backoff on transient EBUSY/EAGAIN errors.
+/// Up to 5 attempts (50/100/200/400/800 ms backoff). Permanent errors are
+/// returned immediately.
+fn open_pcm_with_retry(
+    device_name: &str,
+    params: &StreamParams,
+    buffer: &BufferConfig,
+) -> Result<AlsaPcm> {
+    let backoffs_ms = [50u64, 100, 200, 400, 800];
+    for (idx, &ms) in std::iter::once(&0u64).chain(backoffs_ms.iter()).enumerate() {
+        if ms > 0 {
+            debug!("alsa: device busy, retrying in {} ms (attempt {})", ms, idx);
+            std::thread::sleep(Duration::from_millis(ms));
+        }
+        match AlsaPcm::open_classified(device_name, params, buffer) {
+            Ok(pcm) => return Ok(pcm),
+            Err(AlsaInitError::Busy) => continue,
+            Err(AlsaInitError::Permanent(e)) => return Err(e),
+        }
+    }
+    Err(anyhow!(
+        "alsa: device {} remained busy after {} retries",
+        device_name,
+        backoffs_ms.len()
+    ))
 }

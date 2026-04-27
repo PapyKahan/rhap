@@ -485,8 +485,6 @@ impl Player {
         handle: Option<crate::musictrack::PlaybackHandle>,
         start_from_ts: u64,
     ) -> Result<CurrentTrackInfo> {
-        self.stop()?;
-
         let src_params = StreamParams {
             samplerate: song.sample,
             channels: song.channels as u8,
@@ -494,6 +492,19 @@ impl Player {
             exclusive: true,
             pollmode: self.pollmode,
         };
+
+        // F2: USB DACs need ~50 ms to re-clock when samplerate or bit depth
+        // changes between tracks. Insert a grace period after stop so the
+        // next acquire doesn't race the device's reconfiguration.
+        let needs_grace = matches!(
+            &self.current_adjusted_params,
+            Some(prev) if prev.samplerate != src_params.samplerate
+                       || prev.bits_per_sample != src_params.bits_per_sample
+        );
+        self.stop()?;
+        if needs_grace {
+            std::thread::sleep(Duration::from_millis(50));
+        }
         let mut device = self.host.create_device(self.device_id)?;
         let capabilities = device.get_capabilities()?;
         let adjusted_params = src_params.adjust_with_capabilities(&capabilities);

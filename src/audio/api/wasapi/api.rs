@@ -1,6 +1,5 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use log::debug;
-use log::error;
 use num_integer::Integer;
 use std::cmp;
 use windows::core::w;
@@ -88,6 +87,21 @@ pub fn calculate_period_100ns(frames: i64, samplerate: i64) -> i64 {
 pub enum ShareMode {
     Exclusive,
     Shared,
+}
+
+/// Classified failure of `AudioClient::initialize`. The caller (Device::start)
+/// dispatches retry policy: transient busy errors are retried with backoff,
+/// alignment retries recreate the client with the suggested period, permanent
+/// errors are surfaced immediately.
+pub(crate) enum WasapiInitError {
+    /// Transient: another stream holds the endpoint or the engine is still
+    /// releasing it. Caller should sleep and retry with a fresh AudioClient.
+    Busy,
+    /// Buffer size not aligned. Caller should recreate the AudioClient and
+    /// retry initialize with this period (in 100ns units), per MSDN.
+    AlignmentRetry(i64),
+    /// Permanent: the call cannot succeed by retrying as-is.
+    Permanent(anyhow::Error),
 }
 
 pub struct AudioClient {
@@ -221,33 +235,24 @@ impl AudioClient {
         Ok(aligned_period)
     }
 
-    pub(crate) fn initialize(&mut self, buffer: &BufferConfig) -> Result<()> {
+    /// Initialize the audio client with the given period (in 100ns units).
+    /// Returns a classified error on failure so the caller can drive retry
+    /// policy. On success, `self` is fully configured: `max_buffer_frames`,
+    /// `renderer` and (in event mode) `eventhandle` are populated.
+    pub(crate) fn initialize_with_period(
+        &mut self,
+        period_100ns: i64,
+    ) -> std::result::Result<(), WasapiInitError> {
         let mode = match self.sharemode {
             ShareMode::Exclusive => AUDCLNT_SHAREMODE_EXCLUSIVE,
             ShareMode::Shared => AUDCLNT_SHAREMODE_SHARED,
         };
-
-        let (_default_device_period, _min_device_period) = self.get_default_and_min_periods()?;
-        // Translate target period (ms) to 100ns units, clamping above the device's
-        // minimum so Initialize never fails on exotic hardware with a high min period.
-        let target_period_100ns = (buffer.device_period_ms as i64) * 10_000;
-        let target_period_100ns = target_period_100ns.max(_min_device_period);
-        let mut desired_period =
-            self.calculate_aligned_period_near(target_period_100ns, Some(128))?;
         let device_period = match self.sharemode {
-            ShareMode::Exclusive => desired_period,
+            ShareMode::Exclusive => period_100ns,
             ShareMode::Shared => 0,
         };
-
         let flags = match self.sharemode {
-            ShareMode::Exclusive => {
-                if self.pollmode {
-                    0
-                } else {
-                    AUDCLNT_STREAMFLAGS_EVENTCALLBACK
-                }
-            }
-            ShareMode::Shared => {
+            ShareMode::Exclusive | ShareMode::Shared => {
                 if self.pollmode {
                     0
                 } else {
@@ -256,92 +261,104 @@ impl AudioClient {
             }
         };
 
-        unsafe {
-            let result = self.inner_client.Initialize(
+        let result = unsafe {
+            self.inner_client.Initialize(
                 mode,
                 flags,
-                desired_period,
+                period_100ns,
                 device_period,
                 self.format.get_format(),
                 None,
-            );
-            match result {
-                Ok(()) => {
-                    self.max_buffer_frames = self.inner_client.GetBufferSize()? as usize;
-                    debug!("IAudioClient::Initialize ok");
-                }
-                Err(e) => {
-                    // Some of the possible errors. See the documentation for the full list and descriptions.
-                    // https://docs.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize
-                    match e.code() {
-                        E_INVALIDARG => {
-                            error!("IAudioClient::Initialize: Invalid argument");
-                            return Err(anyhow!("IAudioClient::Initialize: Invalid argument"));
-                        }
-                        AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED => {
-                            debug!("IAudioClient::Initialize: Unaligned buffer, trying to adjust the period.");
-                            // Try to recover following the example in the docs.
-                            // https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize#examples
-                            // Just panic on errors to keep it short and simple.
-                            // 1. Call IAudioClient::GetBufferSize and receive the next-highest-aligned buffer size (in frames).
-                            self.max_buffer_frames = self.inner_client.GetBufferSize()? as usize;
-                            debug!(
-                                "Client next-highest-aligned buffer size: {} frames",
-                                self.max_buffer_frames
-                            );
-                            // 2. Call IAudioClient::Release, skipped since this will happen automatically when we drop the client.
-                            // 3. Calculate the aligned buffer size in 100-nanosecond units.
-                            desired_period = calculate_period_100ns(
-                                self.max_buffer_frames as i64,
-                                self.format.get_samples_per_sec() as i64,
-                            );
-                            debug!("Aligned period in 100ns units: {}", desired_period);
-                            // 4. Get a new IAudioClient
-                            //self.inner_client = self.inner_client.Cast()?;
-                            // 5. Call Initialize again on the created audio client.
-                            //self.initialize()?;
-                            self.inner_client.Initialize(
-                                mode,
-                                flags,
-                                desired_period,
-                                device_period,
-                                self.format.get_format(),
-                                None,
-                            )?;
-                            self.max_buffer_frames = self.inner_client.GetBufferSize()? as usize;
-                            debug!("IAudioClient::Initialize ok");
-                        }
-                        AUDCLNT_E_DEVICE_IN_USE => {
-                            error!("IAudioClient::Initialize: The device is already in use");
-                            return Err(anyhow!("IAudioClient::Initialize: The device is already in use"));
-                        }
-                        AUDCLNT_E_UNSUPPORTED_FORMAT => {
-                            error!("IAudioClient::Initialize: The device does not support the audio format");
-                            return Err(anyhow!("IAudioClient::Initialize: The device does not support the audio format"));
-                        }
-                        AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED => {
-                            error!("IAudioClient::Initialize: Exclusive mode is not allowed");
-                            return Err(anyhow!("IAudioClient::Initialize: Exclusive mode is not allowed"));
-                        }
-                        AUDCLNT_E_ENDPOINT_CREATE_FAILED => {
-                            error!("IAudioClient::Initialize: Failed to create endpoint");
-                            return Err(anyhow!("IAudioClient::Initialize: Failed to create endpoint"));
-                        }
-                        _ => {
-                            error!("IAudioClient::Initialize: Other error, HRESULT: {:#010x}, info: {:?}", e.code().0, e.message());
-                            return Err(anyhow!("IAudioClient::Initialize: Other error, HRESULT: {:#010x}, info: {:?}", e.code().0, e.message()));
-                        }
-                    };
-                }
-            };
+            )
         };
 
-        self.renderer = Some(self.get_renderer()?);
-        if !self.pollmode {
-            self.eventhandle = Some(self.set_get_eventhandle()?);
+        match result {
+            Ok(()) => {
+                self.max_buffer_frames = unsafe { self.inner_client.GetBufferSize() }
+                    .context("wasapi: get_buffer_size")
+                    .map_err(WasapiInitError::Permanent)?
+                    as usize;
+                debug!("IAudioClient::Initialize ok");
+            }
+            Err(e) => {
+                // https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize
+                match e.code() {
+                    AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED => {
+                        // MSDN: query GetBufferSize, recompute aligned period,
+                        // recreate the IAudioClient, retry. We surface the new
+                        // period and let the caller recreate.
+                        let aligned_frames = unsafe { self.inner_client.GetBufferSize() }
+                            .map_err(|err| {
+                                WasapiInitError::Permanent(anyhow!(
+                                    "wasapi: get_buffer_size after BUFFER_SIZE_NOT_ALIGNED: {}",
+                                    err
+                                ))
+                            })?
+                            as i64;
+                        let new_period = calculate_period_100ns(
+                            aligned_frames,
+                            self.format.get_samples_per_sec() as i64,
+                        );
+                        debug!(
+                            "wasapi: aligned retry — frames={}, period={}00ns",
+                            aligned_frames, new_period
+                        );
+                        return Err(WasapiInitError::AlignmentRetry(new_period));
+                    }
+                    AUDCLNT_E_DEVICE_IN_USE | AUDCLNT_E_ENDPOINT_CREATE_FAILED => {
+                        debug!("wasapi: transient init error: {:#010x}", e.code().0);
+                        return Err(WasapiInitError::Busy);
+                    }
+                    E_INVALIDARG => {
+                        return Err(WasapiInitError::Permanent(anyhow!(
+                            "wasapi: initialize: invalid argument"
+                        )));
+                    }
+                    AUDCLNT_E_UNSUPPORTED_FORMAT => {
+                        return Err(WasapiInitError::Permanent(anyhow!(
+                            "wasapi: initialize: device does not support the audio format"
+                        )));
+                    }
+                    AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED => {
+                        return Err(WasapiInitError::Permanent(anyhow!(
+                            "wasapi: initialize: exclusive mode not allowed"
+                        )));
+                    }
+                    code => {
+                        return Err(WasapiInitError::Permanent(anyhow!(
+                            "wasapi: initialize: HRESULT {:#010x}, {:?}",
+                            code.0,
+                            e.message()
+                        )));
+                    }
+                }
+            }
         }
 
+        self.renderer = Some(
+            self.get_renderer()
+                .context("wasapi: get_renderer")
+                .map_err(WasapiInitError::Permanent)?,
+        );
+        if !self.pollmode {
+            self.eventhandle = Some(
+                self.set_get_eventhandle()
+                    .context("wasapi: set_event_handle")
+                    .map_err(WasapiInitError::Permanent)?,
+            );
+        }
         Ok(())
+    }
+
+    /// Compute the desired period (100ns) for a buffer config.
+    pub(crate) fn compute_desired_period(&self, buffer: &BufferConfig) -> Result<i64> {
+        let (_default_device_period, min_device_period) = self
+            .get_default_and_min_periods()
+            .context("wasapi: get_periods")?;
+        let target_period_100ns = (buffer.device_period_ms as i64) * 10_000;
+        let target_period_100ns = target_period_100ns.max(min_device_period);
+        self.calculate_aligned_period_near(target_period_100ns, Some(128))
+            .context("wasapi: calculate_aligned_period")
     }
 
     fn get_renderer(&self) -> Result<AudioRenderClient> {

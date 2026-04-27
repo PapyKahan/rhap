@@ -1,14 +1,17 @@
-use anyhow::Result;
-use log::error;
+use anyhow::{anyhow, Result};
+use log::{debug, error};
 use ringbuf::HeapRb;
 use ringbuf::traits::{Consumer, Observer, Split};
 use windows::Win32::{
     Devices::FunctionDiscovery::PKEY_DeviceInterface_FriendlyName,
-    Media::Audio::IMMDevice,
+    Media::Audio::{
+        IMMDevice, DEVICE_STATE_ACTIVE, DEVICE_STATE_DISABLED, DEVICE_STATE_NOTPRESENT,
+        DEVICE_STATE_UNPLUGGED,
+    },
     System::Com::{StructuredStorage::PropVariantToStringAlloc, STGM_READ},
 };
 
-use super::api::{com_initialize, AudioClient, ShareMode, ThreadPriority, WaveFormat};
+use super::api::{com_initialize, AudioClient, ShareMode, ThreadPriority, WasapiInitError, WaveFormat};
 use crate::audio::{BufferConfig, Capabilities, DeviceTrait, StreamParams};
 use crate::audio::device::{AudioPipeline, BufferSignal};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -146,8 +149,22 @@ impl DeviceTrait for Device {
     fn start(&mut self, params: &StreamParams, buffer: &BufferConfig) -> Result<AudioPipeline> {
         self.stop()?;
 
-        let mut client = self.get_client(params)?;
-        client.initialize(buffer)?;
+        // F3 pre-flight: refuse to even try if the endpoint isn't active.
+        // Avoids cryptic ENDPOINT_CREATE_FAILED errors deep inside Initialize.
+        let state = unsafe { self.inner_device.GetState()? };
+        if state != DEVICE_STATE_ACTIVE {
+            let label = match state {
+                DEVICE_STATE_DISABLED => "DISABLED",
+                DEVICE_STATE_NOTPRESENT => "NOTPRESENT",
+                DEVICE_STATE_UNPLUGGED => "UNPLUGGED",
+                _ => "UNKNOWN",
+            };
+            anyhow::bail!("wasapi: device not active (state={})", label);
+        }
+
+        // F1+F5: classified retry loop. Recreate the IAudioClient on every
+        // attempt — both Busy retries (per safety) and AlignmentRetry (per MSDN).
+        let mut client = open_initialized_client(&self.inner_device, params, buffer)?;
         let wasapi_buffer_bytes = client.get_available_buffer_size()?;
 
         let ring_bytes = buffer.ring_bytes_for(params).max(wasapi_buffer_bytes * 4);
@@ -268,5 +285,53 @@ impl DeviceTrait for Device {
             handle.stop();
         }
         Ok(())
+    }
+}
+
+/// Activate + Initialize a fresh AudioClient with retry policy:
+/// - Up to 5 attempts on transient busy errors (50/100/200/400/800 ms backoff).
+/// - Up to 1 alignment retry, fully recreating the client (MSDN-recommended path).
+/// - Permanent errors are returned immediately.
+fn open_initialized_client(
+    device: &IMMDevice,
+    params: &StreamParams,
+    buffer: &BufferConfig,
+) -> Result<AudioClient> {
+    let backoffs_ms = [50u64, 100, 200, 400, 800];
+    let mut alignment_retry_used = false;
+
+    // Initial period — recomputed once if alignment retry kicks in.
+    let mut client = AudioClient::new(device, params)?;
+    let mut period = client.compute_desired_period(buffer)?;
+
+    let mut busy_idx = 0usize;
+    loop {
+        match client.initialize_with_period(period) {
+            Ok(()) => return Ok(client),
+            Err(WasapiInitError::Busy) => {
+                if busy_idx >= backoffs_ms.len() {
+                    return Err(anyhow!(
+                        "wasapi: device remained busy after {} retries",
+                        backoffs_ms.len()
+                    ));
+                }
+                let ms = backoffs_ms[busy_idx];
+                busy_idx += 1;
+                debug!("wasapi: device busy, retrying in {} ms", ms);
+                std::thread::sleep(std::time::Duration::from_millis(ms));
+                client = AudioClient::new(device, params)?;
+            }
+            Err(WasapiInitError::AlignmentRetry(new_period)) => {
+                if alignment_retry_used {
+                    return Err(anyhow!(
+                        "wasapi: alignment retry already used, second mismatch"
+                    ));
+                }
+                alignment_retry_used = true;
+                period = new_period;
+                client = AudioClient::new(device, params)?;
+            }
+            Err(WasapiInitError::Permanent(e)) => return Err(e),
+        }
     }
 }

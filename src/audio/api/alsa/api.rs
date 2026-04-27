@@ -5,6 +5,24 @@ use log::warn;
 
 use crate::audio::{BitsPerSample, BufferConfig, Capabilities, SampleRate, StreamParams};
 
+/// Classified failure of `AlsaPcm::open_classified`. Caller drives retry policy.
+pub(crate) enum AlsaInitError {
+    /// Transient: device held by another client (PulseAudio, PipeWire, app).
+    /// Caller should sleep and retry.
+    Busy,
+    /// Permanent: cannot succeed by retrying as-is.
+    Permanent(anyhow::Error),
+}
+
+impl AlsaInitError {
+    fn from_alsa_error(err: alsa::Error, phase: &'static str) -> Self {
+        match err.errno() {
+            libc::EBUSY | libc::EAGAIN => Self::Busy,
+            _ => Self::Permanent(anyhow!("alsa: {}: {}", phase, err)),
+        }
+    }
+}
+
 /// Map a bit depth to the corresponding ALSA PCM format.
 fn bits_to_format(bits: BitsPerSample) -> Result<Format> {
     match bits.0 {
@@ -32,11 +50,30 @@ unsafe impl Send for AlsaPcm {}
 
 impl AlsaPcm {
     /// Open and configure an ALSA PCM device for playback.
-    pub fn open(device_name: &str, params: &StreamParams, buffer: &BufferConfig) -> Result<Self> {
-        let pcm = PCM::new(device_name, Direction::Playback, false)
-            .map_err(|e| anyhow!("Failed to open ALSA device '{}': {}", device_name, e))?;
+    /// Returns a classified error so the caller can drive retry policy.
+    pub(crate) fn open_classified(
+        device_name: &str,
+        params: &StreamParams,
+        buffer: &BufferConfig,
+    ) -> std::result::Result<Self, AlsaInitError> {
+        // F3 pre-flight: for raw hw devices, refuse before opening if the
+        // /dev node doesn't exist. Surfaces unplugged USB DACs with a clear
+        // message instead of a generic "No such file or directory".
+        if let Some((card, dev)) = parse_hw_card_dev(device_name) {
+            let dev_path = format!("/dev/snd/pcmC{}D{}p", card, dev);
+            if !std::path::Path::new(&dev_path).exists() {
+                return Err(AlsaInitError::Permanent(anyhow!(
+                    "alsa: hw device {} not present at {} (check connection)",
+                    device_name, dev_path
+                )));
+            }
+        }
 
-        let format = bits_to_format(params.bits_per_sample)?;
+        let pcm = PCM::new(device_name, Direction::Playback, false)
+            .map_err(|e| AlsaInitError::from_alsa_error(e, "open"))?;
+
+        let format = bits_to_format(params.bits_per_sample)
+            .map_err(AlsaInitError::Permanent)?;
         let channels = params.channels as u32;
         let rate = params.samplerate.0;
 
@@ -44,34 +81,34 @@ impl AlsaPcm {
         // to drop the borrows before moving `pcm` into Self.
         let (period_bytes, buffer_bytes, frame_bytes) = {
             let hwp = HwParams::any(&pcm)
-                .map_err(|e| anyhow!("HwParams::any failed: {}", e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "hw_params_any"))?;
 
             hwp.set_access(Access::RWInterleaved)
-                .map_err(|e| anyhow!("set_access failed: {}", e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "set_access"))?;
             hwp.set_format(format)
-                .map_err(|e| anyhow!("set_format({:?}) failed: {}", format, e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "set_format"))?;
             hwp.set_rate(rate, ValueOr::Nearest)
-                .map_err(|e| anyhow!("set_rate({}) failed: {}", rate, e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "set_rate"))?;
             hwp.set_channels(channels)
-                .map_err(|e| anyhow!("set_channels({}) failed: {}", channels, e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "set_channels"))?;
 
             let target_period_us: u32 = buffer.device_period_ms.saturating_mul(1_000);
             hwp.set_period_time_near(target_period_us, ValueOr::Nearest)
-                .map_err(|e| anyhow!("set_period_time_near failed: {}", e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "set_period_time_near"))?;
             hwp.set_periods(4, ValueOr::Nearest)
-                .map_err(|e| anyhow!("set_periods failed: {}", e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "set_periods"))?;
 
             pcm.hw_params(&hwp)
-                .map_err(|e| anyhow!("hw_params apply failed: {}", e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "apply hw_params"))?;
 
             let actual_period_frames = hwp.get_period_size()
-                .map_err(|e| anyhow!("get_period_size failed: {}", e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "get_period_size"))?;
             let actual_buffer_frames = hwp.get_buffer_size()
-                .map_err(|e| anyhow!("get_buffer_size failed: {}", e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "get_buffer_size"))?;
             let actual_rate = hwp.get_rate()
-                .map_err(|e| anyhow!("get_rate failed: {}", e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "get_rate"))?;
             let actual_channels = hwp.get_channels()
-                .map_err(|e| anyhow!("get_channels failed: {}", e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "get_channels"))?;
 
             let bytes_per_sample = params.bits_per_sample.0 as usize / 8;
             let frame_bytes = actual_channels as usize * bytes_per_sample;
@@ -79,13 +116,18 @@ impl AlsaPcm {
             let buffer_bytes = actual_buffer_frames as usize * frame_bytes;
 
             let swp = pcm.sw_params_current()
-                .map_err(|e| anyhow!("sw_params_current failed: {}", e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "sw_params_current"))?;
             swp.set_start_threshold(actual_period_frames as alsa::pcm::Frames)
-                .map_err(|e| anyhow!("set_start_threshold failed: {}", e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "set_start_threshold"))?;
             swp.set_avail_min(actual_period_frames as alsa::pcm::Frames)
-                .map_err(|e| anyhow!("set_avail_min failed: {}", e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "set_avail_min"))?;
             pcm.sw_params(&swp)
-                .map_err(|e| anyhow!("sw_params apply failed: {}", e))?;
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "apply sw_params"))?;
+
+            // F4: explicit prepare guarantees PCM_STATE_PREPARED before first writei,
+            // even on drivers that don't auto-prepare after hw_params.
+            pcm.prepare()
+                .map_err(|e| AlsaInitError::from_alsa_error(e, "prepare"))?;
 
             let period_time_us = if actual_rate > 0 {
                 (actual_period_frames as f64 / actual_rate as f64) * 1_000_000.0
@@ -120,6 +162,7 @@ impl AlsaPcm {
             frame_bytes,
         })
     }
+
 
     /// Write interleaved PCM bytes to the device, with XRUN recovery.
     /// Handles short writes by retrying with the remaining data.
@@ -224,6 +267,16 @@ fn parse_card_number(device_name: &str) -> Option<u32> {
     let rest = device_name.strip_prefix("hw:")?;
     let card_str = rest.split(',').next()?;
     card_str.parse().ok()
+}
+
+/// Parse "hw:N,M" → Some((N, M)). Returns None for any non-raw-hw form
+/// (default, plughw:, dmix:, etc.) — those don't map to a single /dev node.
+fn parse_hw_card_dev(device_name: &str) -> Option<(u32, u32)> {
+    let rest = device_name.strip_prefix("hw:")?;
+    let mut parts = rest.split(',');
+    let card: u32 = parts.next()?.parse().ok()?;
+    let dev: u32 = parts.next()?.parse().ok()?;
+    Some((card, dev))
 }
 
 /// Read USB audio stream descriptors from /proc/asound/cardN/stream0.
