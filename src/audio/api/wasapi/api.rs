@@ -13,14 +13,9 @@ use windows::Win32::Media::Audio::AUDCLNT_E_UNSUPPORTED_FORMAT;
 use windows::Win32::System::Com::CLSCTX_ALL;
 use windows::Win32::System::Threading::AvRevertMmThreadCharacteristics;
 use windows::Win32::System::Threading::AvSetMmThreadCharacteristicsW;
-use windows::Win32::System::Threading::GetCurrentProcess;
 use windows::Win32::System::Threading::GetCurrentThread;
-use windows::Win32::System::Threading::GetPriorityClass;
 use windows::Win32::System::Threading::GetThreadPriority;
-use windows::Win32::System::Threading::SetPriorityClass;
 use windows::Win32::System::Threading::SetThreadPriority;
-use windows::Win32::System::Threading::HIGH_PRIORITY_CLASS;
-use windows::Win32::System::Threading::PROCESS_CREATION_FLAGS;
 use windows::Win32::System::Threading::THREAD_PRIORITY;
 use windows::Win32::System::Threading::THREAD_PRIORITY_HIGHEST;
 use windows::{
@@ -545,7 +540,6 @@ impl From<&StreamParams> for WaveFormat {
 }
 
 pub struct ThreadPriority {
-    previous_process_priority: Option<PROCESS_CREATION_FLAGS>,
     previous_thread_priority: Option<THREAD_PRIORITY>,
     taskhandle: HANDLE,
 }
@@ -555,19 +549,14 @@ unsafe impl Sync for ThreadPriority {}
 
 impl ThreadPriority {
     pub fn new(high_priority_mode: bool) -> Result<ThreadPriority> {
-        let mut previous_process_priority = None;
         let mut previous_thread_priority = None;
         if high_priority_mode {
-            previous_process_priority =
-                Some(unsafe { PROCESS_CREATION_FLAGS(GetPriorityClass(GetCurrentProcess())) });
             previous_thread_priority =
                 Some(unsafe { THREAD_PRIORITY(GetThreadPriority(GetCurrentThread())) });
             unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST)? };
-            unsafe { SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)? }
         }
         let taskhandle = unsafe { AvSetMmThreadCharacteristicsW(w!("Pro Audio"), &mut 0)? };
         Ok(ThreadPriority {
-            previous_process_priority,
             previous_thread_priority,
             taskhandle,
         })
@@ -575,9 +564,6 @@ impl ThreadPriority {
 
     fn revert_thread_priority(&mut self) -> Result<()> {
         unsafe {
-            if let Some(previous_process_priority) = self.previous_process_priority {
-                SetPriorityClass(GetCurrentProcess(), previous_process_priority)?;
-            }
             if let Some(previous_thread_priority) = self.previous_thread_priority {
                 SetThreadPriority(GetCurrentThread(), previous_thread_priority)?;
             }
