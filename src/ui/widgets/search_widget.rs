@@ -84,7 +84,7 @@ impl Component for SearchWidget {
         };
 
         let search_text = ratatui::text::Text::from(ratatui::text::Line::from(vec![
-            ratatui::text::Span::styled("", ctx.theme.accent),
+            ratatui::text::Span::styled("\u{f002}", ctx.theme.accent),
             ratatui::text::Span::raw(" "),
             ratatui::text::Span::styled(&self.input, ctx.theme.text),
         ]));
