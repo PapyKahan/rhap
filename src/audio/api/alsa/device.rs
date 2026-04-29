@@ -180,16 +180,33 @@ impl DeviceTrait for Device {
 /// Acquire a PCM device using the generic acquire helper. Each attempt fully
 /// reopens the PCM (close+open) so a previous EBUSY holder has time to
 /// release its handle.
+///
+/// Always performs a sacrificial open/close before the real one. Some USB
+/// DACs (Colorfly CDA M1P confirmed) emit continuous noise on the very
+/// first playback after a sample-rate change — the kernel renegotiates the
+/// USB altset and the device's clock isn't stable until a full close/reopen
+/// cycle has happened. The double-open emulates the manual stop+replay
+/// workaround so the second PCM (the one returned) plays cleanly. The 10 ms
+/// gap between close and reopen is a measured minimum that survives jitter;
+/// see docs/adr/0001-alsa-double-open-for-usb-dac-noise.md.
 fn acquire_pcm(
     device_name: &str,
     params: &StreamParams,
     buffer: &BufferConfig,
 ) -> Result<AlsaPcm> {
-    acquire_with_backoff("alsa: acquire", DEFAULT_ACQUIRE_BACKOFFS_MS, || {
-        match AlsaPcm::open_classified(device_name, params, buffer) {
-            Ok(pcm) => AcquireDecision::Ok(pcm),
-            Err(AlsaInitError::Busy) => AcquireDecision::BackoffRetry,
-            Err(AlsaInitError::Permanent(e)) => AcquireDecision::Fatal(e),
-        }
-    })
+    let open_one = |label: &'static str| -> Result<AlsaPcm> {
+        acquire_with_backoff(label, DEFAULT_ACQUIRE_BACKOFFS_MS, || {
+            match AlsaPcm::open_classified(device_name, params, buffer) {
+                Ok(pcm) => AcquireDecision::Ok(pcm),
+                Err(AlsaInitError::Busy) => AcquireDecision::BackoffRetry,
+                Err(AlsaInitError::Permanent(e)) => AcquireDecision::Fatal(e),
+            }
+        })
+    };
+
+    let sacrificial = open_one("alsa: acquire (prime)")?;
+    drop(sacrificial);
+    std::thread::sleep(Duration::from_millis(10));
+
+    open_one("alsa: acquire")
 }
