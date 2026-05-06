@@ -42,6 +42,11 @@ struct CallbackState {
 pub struct PwStreamHandle {
     thread: Option<std::thread::JoinHandle<()>>,
     sender: pw::channel::Sender<StreamCommand>,
+    /// True when we forced the daemon's clock.force-rate at startup; we must
+    /// reset it to 0 on stop so PipeWire is left in its normal auto-rate mode
+    /// for other apps. Only set when exclusive (bit-perfect) playback was
+    /// requested.
+    force_rate_active: bool,
 }
 
 impl PwStreamHandle {
@@ -57,7 +62,44 @@ impl PwStreamHandle {
                 Err(_) => error!("PipeWire audio thread panicked"),
             }
         }
+        if self.force_rate_active {
+            reset_clock_force_rate();
+            self.force_rate_active = false;
+        }
     }
+}
+
+/// Force the PipeWire daemon's graph clock to a specific rate, so the entire
+/// graph (and the target sink behind it) runs at the track's native rate.
+/// This is the same mechanism QBZ uses for bit-perfect playback. Returns
+/// true if the metadata was set successfully.
+fn set_clock_force_rate(rate: u32) -> bool {
+    match std::process::Command::new("pw-metadata")
+        .args(["-n", "settings", "0", "clock.force-rate", &rate.to_string()])
+        .output()
+    {
+        Ok(o) if o.status.success() => true,
+        Ok(o) => {
+            error!(
+                "pw-metadata clock.force-rate={} failed: {}",
+                rate,
+                String::from_utf8_lossy(&o.stderr)
+            );
+            false
+        }
+        Err(e) => {
+            error!("pw-metadata not runnable (is it installed?): {}", e);
+            false
+        }
+    }
+}
+
+/// Restore PipeWire's graph clock to auto-negotiation. Called on stream stop
+/// to leave the daemon in a normal state for other applications.
+fn reset_clock_force_rate() {
+    let _ = std::process::Command::new("pw-metadata")
+        .args(["-n", "settings", "0", "clock.force-rate", "0"])
+        .output();
 }
 
 pub fn start_stream(
@@ -74,6 +116,20 @@ pub fn start_stream(
     let channels = params.channels as u32;
     let bytes_per_frame = (params.bits_per_sample.0 / 8) as usize * channels as usize;
     let exclusive = params.exclusive;
+
+    // Bit-perfect path: force PipeWire's graph clock to the track's rate
+    // BEFORE creating the stream, then give the daemon a moment to switch
+    // before we connect. This is the mechanism QBZ uses; it's the only
+    // approach that has worked reliably across PipeWire/WirePlumber versions.
+    let force_rate_active = if exclusive {
+        let ok = set_clock_force_rate(sample_rate);
+        if ok {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+        ok
+    } else {
+        false
+    };
 
     let (cmd_sender, cmd_receiver) = pw::channel::channel::<StreamCommand>();
 
@@ -99,6 +155,7 @@ pub fn start_stream(
     Ok(PwStreamHandle {
         thread: Some(thread),
         sender: cmd_sender,
+        force_rate_active,
     })
 }
 
@@ -161,6 +218,13 @@ fn run_pipewire_loop(
         done: false,
     }));
 
+    // Bit-perfect playback is achieved by forcing the graph clock at the
+    // daemon level (see set_clock_force_rate in start_stream). Stream-level
+    // props like node.passthrough / node.exclusive / node.force-rate look
+    // appealing but reliably trigger "no target node available" because
+    // WirePlumber's policy refuses or because passthrough requires sink
+    // support for compressed audio. We only set node.rate as a hint here,
+    // which is harmless if the daemon already forced the rate.
     let mut props = properties! {
         *pw::keys::MEDIA_TYPE => "Audio",
         *pw::keys::MEDIA_ROLE => "Music",
@@ -168,22 +232,8 @@ fn run_pipewire_loop(
         *pw::keys::NODE_NAME => "rhap",
         *pw::keys::APP_NAME => "rhap",
     };
-    if exclusive {
-        // Passthrough bypasses format conversion and per-stream volume.
-        // Only enabled in exclusive mode since some sinks (Bluetooth)
-        // may reject passthrough connections.
-        props.insert("node.passthrough", "true");
-    }
-    // Request PipeWire to switch the graph clock to the stream's native rate.
-    // Without this, PipeWire keeps its default rate (usually 48000) and resamples.
     props.insert("node.rate", format!("1/{}", sample_rate));
-    props.insert("node.force-rate", format!("1/{}", sample_rate));
-
-    if exclusive {
-        // Ask WirePlumber to cork all other streams on this sink,
-        // preventing mixing and ensuring dedicated graph processing.
-        props.insert("node.exclusive", "true");
-    }
+    let _ = exclusive;
 
     let stream = StreamBox::new(&core, "rhap", props).context("pw: stream_new")?;
 
